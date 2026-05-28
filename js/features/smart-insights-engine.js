@@ -1,6 +1,6 @@
-/* InsightEngine: centralized Smart Insights display models. */
+/* InsightEngine: centralized Smart Insights display models. Phase 6: adaptive signal layer. */
 (function(){
-  if (window.InsightEngine && window.InsightEngine.__phase5Engine) return;
+  if (window.InsightEngine && window.InsightEngine.__phase6Engine) return;
 
   function call(fn, fallback){
     try { return (typeof fn === 'function') ? fn() : fallback; } catch(e) { return fallback; }
@@ -329,7 +329,133 @@
     };
     return subscriptionBurden;
   }
-  function primaryAction(month, guidance, subs, burnPct){
+  /* ----------------------------------------------------------------------
+   * Adaptive signal layer (Phase 6)
+   * Harvests richer, history-aware signals from models app.js already
+   * computes, so the briefing / action / forecast copy can grow more
+   * specific and confident as more months of data accumulate.
+   * Everything here is defensive: any missing source degrades to silence,
+   * never an error.
+   * -------------------------------------------------------------------- */
+
+  function cap(s){ return text(s, '').replace(/^./, function(c){ return c.toUpperCase(); }); }
+  function signed(value){ var n = num(value); return (n > 0 ? '+' : '') + money(Math.abs(n) === n ? n : n); }
+  function signedMoney(value){ var n = num(value); return (n >= 0 ? '+' : '−') + money(Math.abs(n)); }
+  function plural(n, one, many){ return num(n) === 1 ? one : (many || one + 's'); }
+
+  // How many usable prior months exist for this month — the basis of the
+  // "learns over time" confidence gradient.
+  function historyDepth(month){
+    return call(function(){
+      if (!month || !state || !Array.isArray(state.months)) return 0;
+      var idx = state.months.findIndex(function(m){ return m && m.name === month.name; });
+      return idx < 0 ? 0 : idx; // number of months before this one
+    }, 0);
+  }
+  // Maps depth -> qualitative confidence tier used to soften/strengthen copy.
+  function confidenceTier(depth){
+    if (depth <= 0) return { key: 'none',     adj: 'early',      hedge: 'so far',                 weight: 0.4 };
+    if (depth === 1) return { key: 'thin',     adj: 'emerging',   hedge: 'on limited history',     weight: 0.6 };
+    if (depth <= 3) return { key: 'building',  adj: 'building',   hedge: 'against recent months',  weight: 0.85 };
+    return            { key: 'rich',     adj: 'established', hedge: 'against your usual pattern', weight: 1 };
+  }
+
+  // Pull the strongest category trend signals (rising / improving / risk).
+  function trendSignals(month){
+    return call(function(){
+      var data = categoryTrendRows(month) || { rows: [] };
+      var rows = Array.isArray(data.rows) ? data.rows : [];
+      var scored = rows.slice().sort(function(a, b){ return num(b.score) - num(a.score); });
+      var topRisk = scored.find(function(r){ return r.status === 'risk' || r.status === 'watch'; }) || null;
+      var topRising = rows.filter(function(r){ return num(r.pctChange) > 12 && num(r.curr) > 0 && num(r.prev) > 0; })
+                          .sort(function(a, b){ return num(b.pctChange) - num(a.pctChange); })[0] || null;
+      var topImproving = rows.filter(function(r){ return r.status === 'improving' || (num(r.pctChange) < -12 && num(r.prev) > 0); })
+                            .sort(function(a, b){ return num(a.pctChange) - num(b.pctChange); })[0] || null;
+      var hasComparable = rows.some(function(r){ return num(r.prev) > 0; });
+      return { rows: rows, topRisk: topRisk, topRising: topRising, topImproving: topImproving, hasComparable: hasComparable };
+    }, { rows: [], topRisk: null, topRising: null, topImproving: null, hasComparable: false });
+  }
+
+  // Direction of travel vs the previous month (improving / worsening / stable).
+  function driftSignal(month){
+    return call(function(){
+      var d = forecastDriftDirection(month) || {};
+      var cls = text(d.cls, 'stable');
+      return {
+        cls: cls,
+        improving: cls === 'improving',
+        worsening: cls === 'worsening',
+        stable: cls === 'stable',
+        title: text(d.title, '')
+      };
+    }, { cls: 'stable', improving: false, worsening: false, stable: true, title: '' });
+  }
+
+  // Streak of consecutive recent months that finished within / over plan.
+  // Gives the "you've stayed on track N months running" style feedback.
+  function planStreak(month){
+    return call(function(){
+      if (!month || !state || !Array.isArray(state.months)) return { kind: 'none', length: 0 };
+      var idx = state.months.findIndex(function(m){ return m && m.name === month.name; });
+      if (idx < 1) return { kind: 'none', length: 0 };
+      var underRun = 0, overRun = 0, broke = false, started = null;
+      for (var i = idx - 1; i >= 0 && !broke; i--) {
+        var m = state.months[i];
+        var alloc = call(function(){ return allocationRows(m); }, null);
+        if (!alloc || !Array.isArray(alloc.rows)) break;
+        var funds = num(alloc.availableFunds) || 0;
+        var spent = alloc.rows.reduce(function(s, r){ return s + Math.max(0, num(r.actual)); }, 0);
+        if (funds <= 0) break;
+        var usedPct = (spent / funds) * 100;
+        var under = usedPct <= 100;
+        if (started === null) started = under;
+        if (under === started) { if (under) underRun++; else overRun++; }
+        else broke = true;
+      }
+      if (underRun > 0) return { kind: 'under', length: underRun };
+      if (overRun > 0) return { kind: 'over', length: overRun };
+      return { kind: 'none', length: 0 };
+    }, { kind: 'none', length: 0 });
+  }
+
+  // Best behavior-intelligence line (growth / overspend / subscription share).
+  function behaviorSignal(month, metrics){
+    return call(function(){
+      var rows = (metrics && Array.isArray(metrics.behaviorIntelligence)) ? metrics.behaviorIntelligence : getBehaviorIntelligence(month);
+      var warn = rows.find(function(r){ return text(r.tone) === 'warn'; });
+      var lead = warn || rows[0] || null;
+      return lead ? { text: text(lead.text, ''), tone: text(lead.tone, 'neutral'), type: text(lead.type, '') } : null;
+    }, null);
+  }
+
+  // Forecast confidence note from the context layer app.js already builds.
+  function forecastConfidence(month, model){
+    return call(function(){
+      var ctx = forecastContextLayer(month, model || getModel(month) || {}, []);
+      return ctx ? { pct: num(ctx.baseConfidence || ctx.confidencePct), note: text(ctx.confidenceNote, '') } : null;
+    }, null);
+  }
+
+  // Single bundle consumed by briefing + action + metrics.signals.
+  function harvestSignals(month, metrics){
+    var depth = historyDepth(month);
+    return {
+      depth: depth,
+      tier: confidenceTier(depth),
+      trends: trendSignals(month),
+      drift: driftSignal(month),
+      streak: planStreak(month),
+      behavior: behaviorSignal(month, metrics),
+      confidence: forecastConfidence(month, metrics && metrics.model)
+    };
+  }
+
+  function primaryAction(month, guidance, subs, burnPct, signals){
+    signals = signals || {};
+    var trends = signals.trends || {};
+    var drift = signals.drift || {};
+    var streak = signals.streak || {};
+
     var first = guidance && typeof guidance === 'object' ? guidance : null;
     if (first) {
       return {
@@ -342,49 +468,181 @@
       var count = num(subs.dueCount);
       return { title: 'Subscriptions due', sub: count + ' recurring payment' + (count === 1 ? '' : 's') + ' still due', tone: 'warn' };
     }
+    // A clear single overspending driver beats a generic "budget pressure".
+    if (burnPct > 100 && trends.topRisk && num(trends.topRisk.projectedDelta) > 0) {
+      return {
+        title: 'Trim ' + cap(trends.topRisk.key),
+        sub: cap(trends.topRisk.key) + ' is projected ' + signedMoney(trends.topRisk.projectedDelta) + ' over target and is the main pace driver.',
+        tone: 'bad'
+      };
+    }
     if (burnPct > 100) return { title: 'Budget pressure', sub: 'Projected spending is above plan.', tone: 'bad' };
+    // Rising category worth catching early, even when not yet over budget.
+    if (trends.topRising && num(trends.topRising.pctChange) >= 25) {
+      return {
+        title: 'Watch ' + cap(trends.topRising.key),
+        sub: cap(trends.topRising.key) + ' is up ' + Math.round(num(trends.topRising.pctChange)) + '% vs last month — worth a glance before it sets a pattern.',
+        tone: 'warn'
+      };
+    }
+    // Positive reinforcement when a genuine on-track streak exists.
+    if (streak.kind === 'under' && streak.length >= 2) {
+      return {
+        title: 'Keep the streak',
+        sub: streak.length + ' ' + plural(streak.length, 'month') + ' running inside plan — current pace keeps it going.',
+        tone: 'good'
+      };
+    }
+    if (drift.improving) {
+      return { title: 'Trending better', sub: 'You are holding more of your funds than at this point last month.', tone: 'good' };
+    }
     return { title: 'Monitor pace', sub: 'No urgent action detected.', tone: 'good' };
   }
-  function buildBriefing(month, metrics){
-    var subs = metrics.subscriptions;
-    var projection = metrics.forecast.projectedAvailableEnd;
-    var burnPct = metrics.budget.forecastEndPct;
-    var behavior = metrics.behaviorInsights || [];
-    var leadBehavior = behavior[0] || null;
-    var items = [
-      {
-        key: 'forecast',
-        title: projection >= 0 ? 'Positive outlook' : 'Watch cash pressure',
-        sub: 'End-of-month projection: ' + money(projection),
-        tone: projection >= 0 ? 'good' : 'bad'
-      },
-      {
-        key: 'pace',
-        title: burnPct > 100 ? 'Over planned pace' : 'Within planned pace',
-        sub: 'Forecast budget use is currently ' + percent(burnPct) + '.',
-        tone: burnPct > 100 ? 'bad' : (burnPct >= 90 ? 'warn' : 'good')
-      },
-      {
-        key: 'subscriptions',
-        title: num(subs.unpaidTotal) > 0 ? money(subs.unpaidTotal) + ' still due' : 'Recurring load absorbed',
-        sub: num(subs.paidCount) + ' paid · ' + num(subs.dueCount) + ' due',
-        tone: num(subs.unpaidTotal) > 0 ? 'warn' : 'good'
-      }
-    ];
-    if (leadBehavior && leadBehavior.message) {
-      items.push({
-        key: 'behavior',
-        title: text(leadBehavior.tone, 'Signal').replace(/^./, function(c){ return c.toUpperCase(); }) + ' behavior signal',
-        sub: text(leadBehavior.message, '').slice(0, 160),
-        tone: text(leadBehavior.tone, 'warn')
-      });
+  // ---- Slot builders --------------------------------------------------
+  // The workspace binds briefing[0]=forecast, [1]=pace, [2]=subscriptions
+  // by position, so each slot keeps its theme but its copy now adapts to
+  // drift, streaks, trends and history depth.
+
+  function forecastSlot(metrics, signals){
+    var projection = num(metrics.forecast.projectedAvailableEnd);
+    var positive = projection >= 0;
+    var drift = signals.drift || {};
+    var conf = signals.confidence || null;
+    var tier = signals.tier || {};
+
+    var title = positive ? 'Positive outlook' : 'Watch cash pressure';
+    if (positive && drift.improving) title = 'Outlook strengthening';
+    else if (positive && drift.worsening) title = 'Positive, but easing';
+    else if (!positive && drift.improving) title = 'Pressure easing';
+    else if (!positive && drift.worsening) title = 'Pressure building';
+
+    var sub = (positive ? 'Projected ' : 'Projected shortfall of ') + money(Math.abs(projection)) + ' at month end';
+    if (drift.improving) sub += ' — better than this point last month';
+    else if (drift.worsening) sub += ' — tighter than this point last month';
+    // Confidence framing scales with how much history backs the projection.
+    if (conf && conf.note) sub += '. ' + conf.note;
+    else if (tier.key === 'none') sub += '. Read as an early estimate ' + tier.hedge + '.';
+    else if (tier.key === 'thin') sub += '. Still ' + tier.adj + ' — ' + tier.hedge + '.';
+
+    return { key: 'forecast', title: title, sub: sub, tone: positive ? (drift.worsening ? 'warn' : 'good') : 'bad' };
+  }
+
+  function paceSlot(metrics, signals){
+    var burnPct = num(metrics.budget.forecastEndPct);
+    var over = burnPct > 100;
+    var near = burnPct >= 90 && burnPct <= 100;
+    var streak = signals.streak || {};
+    var trends = signals.trends || {};
+
+    var title = over ? 'Over planned pace' : (near ? 'Near planned pace' : 'Within planned pace');
+    if (!over && streak.kind === 'under' && streak.length >= 2) title = 'On track ' + streak.length + ' months running';
+    else if (over && streak.kind === 'over' && streak.length >= 2) title = 'Over plan ' + streak.length + ' months running';
+
+    var sub = 'Forecast budget use is currently ' + percent(burnPct) + '.';
+    if (over && trends.topRisk) {
+      sub += ' ' + cap(trends.topRisk.key) + ' is the heaviest driver (' + signedMoney(trends.topRisk.projectedDelta) + ' vs target).';
+    } else if (!over && trends.topImproving) {
+      sub += ' ' + cap(trends.topImproving.key) + ' is easing vs last month, which is helping.';
+    } else if (streak.kind === 'under' && streak.length >= 2) {
+      sub += ' That extends a ' + streak.length + '-month run inside plan.';
     }
+    return { key: 'pace', title: title, sub: sub, tone: over ? 'bad' : (near ? 'warn' : 'good') };
+  }
+
+  function subscriptionsSlot(metrics){
+    var subs = metrics.subscriptions || {};
+    var unpaid = num(subs.unpaidTotal);
+    var due = num(subs.dueCount);
+    var paid = num(subs.paidCount);
+    var active = num(subs.activeCount);
+    var raw = subs.raw || {};
+    var sharePct = num(raw.unpaidShareOfAvailablePct || raw.plannedShareOfAvailablePct);
+
+    var title = unpaid > 0 ? money(unpaid) + ' still due' : (active > 0 ? 'Recurring load absorbed' : 'No recurring load');
+    var sub;
+    if (unpaid > 0) {
+      sub = paid + ' paid · ' + due + ' due';
+      if (sharePct > 0) sub += ' · ' + percent(sharePct) + ' of available funds';
+    } else if (active > 0) {
+      sub = active + ' active ' + plural(active, 'subscription') + ' fully covered this month';
+    } else {
+      sub = 'Add subscriptions to track recurring pressure over time.';
+    }
+    return { key: 'subscriptions', title: title, sub: sub, tone: unpaid > 0 ? 'warn' : 'good' };
+  }
+
+  // Prioritised 4th slot: surface the single most useful "learned" signal.
+  function spotlightSlot(month, metrics, signals){
+    var trends = signals.trends || {};
+    var behavior = signals.behavior || null;
+    var streak = signals.streak || {};
+    var depth = num(signals.depth);
+
+    // 1. A material rising category (early-warning, the most actionable).
+    if (trends.topRising && num(trends.topRising.pctChange) >= 20) {
+      return {
+        key: 'spotlight',
+        title: cap(trends.topRising.key) + ' climbing',
+        sub: 'Up ' + Math.round(num(trends.topRising.pctChange)) + '% vs last month (' + money(trends.topRising.prev) + ' → ' + money(trends.topRising.curr) + ').',
+        tone: num(trends.topRising.pctChange) >= 40 ? 'warn' : 'neutral'
+      };
+    }
+    // 2. A behaviour-intelligence learning.
+    if (behavior && behavior.text) {
+      return {
+        key: 'spotlight',
+        title: cap(behavior.type || 'Pattern') + ' signal',
+        sub: behavior.text.slice(0, 160),
+        tone: behavior.tone === 'warn' ? 'warn' : 'neutral'
+      };
+    }
+    // 3. An improving category — positive reinforcement.
+    if (trends.topImproving && num(trends.topImproving.curr) > 0) {
+      return {
+        key: 'spotlight',
+        title: cap(trends.topImproving.key) + ' easing',
+        sub: 'Down to ' + money(trends.topImproving.curr) + ' this month — the lighter pace is helping the overall picture.',
+        tone: 'good'
+      };
+    }
+    // 4. A streak callout.
+    if (streak.kind === 'under' && streak.length >= 3) {
+      return {
+        key: 'spotlight',
+        title: streak.length + '-month healthy run',
+        sub: 'You have stayed inside plan ' + streak.length + ' months in a row — a genuine, durable pattern now.',
+        tone: 'good'
+      };
+    }
+    // 5. Cold-start nudge while history is still thin.
+    if (depth <= 1) {
+      return {
+        key: 'spotlight',
+        title: 'Learning your pattern',
+        sub: depth === 0
+          ? 'This is your first tracked month — insights sharpen sharply once a second month lands.'
+          : 'One month of history so far. Trends and comparisons get far richer from next month on.',
+        tone: 'neutral'
+      };
+    }
+    return null;
+  }
+
+  function buildBriefing(month, metrics){
+    var signals = metrics.signals || harvestSignals(month, metrics);
+    var items = [
+      forecastSlot(metrics, signals),
+      paceSlot(metrics, signals),
+      subscriptionsSlot(metrics)
+    ];
+    var spotlight = spotlightSlot(month, metrics, signals);
+    if (spotlight) items.push(spotlight);
     return items.slice(0, 4);
   }
   function analyze(month){
     month = month || (typeof getActiveMonth === 'function' ? getActiveMonth() : null);
     if (!month) {
-      return { month: null, monthName: 'Current month', model: null, forecast: {}, budget: {}, subscriptions: {}, guidance: [], behaviorInsights: [], trends: { rows: [], monthLabels: [] }, action: primaryAction(null, [], {}, 0), briefing: [] };
+      return { month: null, monthName: 'Current month', model: null, forecast: {}, budget: {}, subscriptions: {}, guidance: [], behaviorInsights: [], trends: { rows: [], monthLabels: [] }, signals: { depth: 0, tier: confidenceTier(0), trends: {}, drift: {}, streak: {}, behavior: null, confidence: null }, action: primaryAction(null, [], {}, 0, {}), briefing: [] };
     }
     var model = getModel(month) || {};
     var forecast = model.forecast || {};
@@ -459,14 +717,17 @@
         burnCard: burnCard
       }
     };
-    metrics.action = primaryAction(month, guidance, metrics.subscriptions, burnPct);
+    metrics.signals = harvestSignals(month, metrics);
+    metrics.action = primaryAction(month, guidance, metrics.subscriptions, burnPct, metrics.signals);
     metrics.briefing = buildBriefing(month, metrics);
     return metrics;
   }
 
   window.InsightEngine = {
     __phase5Engine: true,
+    __phase6Engine: true,
     analyze: analyze,
+    harvestSignals: harvestSignals,
     money: money,
     percent: percent
   };

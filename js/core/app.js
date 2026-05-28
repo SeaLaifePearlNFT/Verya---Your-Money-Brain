@@ -6710,6 +6710,22 @@
     }
 
 
+    const ALLOC_CARD_ORDER_KEY = 'budgetDashboard_allocCardOrderV1';
+    function loadAllocCardOrder() {
+      try {
+        const raw = localStorage.getItem(ALLOC_CARD_ORDER_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        return Array.isArray(parsed) ? parsed.map(String) : null;
+      } catch (e) { return null; }
+    }
+    function saveAllocCardOrder(keys) {
+      try {
+        if (Array.isArray(keys) && keys.length) {
+          localStorage.setItem(ALLOC_CARD_ORDER_KEY, JSON.stringify(keys.map(String)));
+        }
+      } catch (e) {}
+    }
+
     function burnRate(month) {
       const base = monthBudgetBase(month);
       const head = base.head;
@@ -6921,7 +6937,7 @@ function renderExpensesTable(rows) {
             <div class="phase4-expense-board-head">
               <div>
                 <h3 class="phase4-expense-board-title">Expense Categories</h3>
-                <div class="phase4-expense-board-sub">Open a category to add expenses, review entries, and manage its underlying rows.</div>
+                <div class="phase4-expense-board-sub">Scan what has been spent, compare it with the assigned budget, and open a category to add or review expenses.</div>
               </div>
               <div class="phase4-expense-board-actions">
                 <button class="feature-action-btn is-primary" id="expenseCsvImportBtn" type="button" title="Upload or review bank CSV imports">🏦 Import Bank CSV</button>
@@ -6930,7 +6946,7 @@ function renderExpensesTable(rows) {
                 <button class="feature-action-btn" id="specialFundingConfigBtn" type="button">Configure Work Benefits</button>
               </div>
             </div>
-            <div class="phase4-expense-grid">
+            <div class="phase4-expense-grid phase4-expense-category-list">
               ${grouped.map(([group, groupRows]) => renderExpenseGroupTile(group, groupRows)).join("")}
             </div>
           </section>
@@ -10902,11 +10918,11 @@ function renderExpenseGroupTile(group, groupRows) {
       const activeMonth = getActiveMonth();
       const totalActual = expenseTabCategoryTotalForGroup(activeMonth, group, groupRows);
       const totalPlanned = allocationAmountForExpenseGroup(activeMonth, group);
-      const totalEntries = expenseTabCategoryEntryCountForGroup(activeMonth, group, groupRows);
       const spent = Math.abs(totalActual);
-      const pct = totalPlanned > 0 ? Math.min((spent / Math.max(totalPlanned, 1)) * 100, 100) : Math.min(totalEntries * 10, 100);
+      const pct = totalPlanned > 0 ? Math.min((spent / Math.max(totalPlanned, 1)) * 100, 100) : 0;
       const rawPct = totalPlanned > 0 ? Math.round((spent / Math.max(totalPlanned, 1)) * 100) : 0;
       const overAmount = totalPlanned > 0 ? Math.max(spent - totalPlanned, 0) : 0;
+      const remainingAmount = totalPlanned > 0 ? Math.max(totalPlanned - spent, 0) : 0;
       const categoryColor = expenseCategoryPickerColor(group, state);
       const categoryTileVars = [
         '--ui3d-top-a:' + hexToRgba(categoryColor, 0.56),
@@ -10921,40 +10937,45 @@ function renderExpenseGroupTile(group, groupRows) {
         '--expense-cat-cta:' + categoryColor
       ].join(';');
       const toneClass = overAmount > 0.0049 ? 'is-alert' : spent > 0 ? 'is-live' : '';
-      const remainingCopy = overAmount > 0.0049
-        ? `${currency(overAmount)} over budget`
-        : totalPlanned > 0
-          ? `${currency(Math.max(totalPlanned - spent, 0))} remaining`
-          : 'No category budget set';
+      const progressCopy = totalPlanned > 0
+        ? `${rawPct}% of budget used`
+        : 'Set a budget to activate progress tracking';
+      const balanceLabel = overAmount > 0.0049 ? 'Over budget' : 'Remaining';
+      const balanceValue = overAmount > 0.0049 ? currency(overAmount) : (totalPlanned > 0 ? currency(remainingAmount) : '—');
       return `
-        <button type="button" class="phase4-expense-tile ${toneClass}" data-open-expense-group="${escapeHtml(group)}" style="${escapeHtml(categoryTileVars)}">
+        <button type="button" class="phase4-expense-tile phase4-expense-row-tile ${toneClass}" data-open-expense-group="${escapeHtml(group)}" style="${escapeHtml(categoryTileVars)}">
           <div class="phase4-expense-tile-head">
             <div class="phase4-expense-title-wrap">
               ${renderCategoryTileIconShell('expense', group)}
               <div class="phase4-expense-title-copy">
-                <div class="phase4-expense-kicker">Category</div>
+                <div class="phase4-expense-kicker">Expense category</div>
                 <div class="phase4-expense-name">${escapeHtml(group)}</div>
               </div>
             </div>
-            <div class="phase4-expense-count">${totalEntries} ${totalEntries === 1 ? 'entry' : 'entries'}</div>
+            <span class="phase4-expense-status ${overAmount > 0.0049 ? 'is-over' : spent > 0 ? 'is-active' : ''}">${overAmount > 0.0049 ? 'Over plan' : spent > 0 ? 'Tracking' : 'Ready'}</span>
           </div>
 
-          <div class="phase4-expense-main ${spent > 0 ? 'is-live' : ''}">${currency(totalActual)}</div>
-
-          <div class="phase4-expense-meta">
-            <div class="phase4-expense-stat">
-              <span class="phase4-expense-stat-label">Budget</span>
-              <span class="phase4-expense-stat-value">${totalPlanned > 0 ? currency(totalPlanned) : '—'}</span>
+          <div class="phase4-expense-row-main">
+            <div class="phase4-expense-total-block">
+              <span class="phase4-expense-total-label">Spent this month</span>
+              <strong class="phase4-expense-main ${spent > 0 ? 'is-live' : ''}">${currency(spent)}</strong>
             </div>
-            <div class="phase4-expense-stat">
-              <span class="phase4-expense-stat-label">Used</span>
-              <span class="phase4-expense-stat-value">${totalPlanned > 0 ? `${rawPct}%` : '—'}</span>
+            <div class="phase4-expense-meta phase4-expense-meta-clean">
+              <div class="phase4-expense-stat">
+                <span class="phase4-expense-stat-label">Budget</span>
+                <span class="phase4-expense-stat-value">${totalPlanned > 0 ? currency(totalPlanned) : 'Not set'}</span>
+              </div>
+              <div class="phase4-expense-stat ${overAmount > 0.0049 ? 'is-over' : ''}">
+                <span class="phase4-expense-stat-label">${balanceLabel}</span>
+                <span class="phase4-expense-stat-value">${balanceValue}</span>
+              </div>
             </div>
           </div>
 
           <div class="phase4-expense-progress">
             <div class="phase4-expense-progress-row">
-              <span>${remainingCopy}</span>
+              <span>${progressCopy}</span>
+              <span>${totalPlanned > 0 ? `${currency(spent)} / ${currency(totalPlanned)}` : 'No target'}</span>
             </div>
             <div class="phase4-expense-progress-track">
               <span class="phase4-expense-progress-fill ${overAmount > 0.0049 ? "is-over" : ""}" style="width:${pct}%"></span>
@@ -10962,7 +10983,7 @@ function renderExpenseGroupTile(group, groupRows) {
           </div>
 
           <div class="phase4-expense-footer">
-            <span class="phase4-expense-cta">Open category</span>
+            <span class="phase4-expense-cta">Add / review expenses</span>
           </div>
         </button>`;
     }
@@ -11236,6 +11257,28 @@ function cashflowKindMeta(kind) {
         </div>`;
     }
 
+    function cashflowProgressToneClass(percent, hasTarget) {
+      if (!hasTarget) return 'is-neutral';
+      const pct = Number(percent || 0);
+      if (pct >= 80) return 'is-good';
+      if (pct >= 50) return 'is-watch';
+      return 'is-low';
+    }
+
+    function cashflowActionLabel(kind, group) {
+      if (kind === 'income') return 'Add Amount';
+      const clean = cleanGroupName(group).toLowerCase();
+      if (clean.indexOf('invest') !== -1) return 'Add Investment';
+      return 'Add Saving';
+    }
+
+    function cashflowActualVerb(kind, group) {
+      if (kind === 'income') return 'received';
+      const clean = cleanGroupName(group).toLowerCase();
+      if (clean.indexOf('invest') !== -1) return 'invested';
+      return 'saved';
+    }
+
     function renderCashflowBoard(rows, kind) {
       const groups = orderedCashflowGroups(rows || [], kind);
       if (!groups.length) {
@@ -11243,63 +11286,79 @@ function cashflowKindMeta(kind) {
       }
       const month = getActiveMonth();
       const meta = cashflowKindMeta(kind);
-      return `<div class="phase4-cashflow-board phase4-${kind}-board">
+      const targetHeading = kind === 'income' ? 'Expected' : 'Assigned Budget';
+      const actualHeading = kind === 'income' ? 'Received' : 'Saved / Invested';
+      const addCategoryLabel = kind === 'income' ? 'Add new income category' : 'Add new savings category';
+      const boardLabel = kind === 'income' ? 'Income categories' : 'Savings and investment categories';
+
+      return `<div class="phase4-cashflow-board phase4-${kind}-board phase4-cashflow-table" role="table" aria-label="${escapeHtml(boardLabel)}">
+        <div class="phase4-cashflow-table-head" role="row">
+          <div role="columnheader">Category</div>
+          <div role="columnheader">${actualHeading}</div>
+          <div role="columnheader">${targetHeading}</div>
+          <div role="columnheader">Progress</div>
+          <div role="columnheader">Actions</div>
+        </div>
+        <div class="phase4-cashflow-table-body">
         ${groups.map(function(entry) {
           const group = entry[0];
           const groupRows = entry[1];
           const stats = cashflowGroupStats(groupRows, kind);
           const assignedAmount = kind === 'savings' ? savingsAssignedAmountForGroup(month, group, false) : stats.planned;
-          const progressPct = assignedAmount > 0
+          const hasTarget = assignedAmount > 0;
+          const progressPct = hasTarget
             ? Math.max(0, Math.min((Math.abs(stats.actual) / Math.max(assignedAmount, 1)) * 100, 100))
             : 0;
-          const remainder = assignedAmount > 0 ? assignedAmount - Math.abs(stats.actual) : 0;
+          const remainder = hasTarget ? assignedAmount - Math.abs(stats.actual) : 0;
           const categoryColor = expenseCategoryPickerColor(group, state);
           const categoryVars = [
             '--money-accent:' + categoryColor,
             '--money-soft:' + hexToRgba(categoryColor, 0.10)
           ].join(';');
+          const toneClass = cashflowProgressToneClass(progressPct, hasTarget);
+          const actualVerb = cashflowActualVerb(kind, group);
+          const actionLabel = cashflowActionLabel(kind, group);
+          const targetSub = hasTarget ? (kind === 'income' ? 'target' : 'assigned') : 'not set';
+          const progressSub = hasTarget
+            ? (kind === 'income' ? 'of expected' : 'funded')
+            : (kind === 'income' ? 'Set an expected amount' : 'Assign a savings budget');
+          const remainingLabel = hasTarget
+            ? (remainder >= 0
+              ? currency(remainder) + (kind === 'income' ? ' still expected' : ' left to fund')
+              : currency(Math.abs(remainder)) + (kind === 'income' ? ' above expected' : ' above budget'))
+            : (kind === 'income' ? 'No expected amount set' : 'No assigned budget set');
           return `
-            <button type="button" class="phase4-money-tile phase4-${kind}-tile" data-open-cashflow-group="${escapeHtml(group)}" data-cashflow-kind="${kind}" style="${escapeHtml(categoryVars)}">
-              <div class="phase4-money-tile-head">
-                <div class="phase4-money-title-wrap">
+            <div class="phase4-cashflow-row ${toneClass}" role="row" tabindex="0" data-open-cashflow-group="${escapeHtml(group)}" data-cashflow-kind="${kind}" style="${escapeHtml(categoryVars)}" aria-label="Open ${escapeHtml(group)} details">
+              <div class="phase4-cashflow-cell phase4-cashflow-cell-category" role="cell">
+                <div class="phase4-cashflow-category-wrap">
                   ${renderCategoryTileIconShell(kind, group)}
-                  <div>
-                    <div class="phase4-money-kicker">${meta.kicker}</div>
-                    <div class="phase4-money-name">${escapeHtml(group)}</div>
+                  <div class="phase4-cashflow-category-copy">
+                    <div class="phase4-cashflow-name">${escapeHtml(group)}</div>
+                    <div class="phase4-cashflow-row-sub">${stats.rowCount} ${stats.rowCount === 1 ? 'item' : 'items'} configured</div>
                   </div>
                 </div>
-                <span class="phase4-money-type">${stats.rowCount} ${stats.rowCount === 1 ? 'item' : 'items'}</span>
               </div>
-
-              <div class="phase4-money-main ${kind === 'income' ? 'is-positive' : ''}">${currency(stats.actual)}</div>
-
-              <div class="phase4-money-meta">
-                <div class="phase4-money-stat">
-                  <span class="phase4-money-stat-label">${meta.expectedLabel}</span>
-                  <span class="phase4-money-stat-value">${assignedAmount > 0 ? currency(assignedAmount) : '—'}</span>
-                </div>
-                <div class="phase4-money-stat">
-                  <span class="phase4-money-stat-label">Entries</span>
-                  <span class="phase4-money-stat-value">${stats.entryCount}</span>
-                </div>
+              <div class="phase4-cashflow-cell phase4-cashflow-cell-actual" role="cell">
+                <div class="phase4-cashflow-amount is-actual">${currency(Math.abs(stats.actual))}</div>
+                <div class="phase4-cashflow-row-sub">${actualVerb}</div>
               </div>
-
-              ${kind === 'savings' ? `
-                <div class="phase4-money-progress">
-                  <div class="phase4-money-progress-row">
-                    <span>${assignedAmount > 0 ? Math.round(progressPct) + '% of assigned' : 'No assigned budget'}</span>
-                  </div>
-                  <div class="phase4-money-progress-track">
-                    <span class="phase4-money-progress-fill" style="width:${progressPct.toFixed(1)}%"></span>
-                  </div>
-                </div>` : ''}
-
-              <div class="phase4-money-footer">
-                <span>${assignedAmount > 0 ? (remainder >= 0 ? currency(remainder) + ' remaining' : currency(Math.abs(remainder)) + ' above assigned') : 'No assigned budget set'}</span>
-                <span class="phase4-money-cta">${kind === 'income' ? 'Add Amount' : 'Add Amount'}</span>
+              <div class="phase4-cashflow-cell phase4-cashflow-cell-target" role="cell">
+                <div class="phase4-cashflow-amount">${hasTarget ? currency(assignedAmount) : '—'}</div>
+                <div class="phase4-cashflow-row-sub">${targetSub}</div>
               </div>
-            </button>`;
+              <div class="phase4-cashflow-cell phase4-cashflow-cell-progress" role="cell">
+                <div class="phase4-cashflow-progress-label"><strong>${hasTarget ? Math.round(progressPct) + '%' : '—'}</strong><span>${progressSub}</span></div>
+                <div class="phase4-cashflow-progress-track" aria-hidden="true"><span class="phase4-cashflow-progress-fill" style="width:${progressPct.toFixed(1)}%"></span></div>
+                <div class="phase4-cashflow-row-sub">${remainingLabel}</div>
+              </div>
+              <div class="phase4-cashflow-cell phase4-cashflow-cell-actions" role="cell">
+                <button type="button" class="phase4-cashflow-add-btn" data-open-cashflow-group="${escapeHtml(group)}" data-cashflow-kind="${kind}">+ ${actionLabel}</button>
+                <span class="phase4-cashflow-more" aria-hidden="true">⋮</span>
+              </div>
+            </div>`;
         }).join('')}
+        </div>
+        <button type="button" class="phase4-cashflow-add-category" data-open-cashflow-structure="${kind}">+ ${addCategoryLabel}</button>
       </div>`;
     }
 
@@ -11487,6 +11546,19 @@ function renderRows(targetId, rows, kind) {
             openCashflowModalKind = btn.dataset.cashflowKind;
             openCashflowModalGroup = btn.dataset.openCashflowGroup;
             render('rows');
+          };
+          btn.onkeydown = function(event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              btn.click();
+            }
+          };
+        });
+        wrap.querySelectorAll('[data-open-cashflow-structure]').forEach(btn => {
+          btn.onclick = function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            openStructureModal(btn.dataset.openCashflowStructure);
           };
         });
         wrap.querySelectorAll('[data-close-cashflow-modal]').forEach(btn => {
@@ -12103,7 +12175,6 @@ function renderRows(targetId, rows, kind) {
       el.innerHTML = `
         <div class="inline-analytics-section-head">
           <span class="inline-analytics-section-title">Smart Insights</span>
-          <button class="inline-analytics-view-all smart-insights-open-btn" type="button">Open Smart Insights →</button>
         </div>
         <div class="inline-analytics">
           <article class="insight-card inline-insight-card forecast-inline-card">
@@ -12166,91 +12237,259 @@ function renderRows(targetId, rows, kind) {
         if (ra !== rb) return ra - rb;
         return Number(b.allocation || 0) - Number(a.allocation || 0);
       });
-      const allocationDisplayRows = allocationExpanded ? allocationRowsByRelevance : allocationRowsByRelevance.slice(0, 3);
-      const allocationHiddenCount = Math.max(0, allocationRowsByRelevance.length - allocationDisplayRows.length);
+      // User-defined drag order (persisted) takes precedence over auto relevance
+      // ordering. Saved keys are placed first in their saved order; any rows not
+      // yet in the saved order (new categories) keep their relevance position and
+      // are appended afterwards.
+      const allocationCustomOrder = loadAllocCardOrder();
+      const allocationOrderedRows = (function() {
+        if (!Array.isArray(allocationCustomOrder) || !allocationCustomOrder.length) {
+          return allocationRowsByRelevance;
+        }
+        const byKey = new Map(allocationRowsByRelevance.map(r => [String(r.key), r]));
+        const result = [];
+        allocationCustomOrder.forEach(function(key) {
+          const r = byKey.get(String(key));
+          if (r) { result.push(r); byKey.delete(String(key)); }
+        });
+        // Append any remaining rows in their existing relevance order
+        allocationRowsByRelevance.forEach(function(r) {
+          if (byKey.has(String(r.key))) result.push(r);
+        });
+        return result;
+      })();
+      const allocationDisplayRows = allocationExpanded ? allocationOrderedRows : allocationOrderedRows.slice(0, 3);
+      const allocationHiddenCount = Math.max(0, allocationOrderedRows.length - allocationDisplayRows.length);
+      // === UI v2: card-based budget allocation layout ===
+      // Logic, math, and data sources are unchanged. Only the rendered structure differs.
+      const carryForwardAmount = Number(incomeActualByName(month, 'Spillover previous Month') || 0);
+      const sharedExpensesNet = Number((outstandingSharedExpenses && outstandingSharedExpenses.net) || 0);
+      const usedAmount = allocation.availableFunds - totalRemaining;
+      const usedPctClamped = Math.max(0, Math.min(100, usedPct));
+      const usedRingClass = usedPct > 100 ? "is-over" : usedPct >= 80 ? "is-warn" : "is-ok";
+      // SVG donut for the "Used from available funds" header card
+      const donutRadius = 30;
+      const donutCircumference = 2 * Math.PI * donutRadius;
+      const donutOffset = donutCircumference - (donutCircumference * usedPctClamped) / 100;
+      const usedDonutSvg = `
+        <svg class="alloc-v2-mini-donut ${usedRingClass}" viewBox="0 0 72 72" aria-hidden="true">
+          <circle class="alloc-v2-mini-donut-track" cx="36" cy="36" r="${donutRadius}"></circle>
+          <circle class="alloc-v2-mini-donut-fill" cx="36" cy="36" r="${donutRadius}"
+            stroke-dasharray="${donutCircumference.toFixed(2)}"
+            stroke-dashoffset="${donutOffset.toFixed(2)}"></circle>
+        </svg>`;
+
+      const allocationTooltipHtml = '<ul class="info-tooltip-list"><li><strong>Shared Expenses:</strong> positive = money owed to you, negative = you owe. Pending stays visible in the Shared Expenses action; settled amounts are applied back to the matching category as reimbursements.</li><li><strong>Savings target</strong> auto-balances to keep the total at 100%. Exceeding it counts as a surplus, not overspending.</li><li><strong>Target editing</strong> locks after day 5 so your original plan stays intact for analysis. Fixed categories (Living Costs, Multimedia, Savings) are always locked.</li><li><strong>Subscriptions:</strong> paid ones sit in Currently; due ones raise Allocation and Remaining until marked paid.</li>' + (splitwiseRolledForward ? '<li><strong>Rollover detected:</strong> pending Shared Expenses is tracked in the next month.</li>' : '') + '</ul>';
+
+      const carryForwardTooltipHtml = '<ul class="info-tooltip-list"><li><strong>Carry-forward</strong> is the spillover income from the previous month that was rolled into this month.</li><li>It is included in your Available funds and is updated automatically when a linked rollover is refreshed.</li></ul>';
+
       const budgetOverviewHtml = `
-        <div class="alloc-grid">
-          <div class="alloc-top-row">
-            <div class="available-funds-wrap">
-              <div class="available-funds-banner">
-                <div class="label">Available funds</div>
-                <div class="value">${currency(allocation.availableFunds)}</div>
+        <div class="alloc-v2">
+          <!-- Top row: Available funds + Used donut card -->
+          <div class="alloc-v2-top-row">
+            <div class="alloc-v2-hero-card alloc-v2-available-card">
+              <div class="alloc-v2-hero-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="6" width="18" height="13" rx="2.5"></rect>
+                  <path d="M3 10h18"></path>
+                  <path d="M7 15h3"></path>
+                </svg>
               </div>
-              ${inlineInfoTriggerHtml('allocationInfoTooltip', '<ul class="info-tooltip-list"><li><strong>Shared Expenses:</strong> positive = money owed to you, negative = you owe. Pending stays visible in the Shared Expenses action; settled amounts are applied back to the matching category as reimbursements.</li><li><strong>Savings target</strong> auto-balances to keep the total at 100%. Exceeding it counts as a surplus, not overspending.</li><li><strong>Target editing</strong> locks after day 5 so your original plan stays intact for analysis. Fixed categories (Living Costs, Multimedia, Savings) are always locked.</li><li><strong>Subscriptions:</strong> paid ones sit in Currently; due ones raise Allocation and Remaining until marked paid.</li>' + (splitwiseRolledForward ? '<li><strong>Rollover detected:</strong> pending Shared Expenses is tracked in the next month.</li>' : '') + '</ul>', { label: 'Budget allocation details' })}
-              ${outstandingSharedExpensesHtml}
+              <div class="alloc-v2-hero-text">
+                <div class="alloc-v2-hero-label">Available funds</div>
+                <div class="alloc-v2-hero-value">${currency(allocation.availableFunds)}</div>
+              </div>
             </div>
-            <div class="alloc-progress">
-              <div class="alloc-progress-head">
-                <span>Used from available funds</span>
-                <strong>${usedPct.toFixed(1)}% · ${currency(allocation.availableFunds - totalRemaining)} / ${currency(allocation.availableFunds)}</strong>
+
+            <div class="alloc-v2-used-card">
+              <div class="alloc-v2-used-donut-wrap">
+                ${usedDonutSvg}
+                <span class="alloc-v2-used-donut-label">${usedPct.toFixed(1)}%</span>
               </div>
-              <div class="alloc-progress-track">
-                <div class="alloc-progress-fill ${usedPct > 100 ? "warn-100" : usedPct >= 80 ? "warn-80" : ""}" style="width:${Math.min(usedPct, 100)}%;"></div>
+              <div class="alloc-v2-used-body">
+                <div class="alloc-v2-used-head">
+                  <span class="alloc-v2-used-title">Used from available funds</span>
+                  <span class="alloc-v2-used-amounts">${currency(usedAmount)} <span class="alloc-v2-divider">/</span> ${currency(allocation.availableFunds)}</span>
+                </div>
+                <div class="alloc-v2-used-track">
+                  <div class="alloc-v2-used-fill ${usedRingClass}" style="width:${usedPctClamped}%;"></div>
+                </div>
               </div>
             </div>
           </div>
+
+          <!-- Mid row: Shared expenses + Carry-forward summary cards -->
+          <div class="alloc-v2-mid-row">
+            <div class="alloc-v2-summary-card">
+              <div class="alloc-v2-summary-icon alloc-v2-icon-tint-indigo" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="9" cy="8" r="3"></circle>
+                  <circle cx="17" cy="8" r="3"></circle>
+                  <path d="M2 20c0-3 3-5 7-5s7 2 7 5"></path>
+                  <path d="M14 15c3 .3 6 2.2 6 5"></path>
+                </svg>
+              </div>
+              <div class="alloc-v2-summary-body">
+                <div class="alloc-v2-summary-label">Shared expenses</div>
+                <div class="alloc-v2-summary-value">${currency(sharedExpensesNet)}</div>
+              </div>
+              <div class="alloc-v2-summary-info">${outstandingSharedExpensesHtml}</div>
+            </div>
+
+            <div class="alloc-v2-summary-card">
+              <div class="alloc-v2-summary-icon alloc-v2-icon-tint-violet" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 12a9 9 0 1 1-3.2-6.9"></path>
+                  <path d="M21 4v5h-5"></path>
+                </svg>
+              </div>
+              <div class="alloc-v2-summary-body">
+                <div class="alloc-v2-summary-label">Carry-forward</div>
+                <div class="alloc-v2-summary-value">${currency(carryForwardAmount)}</div>
+              </div>
+              <div class="alloc-v2-summary-info">${inlineInfoTriggerHtml('carryForwardInfoTooltip', carryForwardTooltipHtml, { label: 'Carry-forward details' })}</div>
+            </div>
+          </div>
+
           ${allocationSubscriptionNote}
-          <div class="alloc-focus-wrap">
-            <div class="alloc-focus-list" role="list">
-                ${allocationDisplayRows.map(row => {
-                  const netActual = Number(row.actual || 0);
-                  const remaining = Number(row.allocation || 0) - netActual;
-                  const currentPct = Number(row.allocation || 0) > 0 ? (netActual / Number(row.allocation || 0)) * 100 : 0;
-                  const isSavingsRow = isSavingsAllocationRow(row);
-                  const entries = month.splitwise?.[row.key] || [];
-                  const splitwiseIsEligible = splitwiseEligible.has(row.key);
-                  const splitwiseHasEntries = entries.length > 0;
-                  const splitwiseActionLabel = splitwiseIsEligible ? (splitwiseHasEntries ? 'Manage Shared Expenses' : 'Add Shared Expenses') : 'Details';
-                  const splitwisePendingAbs = Math.abs(Number(row.splitwise || 0));
-                  const splitwiseStatusHtml = splitwiseIsEligible
-                    ? (splitwiseHasEntries
-                        ? `<div class="alloc-focus-splitwise-hint is-active">Shared Expenses pending: ${currency(splitwisePendingAbs)}</div>`
-                        : `<div class="alloc-focus-splitwise-hint is-active">Shared expense enabled</div>`)
+
+          <!-- Category cards grid -->
+          <div class="alloc-v2-cards-wrap">
+            <div class="alloc-v2-cards" role="list">
+              ${allocationDisplayRows.map(row => {
+                const netActual = Number(row.actual || 0);
+                const remaining = Number(row.allocation || 0) - netActual;
+                const currentPct = Number(row.allocation || 0) > 0 ? (netActual / Number(row.allocation || 0)) * 100 : 0;
+                const isSavingsRow = isSavingsAllocationRow(row);
+                const entries = month.splitwise?.[row.key] || [];
+                const splitwiseIsEligible = splitwiseEligible.has(row.key);
+                const splitwiseHasEntries = entries.length > 0;
+                const splitwiseActionLabel = splitwiseIsEligible ? (splitwiseHasEntries ? 'Manage shared' : 'Add shared') : 'Details';
+                const splitwisePendingAbs = Math.abs(Number(row.splitwise || 0));
+                const amountClass = isSavingsRow ? (netActual !== 0 ? "income-positive" : "") : (netActual < 0 ? "income-positive" : netActual > 0 ? "expense-negative" : "");
+                const fillClass = isSavingsRow ? (currentPct >= 100 ? "" : currentPct >= 80 ? "warn-80" : "") : (currentPct > 100 ? "warn-100" : currentPct >= 80 ? "warn-80" : "");
+                const remainingClass = isSavingsRow
+                  ? (remaining < 0 ? "good-budget value-positive" : remaining === 0 ? "" : "remaining-low")
+                  : (remaining <= 0 ? "remaining-negative" : row.allocation > 0 && (remaining / row.allocation) < 0.2 ? "remaining-low" : "good-budget value-positive");
+                const remainingLabel = isSavingsRow && remaining < 0 ? `Ahead ${currency(Math.abs(remaining))}` : currency(remaining);
+
+                // State classification (drives card color theme)
+                let stateClass, stateLabel, stateTone, statusLabel, statusTone;
+                if (isSavingsRow) {
+                  stateClass = "is-savings";
+                  stateLabel = "Savings";
+                  stateTone = "savings";
+                  statusLabel = remaining < 0 ? 'Ahead' : 'Tracking';
+                  statusTone = remaining < 0 ? 'good' : 'neutral';
+                } else if (Number(row.allocation || 0) <= 0 && Math.abs(netActual) < 0.005) {
+                  // No allocation AND no spend → "No spend" gray legend item
+                  stateClass = "is-empty";
+                  stateLabel = "No spend";
+                  stateTone = "empty";
+                  statusLabel = 'No spend';
+                  statusTone = 'neutral';
+                } else if (remaining < 0) {
+                  stateClass = "is-over";
+                  stateLabel = "Over budget";
+                  stateTone = "over";
+                  statusLabel = 'Over';
+                  statusTone = 'bad';
+                } else if (Number(row.allocation || 0) > 0 && (remaining / Number(row.allocation || 0)) < 0.2) {
+                  // remaining is 0 (exactly at limit) or less than 20% headroom → near limit
+                  stateClass = "is-low";
+                  stateLabel = "Near limit";
+                  stateTone = "low";
+                  statusLabel = remaining === 0 ? 'At limit' : 'Watch';
+                  statusTone = 'warn';
+                } else {
+                  stateClass = "is-good";
+                  stateLabel = "On track";
+                  stateTone = "good";
+                  statusLabel = 'Healthy';
+                  statusTone = 'good';
+                }
+                const sharedTone = Number(row.splitwise || 0) > 0 ? 'receivable' : Number(row.splitwise || 0) < 0 ? 'payable' : 'neutral';
+                const adjustedSpendLabel = currency(netActual);
+                const pctClass = currentPct > 100 ? 'over' : currentPct >= 80 ? 'low' : '';
+                const pctClamped = Math.max(0, Math.min(100, currentPct));
+                const ringOffset = donutCircumference - (donutCircumference * pctClamped) / 100;
+                const ringClass = currentPct > 100 ? 'is-over' : currentPct >= 80 ? 'is-warn' : 'is-ok';
+
+                // Category icon (from existing registry); fallback to first letter
+                const iconKey = !isSavingsRow ? getCategoryIcon('expense', row.label) : 'savings';
+                const iconEmoji = iconKey ? categoryIconEmoji(iconKey) : '';
+                const iconHtml = iconEmoji
+                  ? `<span class="alloc-v2-card-icon-emoji">${iconEmoji}</span>`
+                  : `<span class="alloc-v2-card-icon-letter">${escapeHtml(String(row.label || '?').trim().charAt(0).toUpperCase())}</span>`;
+
+                const targetLocked = row.editable && row.lockState?.locked;
+                const targetReadOnly = !row.editable;
+                const lockIconSvg = `<svg class="alloc-v2-lock-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 7V5.25a3.5 3.5 0 1 1 7 0V7h.5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h.5Zm1.5 0h4V5.25a2 2 0 1 0-4 0V7Z" fill="currentColor"/></svg>`;
+
+                // Top-right shows usage percentage wrapped in a small donut ring.
+                // Ring geometry is self-contained (its own radius/circumference) so it
+                // scales independently from the (now removed) large donut.
+                const usageRingRadius = 15.5;
+                const usageRingCircumference = 2 * Math.PI * usageRingRadius;
+                const usageRingOffset = usageRingCircumference - (usageRingCircumference * pctClamped) / 100;
+                const usagePctHtml = `<span class="alloc-v2-card-usage-pct ${pctClass}" title="Used ${currentPct.toFixed(0)}% of this category allocation">
+                  <svg class="alloc-v2-card-usage-ring ${ringClass}" viewBox="0 0 40 40" aria-hidden="true">
+                    <circle class="alloc-v2-card-usage-ring-track" cx="20" cy="20" r="${usageRingRadius}"></circle>
+                    <circle class="alloc-v2-card-usage-ring-fill" cx="20" cy="20" r="${usageRingRadius}"
+                      stroke-dasharray="${usageRingCircumference.toFixed(2)}"
+                      stroke-dashoffset="${usageRingOffset.toFixed(2)}"></circle>
+                  </svg>
+                  <span class="alloc-v2-card-usage-pct-value">${currentPct.toFixed(0)}%</span>
+                </span>`;
+                let donutAllocationHtml;
+                if (targetReadOnly) {
+                  donutAllocationHtml = `<span class="alloc-v2-card-donut-state">LOCKED</span><span class="alloc-v2-card-donut-pct">${Number(row.target || 0).toFixed(2)}%</span><span class="alloc-v2-card-donut-lock" aria-hidden="true">${lockIconSvg}</span>`;
+                } else if (targetLocked) {
+                  donutAllocationHtml = `<span class="alloc-v2-card-donut-state">LOCKED</span><span class="alloc-v2-card-donut-input"><input class="target-input target-input-v2" type="number" step="0.01" value="${Number(row.target || 0).toFixed(2)}" data-alloc-target="${row.key}" disabled title="${escapeHtml(row.lockState?.reason || '')}" /><span class="alloc-v2-pct-symbol">%</span></span><span class="alloc-v2-card-donut-lock" aria-hidden="true">${lockIconSvg}</span>`;
+                } else {
+                  donutAllocationHtml = `<span class="alloc-v2-card-donut-state">ALLOCATE</span><span class="alloc-v2-card-donut-input"><input class="target-input target-input-v2" type="number" step="0.01" value="${Number(row.target || 0).toFixed(2)}" data-alloc-target="${row.key}" title="${escapeHtml(row.lockState?.reason || 'Custom target')}" /><span class="alloc-v2-pct-symbol">%</span></span>`;
+                }
+
+                const sharedHintHtml = splitwiseIsEligible && splitwiseHasEntries
+                  ? `<div class="alloc-v2-card-shared-hint">Shared pending: <strong class="${sharedTone}">${currency(splitwisePendingAbs)}</strong></div>`
+                  : splitwiseIsEligible
+                    ? `<div class="alloc-v2-card-shared-hint">Shared expense enabled</div>`
                     : '';
-                  const amountClass = isSavingsRow ? (netActual !== 0 ? "income-positive" : "") : (netActual < 0 ? "income-positive" : netActual > 0 ? "expense-negative" : "");
-                  const fillClass = isSavingsRow ? (currentPct >= 100 ? "" : currentPct >= 80 ? "warn-80" : "") : (currentPct > 100 ? "warn-100" : currentPct >= 80 ? "warn-80" : "");
-                  const remainingClass = isSavingsRow
-                    ? (remaining < 0 ? "good-budget value-positive" : remaining === 0 ? "" : "remaining-low")
-                    : (remaining <= 0 ? "remaining-negative" : row.allocation > 0 && (remaining / row.allocation) < 0.2 ? "remaining-low" : "good-budget value-positive");
-                  const remainingLabel = isSavingsRow && remaining < 0 ? `Ahead ${currency(Math.abs(remaining))}` : currency(remaining);
-                  const rowStateClass = isSavingsRow ? "is-savings" : (remaining <= 0 ? "is-over" : row.allocation > 0 && (remaining / row.allocation) < 0.2 ? "is-low" : "is-good");
-                  const statusLabel = isSavingsRow ? (remaining < 0 ? 'Ahead' : 'Tracking') : (remaining <= 0 ? 'Over' : row.allocation > 0 && (remaining / row.allocation) < 0.2 ? 'Watch' : 'Healthy');
-                  const statusTone = isSavingsRow ? (remaining < 0 ? 'good' : 'neutral') : (remaining <= 0 ? 'bad' : row.allocation > 0 && (remaining / row.allocation) < 0.2 ? 'warn' : 'good');
-                  const sharedTone = Number(row.splitwise || 0) > 0 ? 'receivable' : Number(row.splitwise || 0) < 0 ? 'payable' : 'neutral';
-                  const adjustedSpendLabel = isSavingsRow ? currency(netActual) : currency(netActual);
-                  const pctClass = currentPct > 100 ? 'over' : currentPct >= 80 ? 'low' : '';
-                  return `
-                    <div class="alloc-focus-row ${rowStateClass}" role="listitem">
-                      <div class="alloc-focus-category">
-                        <div class="alloc-focus-title-row">
-                          <span class="alloc-focus-title">${row.label}</span>
-                        </div>
-                        ${row.source ? `<div class="alloc-focus-source">${row.source}</div>` : ``}
-                        ${splitwiseStatusHtml}
-                      </div>
 
-                      <div class="alloc-focus-target">
-                        ${row.editable
-                          ? (row.lockState?.locked
-                              ? `<span class="target-edit"><input class="target-input" type="number" step="0.01" value="${Number(row.target || 0).toFixed(2)}" data-alloc-target="${row.key}" disabled title="${row.lockState.reason}" /><span class="pct-symbol">%</span></span>`
-                              : `<span class="target-edit"><input class="target-input" type="number" step="0.01" value="${Number(row.target || 0).toFixed(2)}" data-alloc-target="${row.key}" title="${row.lockState?.reason || 'Custom target'}" /><span class="pct-symbol">%</span></span>`)
-                          : `<span class="pill-soft" title="${row.lockState?.reason || row.source}">${Number(row.target || 0).toFixed(2)}%</span>`}
+                return `
+                  <div class="alloc-v2-card ${stateClass}" role="listitem" data-alloc-card-state="${stateTone}" data-alloc-card-key="${escapeHtml(String(row.key))}">
+                    <button type="button" class="alloc-v2-card-drag-handle" aria-label="Drag to reorder ${escapeHtml(row.label)}" title="Drag to reorder" tabindex="-1">
+                      <svg viewBox="0 0 10 16" width="10" height="16" fill="currentColor" aria-hidden="true"><circle cx="2" cy="2" r="1.3"/><circle cx="8" cy="2" r="1.3"/><circle cx="2" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="2" cy="14" r="1.3"/><circle cx="8" cy="14" r="1.3"/></svg>
+                    </button>
+                    <div class="alloc-v2-card-head">
+                      <div class="alloc-v2-card-icon alloc-v2-card-icon-${stateTone}" aria-hidden="true">${iconHtml}</div>
+                      <div class="alloc-v2-card-title-wrap">
+                        <div class="alloc-v2-card-title">${escapeHtml(row.label)}</div>
                       </div>
+                      ${usagePctHtml}
+                      <div class="alloc-v2-card-meta">
+                        <div class="alloc-v2-card-subtitle">${escapeHtml(row.source || '')}</div>
+                        ${sharedHintHtml}
+                      </div>
+                    </div>
 
-                      <div class="alloc-focus-current">
-                        <div class="alloc-focus-current-top">
-                          <span class="alloc-focus-current-value"><span class="${amountClass}">${currency(netActual)}</span> / ${currency(row.allocation)}</span>
-                          <span class="alloc-focus-pct ${pctClass}">${currentPct.toFixed(0)}%</span>
+                    <div class="alloc-v2-card-progress">
+                      <div class="alloc-v2-card-amounts">
+                        <div class="alloc-v2-card-alloc-line">
+                          ${donutAllocationHtml}
                         </div>
-                        <div class="alloc-focus-bar" aria-label="${row.label} progress">
-                          <div class="alloc-focus-fill alloc-current-fill ${fillClass}" style="width:${Math.min(100, Math.max(0, currentPct))}%;"></div>
+                        <div class="alloc-v2-card-amounts-row">
+                          <span class="alloc-v2-card-amount-current ${amountClass}">${currency(netActual)}</span>
+                          <span class="alloc-v2-divider">/</span>
+                          <span class="alloc-v2-card-amount-target">${currency(row.allocation)}</span>
                         </div>
                       </div>
+                    </div>
 
-                      <span class="alloc-focus-remaining ${remainingClass}" title="Remaining">${remainingLabel}</span>
-
-                      <details class="alloc-focus-details" data-alloc-detail="${row.key}" ${openSplitwiseKey === row.key ? 'open' : ''}>
-                        <summary class="alloc-focus-details-btn"><span class="alloc-focus-details-label">${splitwiseActionLabel}</span></summary>
+                    <div class="alloc-v2-card-footer">
+                      <span class="alloc-v2-card-footer-value alloc-focus-remaining ${remainingClass}">${remainingLabel}</span>
+                      <details class="alloc-focus-details alloc-v2-details" data-alloc-detail="${row.key}" ${openSplitwiseKey === row.key ? 'open' : ''}>
+                        <summary class="alloc-focus-details-btn alloc-v2-details-btn"><span class="alloc-focus-details-label alloc-v2-details-label">${splitwiseActionLabel}</span><span class="alloc-v2-details-caret" aria-hidden="true">›</span></summary>
                         <div class="alloc-focus-panel">
                           <div class="alloc-focus-summary-strip" aria-label="Budget allocation summary">
                             <div class="alloc-focus-summary-main">
@@ -12287,25 +12526,151 @@ function renderRows(targetId, rows, kind) {
                           </div>
                         </div>
                       </details>
-                    </div>`;
-                }).join("")}
-                ${allocationRowsByRelevance.length > 3 ? `<button class="alloc-focus-toggle" type="button" data-alloc-focus-toggle>${allocationExpanded ? 'Show top 3 categories' : `Show all (${allocationHiddenCount} more categories)`}</button>` : ''}
-                <div class="alloc-focus-total">
-                  <div class="alloc-focus-total-label">Total Target</div>
-                  <div class="alloc-focus-total-target">${totalTarget.toFixed(2)}%</div>
-                  <div class="alloc-focus-total-current">
-                    <span class="alloc-focus-total-actual">${currency(totalNetActual)}</span>
-                    <span class="alloc-focus-total-divider">/</span>
-                    <span class="alloc-focus-total-allocation">${currency(totalAllocation)}</span>
-                  </div>
-                  <div class="alloc-focus-total-splitwise">${currency(totalSplitwise)}</div>
-                  <div class="alloc-focus-total-remaining">${currency(totalRemaining)}</div>
-                </div>
+                    </div>
+                  </div>`;
+              }).join("")}
+            </div>
+
+            <!-- Footer row: lock note + legend + expand button -->
+            <div class="alloc-v2-footer-row">
+              <div class="alloc-v2-lock-note">
+                <span class="alloc-v2-lock-note-icon" aria-hidden="true">
+                  <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 7V5.25a3.5 3.5 0 1 1 7 0V7h.5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h.5Zm1.5 0h4V5.25a2 2 0 1 0-4 0V7Z"/></svg>
+                </span>
+                <span>Allocation percentage is locked after the 5th day of the month.</span>
+              </div>
+
+              <div class="alloc-v2-legend" aria-label="Category status legend">
+                <span class="alloc-v2-legend-item is-good"><span class="alloc-v2-legend-dot"></span>On track</span>
+                <span class="alloc-v2-legend-item is-low"><span class="alloc-v2-legend-dot"></span>Near limit</span>
+                <span class="alloc-v2-legend-item is-over"><span class="alloc-v2-legend-dot"></span>Over budget</span>
+                <span class="alloc-v2-legend-item is-empty"><span class="alloc-v2-legend-dot"></span>No spend</span>
+              </div>
+
+              ${allocationRowsByRelevance.length > 3
+                ? `<button class="alloc-v2-show-all-btn" type="button" data-alloc-focus-toggle>${allocationExpanded ? 'Show top 3 categories' : `Show all categories (${allocationHiddenCount} more)`}</button>`
+                : '<div class="alloc-v2-show-all-spacer" aria-hidden="true"></div>'}
+            </div>
+
+            <!-- Totals strip preserved (hidden visually, but kept for any downstream consumers) -->
+            <div class="alloc-focus-total alloc-v2-total-hidden" aria-hidden="true">
+              <div class="alloc-focus-total-label">Total Target</div>
+              <div class="alloc-focus-total-target">${totalTarget.toFixed(2)}%</div>
+              <div class="alloc-focus-total-current">
+                <span class="alloc-focus-total-actual">${currency(totalNetActual)}</span>
+                <span class="alloc-focus-total-divider">/</span>
+                <span class="alloc-focus-total-allocation">${currency(totalAllocation)}</span>
+              </div>
+              <div class="alloc-focus-total-splitwise">${currency(totalSplitwise)}</div>
+              <div class="alloc-focus-total-remaining">${currency(totalRemaining)}</div>
             </div>
           </div>
         </div>`;
       const budgetOverviewEl = document.getElementById("budgetOverview");
       if (budgetOverviewEl) budgetOverviewEl.innerHTML = budgetOverviewHtml;
+      // Show the hover tooltip (title attr) only when tile text is actually
+      // truncated with an ellipsis; otherwise remove it so non-clipped labels
+      // don't show a redundant tooltip on hover.
+      const refreshAllocTruncationTitles = () => {
+        document.querySelectorAll('.alloc-v2-card-title, .alloc-v2-card-subtitle').forEach(el => {
+          const full = el.dataset.fullLabel != null ? el.dataset.fullLabel : (el.dataset.fullLabel = el.textContent || '');
+          const isTruncated = el.scrollWidth > el.clientWidth + 1;
+          if (isTruncated && full) {
+            el.setAttribute('title', full);
+          } else {
+            el.removeAttribute('title');
+          }
+        });
+      };
+      requestAnimationFrame(refreshAllocTruncationTitles);
+      if (!window.__allocTruncationListenerBound) {
+        window.addEventListener('resize', () => {
+          if (window.__refreshAllocTruncationTitles) window.__refreshAllocTruncationTitles();
+        }, { passive: true });
+        window.__allocTruncationListenerBound = true;
+      }
+      window.__refreshAllocTruncationTitles = refreshAllocTruncationTitles;
+      // ── Drag-to-reorder the allocation category cards directly on the page ──
+      // Adapted from the card-visibility popover concept, but operates on the
+      // cards themselves and uses horizontal (left/right) drop detection since
+      // the cards sit in a row. The chosen order is persisted in localStorage
+      // and applied via allocationOrderedRows on the next render.
+      (function wireAllocCardDragReorder() {
+        const cardsContainer = budgetOverviewEl ? budgetOverviewEl.querySelector('.alloc-v2-cards') : null;
+        if (!cardsContainer) return;
+        const cards = Array.prototype.slice.call(cardsContainer.querySelectorAll('.alloc-v2-card[data-alloc-card-key]'));
+        if (cards.length < 2) return;
+        const dragState = { key: null };
+
+        const clearIndicators = () => {
+          cards.forEach(c => c.classList.remove('alloc-drag-over-before', 'alloc-drag-over-after'));
+        };
+
+        cards.forEach(card => {
+          const handle = card.querySelector('.alloc-v2-card-drag-handle');
+          if (!handle) return;
+
+          // Only allow dragging when initiated from the handle.
+          handle.addEventListener('mousedown', () => { card.setAttribute('draggable', 'true'); });
+          handle.addEventListener('touchstart', () => { card.setAttribute('draggable', 'true'); }, { passive: true });
+          card.addEventListener('mousedown', (e) => {
+            if (!handle.contains(e.target)) card.setAttribute('draggable', 'false');
+          });
+
+          card.addEventListener('dragstart', (e) => {
+            dragState.key = card.dataset.allocCardKey;
+            try {
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', dragState.key);
+            } catch (err) {}
+            setTimeout(() => card.classList.add('alloc-is-dragging'), 0);
+          });
+
+          card.addEventListener('dragend', () => {
+            card.setAttribute('draggable', 'false');
+            card.classList.remove('alloc-is-dragging');
+            dragState.key = null;
+            clearIndicators();
+          });
+
+          card.addEventListener('dragover', (e) => {
+            if (dragState.key == null || dragState.key === card.dataset.allocCardKey) return;
+            e.preventDefault();
+            try { e.dataTransfer.dropEffect = 'move'; } catch (err) {}
+            const rect = card.getBoundingClientRect();
+            const before = e.clientX < rect.left + rect.width / 2;
+            clearIndicators();
+            card.classList.add(before ? 'alloc-drag-over-before' : 'alloc-drag-over-after');
+          });
+
+          card.addEventListener('dragleave', () => {
+            card.classList.remove('alloc-drag-over-before', 'alloc-drag-over-after');
+          });
+
+          card.addEventListener('drop', (e) => {
+            if (dragState.key == null || dragState.key === card.dataset.allocCardKey) return;
+            e.preventDefault();
+            const rect = card.getBoundingClientRect();
+            const before = e.clientX < rect.left + rect.width / 2;
+            clearIndicators();
+
+            // Build the full key order from the complete row set, not just the
+            // visible cards, so collapsed (top-3) view still reorders correctly.
+            let keys = allocationOrderedRows.map(r => String(r.key));
+            const fromIdx = keys.indexOf(String(dragState.key));
+            const targetIdx = keys.indexOf(String(card.dataset.allocCardKey));
+            if (fromIdx === -1 || targetIdx === -1) return;
+
+            keys.splice(fromIdx, 1);
+            let insertIdx = keys.indexOf(String(card.dataset.allocCardKey));
+            insertIdx = before ? insertIdx : insertIdx + 1;
+            keys.splice(insertIdx, 0, String(dragState.key));
+
+            saveAllocCardOrder(keys);
+            render('overview');
+          });
+        });
+      })();
       const allocationHeadInfo = document.getElementById('allocationHeadInfo');
       if (allocationHeadInfo) allocationHeadInfo.textContent = `${allocation.rows.length} categor${allocation.rows.length === 1 ? 'y' : 'ies'} · ${month.name || 'Current month'}`;
       const allocationRowCount = Math.max(3, Array.isArray(allocation.rows) ? allocation.rows.length : 0);
@@ -17834,6 +18199,8 @@ function render(hint) {
         const month = getStructureEditingMonth('income');
         const name = nextUniqueGroupName(month, "income", "New Category");
         month.incomeCategoryOrder = monthGroupsByKind(month, "income").concat(name);
+        month.income = Array.isArray(month.income) ? month.income : [];
+        month.income.push({ id: nextRowId("income"), type: "VARIABLE", group: name, name: "New sub-category", planned: 0, toggleBased: false, transactions: [], fixedPaid: false });
         setActiveStructureGroup('income', name);
         ensureRowStructure(month, "income");
         renderStructureModal('income');
@@ -17852,6 +18219,8 @@ function render(hint) {
         const month = getStructureEditingMonth('savings');
         const name = nextUniqueGroupName(month, "savings", "New Category");
         month.savingsCategoryOrder = monthGroupsByKind(month, "savings").concat(name);
+        month.savings = Array.isArray(month.savings) ? month.savings : [];
+        month.savings.push({ id: nextRowId("savings"), type: "VARIABLE", group: name, name: "New sub-category", planned: 0, classification: "savings", transactions: [], fixedPaid: false });
         setActiveStructureGroup('savings', name);
         ensureRowStructure(month, "savings");
         renderStructureModal('savings');

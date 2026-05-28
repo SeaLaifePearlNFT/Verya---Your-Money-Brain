@@ -3567,7 +3567,8 @@ body {
 .alloc-focus-details > summary{list-style:none;}
 .alloc-focus-details > summary::-webkit-details-marker{display:none;}
 .alloc-focus-details-btn{width:100%;min-height:30px;display:inline-flex;align-items:center;justify-content:center;gap:4px;border:1px solid rgba(111,135,154,0.22);border-radius:10px;background:rgba(248,250,252,0.85);color:var(--accent-text);font:inherit;font-size:0.59rem;font-weight:850;line-height:1.05;text-align:center;cursor:pointer;transition:background 120ms ease,border-color 120ms ease;padding:4px 6px;box-sizing:border-box;}
-.alloc-focus-details-btn:hover,.alloc-focus-details[open] .alloc-focus-details-btn{background:var(--accent-surface);border-color:var(--accent-border);}
+.alloc-focus-details-btn:hover,.alloc-focus-details[open] .alloc-focus-details-btn,
+.alloc-focus-details[data-alloc-detail-open="true"] .alloc-focus-details-btn{background:var(--accent-surface);border-color:var(--accent-border);}
 .alloc-focus-details-label{display:block;min-width:0;text-align:center;line-height:1.05;}
 .alloc-focus-details-btn::after{content:'⌄';flex:0 0 auto;font-size:0.54rem;line-height:1;color:var(--muted);transform:none;}
 .alloc-focus-details[open] .alloc-focus-details-btn::after{content:'⌃';}
@@ -14217,7 +14218,8 @@ body.cashflow-modal-open {
   margin-top:1px;
 }
 .alloc-focus-details-btn:hover,
-.alloc-focus-details[open] .alloc-focus-details-btn{
+.alloc-focus-details[open] .alloc-focus-details-btn,
+.alloc-focus-details[data-alloc-detail-open="true"] .alloc-focus-details-btn{
   border-color:rgba(74,122,178,0.40);
   background:linear-gradient(145deg, rgba(255,255,255,1) 0%, rgba(229,241,255,0.96) 100%);
   box-shadow:inset 0 1px 0 rgba(255,255,255,0.96), 0 8px 18px rgba(30,64,120,0.08);
@@ -19036,6 +19038,12 @@ body.tools-drawer-open .tools-drawer{transform:translateX(0);opacity:1;pointer-e
   line-height:1.42;
 }
 .insight-card-detail strong{color:var(--accent);font-weight:700;}
+.burn-pace-row{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:8px;
+}
 
 /* Allocation section: one clean grid, equal-height cards, no clipped content */
 .grid-overview{
@@ -22782,3 +22790,2117 @@ body.dark-mode .smart-insights-tab .negative {
   box-shadow: none !important;
 }
 
+
+/* === Expenses tab clarity rework — category rows without entry-count metric === */
+.phase4-expense-category-list{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+}
+
+.phase4-expense-row-tile{
+  min-height:0;
+  padding:16px 18px 16px 20px;
+  display:grid;
+  grid-template-columns:minmax(220px,.95fr) minmax(280px,1.25fr) minmax(260px,1fr) auto;
+  align-items:center;
+  gap:16px;
+  border-radius:18px;
+  background:linear-gradient(135deg, var(--expense-cat-soft, rgba(16,185,129,.08)), rgba(255,255,255,.94));
+}
+
+.phase4-expense-row-tile .phase4-expense-tile-head{
+  min-width:0;
+  align-items:center;
+  justify-content:flex-start;
+}
+
+.phase4-expense-row-tile .phase4-expense-title-wrap{
+  align-items:center;
+}
+
+.phase4-expense-row-tile .phase4-expense-name{
+  font-size:.96rem;
+  white-space:normal;
+}
+
+.phase4-expense-status{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  margin-left:auto;
+  padding:5px 9px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:rgba(255,255,255,.72);
+  color:var(--muted);
+  font-size:.6rem;
+  font-weight:850;
+  white-space:nowrap;
+}
+
+.phase4-expense-status.is-active{
+  border-color:rgba(16,185,129,.24);
+  background:rgba(16,185,129,.09);
+  color:var(--green-800);
+}
+
+.phase4-expense-status.is-over{
+  border-color:rgba(239,68,68,.24);
+  background:rgba(239,68,68,.08);
+  color:var(--red-800);
+}
+
+.phase4-expense-row-main{
+  min-width:0;
+  display:grid;
+  grid-template-columns:minmax(150px,.8fr) minmax(220px,1.2fr);
+  align-items:center;
+  gap:14px;
+}
+
+.phase4-expense-total-block{
+  min-width:0;
+  display:grid;
+  gap:4px;
+}
+
+.phase4-expense-total-label{
+  color:var(--muted);
+  font-size:.58rem;
+  font-weight:850;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+
+.phase4-expense-row-tile .phase4-expense-main{
+  margin:0;
+  font-size:1.28rem;
+  color:var(--accent);
+}
+
+.phase4-expense-row-tile .phase4-expense-main.is-live{
+  color:var(--red-text);
+}
+
+.phase4-expense-meta-clean{
+  grid-template-columns:repeat(2, minmax(0,1fr));
+}
+
+.phase4-expense-meta-clean .phase4-expense-stat.is-over{
+  border-color:rgba(239,68,68,.22);
+  background:rgba(239,68,68,.06);
+}
+
+.phase4-expense-meta-clean .phase4-expense-stat.is-over .phase4-expense-stat-value{
+  color:var(--red-800);
+}
+
+.phase4-expense-row-tile .phase4-expense-progress{
+  margin:0;
+  min-width:0;
+}
+
+.phase4-expense-row-tile .phase4-expense-progress-row{
+  font-size:.62rem;
+}
+
+.phase4-expense-row-tile .phase4-expense-footer{
+  justify-content:flex-end;
+}
+
+.phase4-expense-row-tile .phase4-expense-cta{
+  border-color:var(--ui3d-border, var(--line));
+  background:var(--panel);
+  color:var(--accent);
+}
+
+@media (max-width: 1180px){
+  .phase4-expense-row-tile{
+    grid-template-columns:minmax(220px,1fr) minmax(260px,1fr);
+  }
+  .phase4-expense-row-tile .phase4-expense-progress,
+  .phase4-expense-row-tile .phase4-expense-footer{
+    grid-column:auto;
+  }
+}
+
+@media (max-width: 760px){
+  .phase4-expense-row-tile{
+    grid-template-columns:1fr;
+    align-items:stretch;
+    gap:14px;
+  }
+  .phase4-expense-row-main{
+    grid-template-columns:1fr;
+  }
+  .phase4-expense-status{
+    margin-left:0;
+  }
+  .phase4-expense-row-tile .phase4-expense-tile-head{
+    justify-content:space-between;
+  }
+  .phase4-expense-row-tile .phase4-expense-footer{
+    justify-content:flex-start;
+  }
+}
+/* === end Expenses tab clarity rework === */
+
+/* === v1334 — Income & Savings row layout redesign ===
+   Replaces the category tile grid with a clearer table-style main view.
+   Entries are intentionally removed from the main view; row details remain in the existing modal. */
+.phase4-cashflow-board.phase4-cashflow-table{
+  display:block;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:var(--panel);
+  box-shadow:0 10px 24px rgba(15,23,42,.045);
+  overflow:hidden;
+}
+.phase4-cashflow-table-head{
+  display:grid;
+  grid-template-columns:minmax(260px,1.45fr) minmax(150px,.8fr) minmax(150px,.8fr) minmax(210px,1fr) minmax(160px,.7fr);
+  align-items:center;
+  gap:14px;
+  padding:12px 18px;
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg, rgba(248,250,252,.92), rgba(255,255,255,.72));
+  color:var(--muted);
+  font-size:.60rem;
+  font-weight:900;
+  letter-spacing:.075em;
+  text-transform:uppercase;
+}
+.phase4-cashflow-table-body{
+  display:grid;
+}
+.phase4-cashflow-row{
+  --money-accent:var(--emerald);
+  --money-soft:rgba(16,185,129,.10);
+  display:grid;
+  grid-template-columns:minmax(260px,1.45fr) minmax(150px,.8fr) minmax(150px,.8fr) minmax(210px,1fr) minmax(160px,.7fr);
+  align-items:center;
+  gap:14px;
+  min-height:76px;
+  padding:14px 18px;
+  border:0;
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(90deg, var(--money-soft), transparent 36%), var(--panel);
+  color:var(--accent-text);
+  cursor:pointer;
+  text-align:left;
+  transition:background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+.phase4-cashflow-row:last-child{border-bottom:0;}
+.phase4-cashflow-row:hover,
+.phase4-cashflow-row:focus-visible{
+  background:linear-gradient(90deg, var(--money-soft), rgba(255,255,255,.88) 42%), var(--panel);
+  box-shadow:inset 4px 0 0 var(--money-accent), 0 8px 18px rgba(15,23,42,.045);
+  outline:none;
+}
+.phase4-cashflow-row:focus-visible{box-shadow:inset 4px 0 0 var(--money-accent), 0 0 0 3px rgba(94,23,235,.14);}
+.phase4-cashflow-cell{min-width:0;}
+.phase4-cashflow-category-wrap{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+.phase4-cashflow-row .category-tile-icon-shell{
+  flex:0 0 auto;
+  width:38px;
+  height:38px;
+  border-color:rgba(16,185,129,.22);
+  background:rgba(16,185,129,.10);
+}
+.phase4-cashflow-name{
+  color:var(--accent-text);
+  font-size:.84rem;
+  font-weight:900;
+  line-height:1.2;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.phase4-cashflow-row-sub{
+  margin-top:3px;
+  color:var(--muted);
+  font-size:.66rem;
+  font-weight:650;
+  line-height:1.25;
+}
+.phase4-cashflow-amount{
+  color:var(--accent-text);
+  font-family:var(--font-mono);
+  font-size:.93rem;
+  font-weight:850;
+  letter-spacing:-.02em;
+  white-space:nowrap;
+}
+.phase4-cashflow-amount.is-actual{
+  color:#047857;
+  font-size:1.06rem;
+  font-weight:950;
+}
+.phase4-cashflow-progress-label{
+  display:flex;
+  align-items:baseline;
+  gap:5px;
+  color:var(--muted);
+  font-size:.68rem;
+  font-weight:700;
+}
+.phase4-cashflow-progress-label strong{
+  color:var(--money-accent);
+  font-family:var(--font-mono);
+  font-size:.92rem;
+  font-weight:950;
+}
+.phase4-cashflow-progress-track{
+  width:100%;
+  max-width:180px;
+  height:6px;
+  margin-top:7px;
+  border-radius:999px;
+  background:rgba(148,163,184,.20);
+  overflow:hidden;
+}
+.phase4-cashflow-progress-fill{
+  display:block;
+  height:100%;
+  border-radius:999px;
+  background:var(--money-accent);
+  transition:width 220ms ease;
+}
+.phase4-cashflow-row.is-watch .phase4-cashflow-progress-label strong{color:#d97706;}
+.phase4-cashflow-row.is-watch .phase4-cashflow-progress-fill{background:#f59e0b;}
+.phase4-cashflow-row.is-low .phase4-cashflow-progress-label strong{color:#dc2626;}
+.phase4-cashflow-row.is-low .phase4-cashflow-progress-fill{background:#ef4444;}
+.phase4-cashflow-row.is-neutral .phase4-cashflow-progress-label strong{color:var(--muted);}
+.phase4-cashflow-row.is-neutral .phase4-cashflow-progress-fill{background:rgba(148,163,184,.38);}
+.phase4-cashflow-cell-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:10px;
+}
+.phase4-cashflow-add-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:32px;
+  padding:7px 12px;
+  border:1px solid rgba(16,185,129,.32);
+  border-radius:9px;
+  background:rgba(236,253,245,.72);
+  color:#047857;
+  font:inherit;
+  font-size:.67rem;
+  font-weight:850;
+  white-space:nowrap;
+  cursor:pointer;
+}
+.phase4-cashflow-add-btn:hover,
+.phase4-cashflow-add-btn:focus-visible{
+  background:rgba(209,250,229,.88);
+  border-color:rgba(5,150,105,.44);
+  outline:none;
+}
+.phase4-cashflow-more{
+  color:var(--muted);
+  font-size:1.08rem;
+  line-height:1;
+}
+.phase4-cashflow-add-category{
+  width:100%;
+  min-height:48px;
+  border:0;
+  border-top:1px dashed rgba(148,163,184,.34);
+  background:rgba(255,255,255,.50);
+  color:#047857;
+  font:inherit;
+  font-size:.78rem;
+  font-weight:900;
+  cursor:pointer;
+}
+.phase4-cashflow-add-category:hover,
+.phase4-cashflow-add-category:focus-visible{
+  background:rgba(236,253,245,.70);
+  outline:none;
+}
+.phase4-savings-board.phase4-cashflow-table .phase4-cashflow-amount.is-actual{
+  color:#0f766e;
+}
+.phase4-savings-board.phase4-cashflow-table .phase4-cashflow-add-btn,
+.phase4-savings-board.phase4-cashflow-table .phase4-cashflow-add-category{
+  color:#0f766e;
+  border-color:rgba(20,184,166,.32);
+}
+@media (max-width:1120px){
+  .phase4-cashflow-table-head,
+  .phase4-cashflow-row{
+    grid-template-columns:minmax(220px,1.4fr) minmax(130px,.8fr) minmax(130px,.8fr) minmax(170px,1fr) minmax(130px,.7fr);
+    gap:10px;
+  }
+}
+@media (max-width:860px){
+  .phase4-cashflow-table-head{display:none;}
+  .phase4-cashflow-row{
+    grid-template-columns:1fr;
+    align-items:start;
+    gap:10px;
+    padding:16px;
+  }
+  .phase4-cashflow-cell-actual,
+  .phase4-cashflow-cell-target,
+  .phase4-cashflow-cell-progress{
+    padding-left:50px;
+  }
+  .phase4-cashflow-cell-actions{
+    justify-content:flex-start;
+    padding-left:50px;
+  }
+  .phase4-cashflow-add-btn{min-width:150px;}
+  .phase4-cashflow-progress-track{max-width:100%;}
+}
+@media (max-width:520px){
+  .phase4-cashflow-cell-actual,
+  .phase4-cashflow-cell-target,
+  .phase4-cashflow-cell-progress,
+  .phase4-cashflow-cell-actions{padding-left:0;}
+  .phase4-cashflow-category-wrap{align-items:flex-start;}
+  .phase4-cashflow-add-btn{width:100%;}
+}
+html[data-theme="dark"] .phase4-cashflow-board.phase4-cashflow-table{
+  background:rgba(15,23,42,.96);
+  border-color:rgba(148,163,184,.22);
+  box-shadow:0 16px 36px rgba(0,0,0,.24);
+}
+html[data-theme="dark"] .phase4-cashflow-table-head{
+  background:linear-gradient(180deg, rgba(30,41,59,.96), rgba(15,23,42,.90));
+  border-color:rgba(148,163,184,.18);
+}
+html[data-theme="dark"] .phase4-cashflow-row{
+  background:linear-gradient(90deg, rgba(16,185,129,.08), transparent 38%), rgba(15,23,42,.96);
+  border-color:rgba(148,163,184,.14);
+}
+html[data-theme="dark"] .phase4-cashflow-row:hover,
+html[data-theme="dark"] .phase4-cashflow-row:focus-visible{
+  background:linear-gradient(90deg, rgba(16,185,129,.12), rgba(15,23,42,.98) 46%), rgba(15,23,42,.96);
+}
+html[data-theme="dark"] .phase4-cashflow-amount.is-actual{color:#86efac;}
+html[data-theme="dark"] .phase4-savings-board.phase4-cashflow-table .phase4-cashflow-amount.is-actual{color:#5eead4;}
+html[data-theme="dark"] .phase4-cashflow-add-btn{
+  background:rgba(16,185,129,.10);
+  border-color:rgba(16,185,129,.28);
+  color:#86efac;
+}
+html[data-theme="dark"] .phase4-cashflow-add-category{
+  background:rgba(15,23,42,.72);
+  border-color:rgba(148,163,184,.20);
+  color:#86efac;
+}
+
+/* ============================================================
+   Budget Allocation v2 — card-based layout
+   Scoped under .alloc-v2 wrapper to avoid impacting any other UI.
+   ============================================================ */
+
+.alloc-v2{
+  --av2-radius-lg: 16px;
+  --av2-radius-md: 12px;
+  --av2-radius-sm: 10px;
+  --av2-gap: 12px;
+  --av2-card-bg: #ffffff;
+  --av2-card-border: rgba(15,23,42,0.08);
+  --av2-card-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 14px rgba(15,23,42,0.05);
+  --av2-text: #0f172a;
+  --av2-text-muted: #6b7a90;
+  --av2-text-label: #6b7a90;
+  --av2-divider: rgba(15,23,42,0.08);
+
+  /* status palette */
+  --av2-good: #10b981;
+  --av2-good-soft: rgba(16,185,129,0.10);
+  --av2-good-border: rgba(16,185,129,0.22);
+  --av2-low: #f59e0b;
+  --av2-low-soft: rgba(245,158,11,0.10);
+  --av2-low-border: rgba(245,158,11,0.24);
+  --av2-over: #ef4444;
+  --av2-over-soft: rgba(239,68,68,0.10);
+  --av2-over-border: rgba(239,68,68,0.22);
+  --av2-savings: #6366f1;
+  --av2-savings-soft: rgba(99,102,241,0.10);
+  --av2-savings-border: rgba(99,102,241,0.22);
+  --av2-empty: #94a3b8;
+  --av2-empty-soft: rgba(148,163,184,0.14);
+  --av2-empty-border: rgba(148,163,184,0.22);
+
+  display: grid;
+  gap: 14px;
+  padding: 4px 4px 2px;
+}
+
+/* Override container constraints from old .alloc-grid rules */
+.overview-allocation-card .alloc-v2{
+  width: 100%;
+  min-width: 0;
+}
+
+/* ---------- Top row: Available funds + Used donut ---------- */
+.alloc-v2-top-row{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr);
+  gap: var(--av2-gap);
+  align-items: stretch;
+}
+
+.alloc-v2-hero-card{
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: var(--av2-radius-lg);
+  color: #ffffff;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,0.12) 0%, transparent 55%),
+    linear-gradient(135deg, #065f46 0%, #047857 55%, #034d39 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.10) inset,
+    0 -1px 0 rgba(0,0,0,0.18) inset,
+    0 10px 24px rgba(4,77,57,0.22);
+  min-height: 92px;
+  overflow: hidden;
+}
+
+.alloc-v2-hero-card::after{
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(255,255,255,0.10);
+  pointer-events: none;
+}
+
+.alloc-v2-hero-icon{
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,0.14);
+  color: #ecfdf5;
+  backdrop-filter: blur(4px);
+}
+.alloc-v2-hero-icon svg{ width: 24px; height: 24px; }
+
+.alloc-v2-hero-text{
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.alloc-v2-hero-label{
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(236,253,245,0.86);
+  letter-spacing: 0.01em;
+}
+.alloc-v2-hero-value{
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Used from available funds card */
+.alloc-v2-used-card{
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: var(--av2-radius-lg);
+  background: var(--av2-card-bg);
+  border: 1px solid var(--av2-card-border);
+  box-shadow: var(--av2-card-shadow);
+  min-height: 92px;
+  min-width: 0;
+}
+
+.alloc-v2-used-donut-wrap{
+  flex: 0 0 auto;
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+}
+.alloc-v2-mini-donut{
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.alloc-v2-mini-donut-track{
+  fill: none;
+  stroke: rgba(15,23,42,0.10);
+  stroke-width: 6;
+}
+.alloc-v2-mini-donut-fill{
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 420ms ease;
+}
+.alloc-v2-mini-donut.is-ok .alloc-v2-mini-donut-fill{ stroke: var(--av2-good); }
+.alloc-v2-mini-donut.is-warn .alloc-v2-mini-donut-fill{ stroke: var(--av2-low); }
+.alloc-v2-mini-donut.is-over .alloc-v2-mini-donut-fill{ stroke: var(--av2-over); }
+.alloc-v2-used-donut-label{
+  position: absolute;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--av2-text);
+  letter-spacing: -0.01em;
+}
+
+.alloc-v2-used-body{
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.alloc-v2-used-head{
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.alloc-v2-used-title{
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--av2-text-muted);
+}
+.alloc-v2-used-amounts{
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--av2-text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.alloc-v2-divider{
+  color: var(--av2-text-muted);
+  font-weight: 600;
+  padding: 0 2px;
+}
+.alloc-v2-used-track{
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(15,23,42,0.07);
+  overflow: hidden;
+}
+.alloc-v2-used-fill{
+  height: 100%;
+  border-radius: 999px;
+  background: var(--av2-good);
+  transition: width 420ms ease, background 240ms ease;
+}
+.alloc-v2-used-fill.is-warn{ background: var(--av2-low); }
+.alloc-v2-used-fill.is-over{ background: var(--av2-over); }
+
+/* ---------- Mid row: Shared expenses + Carry-forward summary ---------- */
+.alloc-v2-mid-row{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--av2-gap);
+}
+.alloc-v2-summary-card{
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--av2-radius-lg);
+  background: var(--av2-card-bg);
+  border: 1px solid var(--av2-card-border);
+  box-shadow: var(--av2-card-shadow);
+  min-height: 72px;
+  min-width: 0;
+}
+.alloc-v2-summary-icon{
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+}
+.alloc-v2-summary-icon svg{ width: 22px; height: 22px; }
+.alloc-v2-icon-tint-indigo{
+  background: rgba(99,102,241,0.10);
+  color: #4f46e5;
+}
+.alloc-v2-icon-tint-violet{
+  background: rgba(139,92,246,0.10);
+  color: #6d28d9;
+}
+.alloc-v2-summary-body{
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.alloc-v2-summary-label{
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--av2-text-muted);
+}
+.alloc-v2-summary-value{
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: var(--av2-text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.alloc-v2-summary-info{
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Style the info trigger (renders inside .inline-info-wrap) to match the mockup's blue circle */
+.alloc-v2-summary-info .inline-info-wrap{
+  display: inline-flex;
+}
+.alloc-v2-summary-info .inline-info-trigger{
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(59,130,246,0.10);
+  color: #2563eb;
+  border: 1px solid rgba(59,130,246,0.22);
+  display: grid;
+  place-items: center;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+.alloc-v2-summary-info .inline-info-trigger:hover{
+  background: rgba(59,130,246,0.16);
+  border-color: rgba(59,130,246,0.36);
+  transform: translateY(-1px);
+}
+.alloc-v2-summary-info .inline-info-icon{ width: 16px; height: 16px; }
+
+/* Shared outstanding details: keep panel popup behavior, restyle the trigger */
+.alloc-v2-summary-info .shared-outstanding-details{
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(59,130,246,0.10);
+  color: #2563eb;
+  border: 1px solid rgba(59,130,246,0.22);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+.alloc-v2-summary-info .shared-outstanding-details:hover,
+.alloc-v2-summary-info .shared-outstanding-details:focus-visible{
+  background: rgba(59,130,246,0.16);
+  border-color: rgba(59,130,246,0.36);
+  transform: translateY(-1px);
+}
+.alloc-v2-summary-info .shared-outstanding-icon{
+  font-size: 0.86rem;
+  font-weight: 800;
+  font-style: italic;
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1;
+}
+
+/* ---------- Subscription/recurring note ---------- */
+.alloc-v2 .alloc-subscription-note{
+  padding: 11px 14px;
+  border-radius: var(--av2-radius-md);
+  background: linear-gradient(180deg, rgba(254,243,199,0.55), rgba(254,243,199,0.32));
+  border: 1px solid rgba(245,158,11,0.30);
+  color: #78350f;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.alloc-v2 .alloc-subscription-note::before{
+  content: "";
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 38%, #ffffff 0 1.2px, transparent 1.6px),
+    radial-gradient(circle at 50% 60%, #ffffff 0 2.2px, transparent 2.6px),
+    #f59e0b;
+}
+.alloc-v2 .alloc-subscription-note strong{ font-weight: 800; }
+.alloc-v2 .alloc-subscription-note.warn{
+  background: linear-gradient(180deg, rgba(254,226,226,0.55), rgba(254,226,226,0.32));
+  border-color: rgba(239,68,68,0.30);
+  color: #7f1d1d;
+}
+.alloc-v2 .alloc-subscription-note.warn::before{ background:
+  radial-gradient(circle at 50% 38%, #ffffff 0 1.2px, transparent 1.6px),
+  radial-gradient(circle at 50% 60%, #ffffff 0 2.2px, transparent 2.6px),
+  #ef4444; }
+
+/* ---------- Category cards grid ---------- */
+.alloc-v2-cards-wrap{
+  display: grid;
+  gap: 14px;
+}
+.alloc-v2-cards{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--av2-gap);
+}
+
+.alloc-v2-card{
+  --av2-card-accent: var(--av2-good);
+  --av2-card-accent-soft: var(--av2-good-soft);
+  --av2-card-accent-border: var(--av2-good-border);
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--av2-radius-lg);
+  background: var(--av2-card-bg);
+  border: 1px solid var(--av2-card-accent-border);
+  box-shadow: var(--av2-card-shadow);
+  min-width: 0;
+  overflow: visible; /* allow popup panel to escape via position:fixed */
+  /* NOTE: no `transform` here. A transform on this card establishes a
+     containing block for the position:fixed .alloc-focus-panel inside it,
+     which makes the JS-computed viewport coordinates wrong and causes the
+     Details popup to jump/flicker on hover. Hover lift uses box-shadow only. */
+  transition: box-shadow 160ms ease, border-color 160ms ease;
+}
+.alloc-v2-card::before{
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 999px 999px 0;
+  background: var(--av2-card-accent);
+  opacity: 0.8;
+}
+.alloc-v2-card:hover{
+  box-shadow: 0 2px 4px rgba(15,23,42,0.06), 0 12px 26px rgba(15,23,42,0.09);
+  border-color: var(--av2-card-accent);
+}
+
+.alloc-v2-card.is-good{
+  --av2-card-accent: var(--av2-good);
+  --av2-card-accent-soft: var(--av2-good-soft);
+  --av2-card-accent-border: var(--av2-good-border);
+}
+.alloc-v2-card.is-low{
+  --av2-card-accent: var(--av2-low);
+  --av2-card-accent-soft: var(--av2-low-soft);
+  --av2-card-accent-border: var(--av2-low-border);
+}
+.alloc-v2-card.is-over{
+  --av2-card-accent: var(--av2-over);
+  --av2-card-accent-soft: var(--av2-over-soft);
+  --av2-card-accent-border: var(--av2-over-border);
+}
+.alloc-v2-card.is-savings{
+  --av2-card-accent: var(--av2-savings);
+  --av2-card-accent-soft: var(--av2-savings-soft);
+  --av2-card-accent-border: var(--av2-savings-border);
+}
+.alloc-v2-card.is-empty{
+  --av2-card-accent: var(--av2-empty);
+  --av2-card-accent-soft: var(--av2-empty-soft);
+  --av2-card-accent-border: var(--av2-empty-border);
+}
+
+/* Card head: icon + title block + locked pill */
+.alloc-v2-card-head{
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: flex-start;
+  gap: 10px;
+}
+.alloc-v2-card-icon{
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: var(--av2-card-accent-soft);
+  color: var(--av2-card-accent);
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.alloc-v2-card-icon-emoji{ font-size: 1.2rem; line-height: 1; }
+.alloc-v2-card-icon-letter{
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.alloc-v2-card-title-wrap{
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding-top: 1px;
+}
+.alloc-v2-card-title{
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--av2-text);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.alloc-v2-card-subtitle{
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--av2-text-muted);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.alloc-v2-card-shared-hint{
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--av2-text-muted);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.alloc-v2-card-shared-hint strong{ font-weight: 800; }
+.alloc-v2-card-shared-hint strong.receivable{ color: #047857; }
+.alloc-v2-card-shared-hint strong.payable{ color: #b91c1c; }
+
+/* Locked allocation pill (top-right) */
+.alloc-v2-locked-pill{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 9px;
+  border-radius: 9px;
+  background: rgba(15,23,42,0.04);
+  border: 1px solid rgba(15,23,42,0.08);
+  min-height: 36px;
+}
+.alloc-v2-locked-pill.is-editable{
+  background: rgba(99,102,241,0.06);
+  border-color: rgba(99,102,241,0.18);
+}
+.alloc-v2-locked-pill-label{
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: var(--av2-text-muted);
+  letter-spacing: 0.06em;
+  line-height: 1.05;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.alloc-v2-locked-pill-value{
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--av2-text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.alloc-v2-locked-pill-input{
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+}
+.alloc-v2-locked-pill-input .target-input-v2{
+  width: 46px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0 4px;
+  background: transparent;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--av2-text);
+  text-align: right;
+  letter-spacing: -0.01em;
+}
+.alloc-v2-locked-pill-input .target-input-v2:focus{
+  outline: none;
+  border-color: rgba(99,102,241,0.42);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.16);
+}
+.alloc-v2-locked-pill-input .target-input-v2:disabled{
+  color: var(--av2-text);
+  cursor: not-allowed;
+}
+.alloc-v2-locked-pill-input .target-input-v2::-webkit-outer-spin-button,
+.alloc-v2-locked-pill-input .target-input-v2::-webkit-inner-spin-button{
+  -webkit-appearance: none;
+  margin: 0;
+}
+.alloc-v2-locked-pill-input .target-input-v2[type=number]{ -moz-appearance: textfield; }
+.alloc-v2-pct-symbol{
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--av2-text-muted);
+}
+.alloc-v2-lock-icon{
+  width: 12px;
+  height: 12px;
+  color: var(--av2-text-muted);
+  flex: 0 0 auto;
+}
+
+/* Card progress: allocation line + current/allocated amounts (donut removed) */
+.alloc-v2-card-progress{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+.alloc-v2-card-donut-wrap{
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+}
+.alloc-v2-card-donut{
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.alloc-v2-card-donut-track{
+  fill: none;
+  stroke: rgba(15,23,42,0.10);
+  stroke-width: 6;
+}
+.alloc-v2-card-donut-fill{
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 420ms ease;
+  stroke: var(--av2-card-accent);
+}
+/* On-card donut color tracks card state */
+.alloc-v2-card-donut.is-ok .alloc-v2-card-donut-fill{ stroke: var(--av2-card-accent); }
+.alloc-v2-card-donut.is-warn .alloc-v2-card-donut-fill{ stroke: var(--av2-low); }
+.alloc-v2-card-donut.is-over .alloc-v2-card-donut-fill{ stroke: var(--av2-over); }
+.alloc-v2-card-donut-text{
+  position: absolute;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 1px;
+}
+.alloc-v2-card-donut-pct{
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--av2-text);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.alloc-v2-card-donut-lock{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+.alloc-v2-card-donut-lock .alloc-v2-lock-icon{ width: 10px; height: 10px; }
+
+.alloc-v2-card-amounts{
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+.alloc-v2-card-amounts-row{
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.alloc-v2-card-amount-current,
+.alloc-v2-card-amount-target{
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--av2-text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.alloc-v2-card-amount-current.expense-negative{ color: #b91c1c; }
+.alloc-v2-card-amount-current.income-positive{ color: #047857; }
+.alloc-v2-card-pct{
+  margin-left: auto;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--av2-text-muted);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.alloc-v2-card-pct.over{ color: var(--av2-over); }
+.alloc-v2-card-pct.low{ color: var(--av2-low); }
+.alloc-v2-card-bar{
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(15,23,42,0.08);
+  overflow: hidden;
+}
+.alloc-v2-card-bar-fill{
+  height: 100%;
+  border-radius: 999px;
+  background: var(--av2-low); /* default orange like mockup's living-costs */
+  transition: width 420ms ease, background 240ms ease;
+}
+.alloc-v2-card .alloc-v2-card-bar-fill.warn-80{ background: var(--av2-low); }
+.alloc-v2-card .alloc-v2-card-bar-fill.warn-100{ background: var(--av2-over); }
+.alloc-v2-card.is-good .alloc-v2-card-bar-fill{ background: var(--av2-good); }
+.alloc-v2-card.is-good .alloc-v2-card-bar-fill.warn-80{ background: var(--av2-low); }
+.alloc-v2-card.is-good .alloc-v2-card-bar-fill.warn-100{ background: var(--av2-over); }
+.alloc-v2-card.is-savings .alloc-v2-card-bar-fill{ background: var(--av2-savings); }
+.alloc-v2-card.is-empty .alloc-v2-card-bar-fill{ background: var(--av2-empty); }
+
+/* Card footer: remaining + details button */
+.alloc-v2-card-footer{
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--av2-divider);
+}
+.alloc-v2-card-footer-label{
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--av2-text-muted);
+}
+.alloc-v2-card-footer-value{
+  justify-self: start;
+  min-height: 30px;
+  padding: 4px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(15,23,42,0.08);
+  background: rgba(15,23,42,0.04);
+  color: var(--av2-text);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.alloc-v2-card-footer-value.good-budget,
+.alloc-v2-card-footer-value.value-positive{
+  background: var(--av2-good-soft);
+  border-color: var(--av2-good-border);
+  color: #047857;
+}
+.alloc-v2-card-footer-value.remaining-low{
+  background: var(--av2-low-soft);
+  border-color: var(--av2-low-border);
+  color: #b45309;
+}
+.alloc-v2-card-footer-value.remaining-negative{
+  background: var(--av2-over-soft);
+  border-color: var(--av2-over-border);
+  color: #b91c1c;
+}
+
+/* Details button (replaces old summary visual) */
+.alloc-v2 .alloc-v2-details{
+  position: relative;
+  min-width: 0;
+  justify-self: end;
+}
+.alloc-v2 .alloc-v2-details > summary{
+  list-style: none;
+  cursor: pointer;
+}
+.alloc-v2 .alloc-v2-details > summary::-webkit-details-marker{ display: none; }
+.alloc-v2-details-btn{
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px 6px 12px;
+  min-height: 32px;
+  border-radius: 9px;
+  border: 1px solid rgba(15,23,42,0.10);
+  background: #ffffff;
+  color: var(--av2-text);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+.alloc-v2-details-btn:hover{
+  background: rgba(15,23,42,0.04);
+  border-color: rgba(15,23,42,0.18);
+}
+.alloc-v2-details[open] .alloc-v2-details-btn{
+  background: rgba(15,23,42,0.04);
+  border-color: rgba(15,23,42,0.18);
+  box-shadow: 0 0 0 3px rgba(15,23,42,0.04);
+}
+.alloc-v2-details-label{
+  display: inline-block;
+  line-height: 1;
+}
+.alloc-v2-details-caret{
+  display: inline-block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--av2-text-muted);
+  line-height: 1;
+  transform: translateY(-1px);
+  transition: transform 160ms ease;
+}
+.alloc-v2-details[open] .alloc-v2-details-caret{ transform: rotate(90deg) translateX(-1px); }
+
+/* Suppress the old ::after caret added by .alloc-focus-details-btn */
+.alloc-v2 .alloc-focus-details-btn.alloc-v2-details-btn::after{ content: none; }
+
+/* Popup panel: keep position:fixed (positioned by JS), update look */
+.alloc-v2 .alloc-focus-panel{
+  z-index: 1350;
+  width: min(380px, calc(100vw - 24px));
+  max-width: min(380px, calc(100vw - 24px));
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(15,23,42,0.10);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 22px 50px rgba(15,23,42,0.18);
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+/* ---------- Footer row ---------- */
+.alloc-v2-footer-row{
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding-top: 4px;
+}
+.alloc-v2-lock-note{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(245,158,11,0.10);
+  border: 1px solid rgba(245,158,11,0.22);
+  color: #92400e;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.alloc-v2-lock-note-icon{
+  display: inline-flex;
+  align-items: center;
+  color: #b45309;
+  flex: 0 0 auto;
+}
+.alloc-v2-lock-note-icon svg{ width: 14px; height: 14px; }
+
+.alloc-v2-legend{
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  justify-self: center;
+}
+.alloc-v2-legend-item{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--av2-text-muted);
+  white-space: nowrap;
+}
+.alloc-v2-legend-dot{
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+.alloc-v2-legend-item.is-good .alloc-v2-legend-dot{ background: var(--av2-good); }
+.alloc-v2-legend-item.is-low .alloc-v2-legend-dot{ background: var(--av2-low); }
+.alloc-v2-legend-item.is-over .alloc-v2-legend-dot{ background: var(--av2-over); }
+.alloc-v2-legend-item.is-empty .alloc-v2-legend-dot{ background: var(--av2-empty); }
+
+.alloc-v2-show-all-btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  min-height: 38px;
+  border-radius: 999px;
+  border: 0;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(79,70,229,0.28);
+  transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
+}
+.alloc-v2-show-all-btn:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 9px 22px rgba(79,70,229,0.34);
+  filter: brightness(1.04);
+}
+.alloc-v2-show-all-btn:active{ transform: translateY(0); }
+.alloc-v2-show-all-spacer{ width: 0; height: 0; }
+
+/* Hide the legacy totals strip we left in the DOM for safety */
+.alloc-v2 .alloc-v2-total-hidden{
+  display: none !important;
+}
+
+/* Override the inherited .overview-allocation-card #budgetOverview padding for cleaner edges */
+.overview-allocation-card #budgetOverview:has(.alloc-v2){
+  padding: 0;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1100px){
+  .alloc-v2-cards{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px){
+  .alloc-v2-top-row,
+  .alloc-v2-mid-row{
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .alloc-v2-cards{ grid-template-columns: minmax(0, 1fr); }
+  .alloc-v2-footer-row{
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: stretch;
+  }
+  .alloc-v2-legend{ justify-self: start; }
+  .alloc-v2-show-all-btn{ width: 100%; }
+  .alloc-v2-hero-value{ font-size: 1.55rem; }
+  .alloc-v2-used-amounts{ font-size: 0.92rem; }
+}
+@media (max-width: 480px){
+  .alloc-v2-used-card{ flex-wrap: wrap; }
+  .alloc-v2-card-head{ grid-template-columns: 36px minmax(0, 1fr) auto; gap: 8px; }
+  .alloc-v2-card-icon{ width: 36px; height: 36px; }
+  .alloc-v2-card-footer{ grid-template-columns: 1fr; gap: 8px; }
+  .alloc-v2 .alloc-v2-details{ justify-self: stretch; }
+  .alloc-v2-details-btn{ width: 100%; justify-content: center; }
+}
+
+/* ---------- Dark theme ---------- */
+html[data-theme="dark"] .alloc-v2{
+  --av2-card-bg: rgba(20,26,42,0.92);
+  --av2-card-border: rgba(148,163,184,0.18);
+  --av2-card-shadow: 0 1px 2px rgba(0,0,0,0.30), 0 6px 18px rgba(0,0,0,0.30);
+  --av2-text: #e6edf7;
+  --av2-text-muted: #94a3b8;
+  --av2-text-label: #94a3b8;
+  --av2-divider: rgba(148,163,184,0.18);
+
+  --av2-good: #34d399;
+  --av2-good-soft: rgba(52,211,153,0.14);
+  --av2-good-border: rgba(52,211,153,0.30);
+  --av2-low: #fbbf24;
+  --av2-low-soft: rgba(251,191,36,0.14);
+  --av2-low-border: rgba(251,191,36,0.30);
+  --av2-over: #f87171;
+  --av2-over-soft: rgba(248,113,113,0.14);
+  --av2-over-border: rgba(248,113,113,0.30);
+  --av2-savings: #818cf8;
+  --av2-savings-soft: rgba(129,140,248,0.14);
+  --av2-savings-border: rgba(129,140,248,0.30);
+  --av2-empty: #94a3b8;
+  --av2-empty-soft: rgba(148,163,184,0.16);
+  --av2-empty-border: rgba(148,163,184,0.30);
+}
+html[data-theme="dark"] .alloc-v2-hero-card{
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(255,255,255,0.10) 0%, transparent 55%),
+    linear-gradient(135deg, #064e3b 0%, #065f46 55%, #022c22 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.06) inset,
+    0 -1px 0 rgba(0,0,0,0.34) inset,
+    0 10px 24px rgba(0,0,0,0.38);
+}
+html[data-theme="dark"] .alloc-v2-used-track{ background: rgba(148,163,184,0.16); }
+html[data-theme="dark"] .alloc-v2-card-bar{ background: rgba(148,163,184,0.16); }
+html[data-theme="dark"] .alloc-v2-mini-donut-track,
+html[data-theme="dark"] .alloc-v2-card-donut-track{ stroke: rgba(148,163,184,0.22); }
+html[data-theme="dark"] .alloc-v2-card-amount-current.expense-negative{ color: #fca5a5; }
+html[data-theme="dark"] .alloc-v2-card-amount-current.income-positive{ color: #86efac; }
+html[data-theme="dark"] .alloc-v2-card-shared-hint strong.receivable{ color: #86efac; }
+html[data-theme="dark"] .alloc-v2-card-shared-hint strong.payable{ color: #fca5a5; }
+html[data-theme="dark"] .alloc-v2-summary-info .inline-info-trigger,
+html[data-theme="dark"] .alloc-v2-summary-info .shared-outstanding-details{
+  background: rgba(96,165,250,0.16);
+  color: #93c5fd;
+  border-color: rgba(96,165,250,0.32);
+}
+html[data-theme="dark"] .alloc-v2-icon-tint-indigo{ background: rgba(129,140,248,0.18); color: #c7d2fe; }
+html[data-theme="dark"] .alloc-v2-icon-tint-violet{ background: rgba(167,139,250,0.18); color: #ddd6fe; }
+html[data-theme="dark"] .alloc-v2 .alloc-subscription-note{
+  background: linear-gradient(180deg, rgba(120,53,15,0.34), rgba(120,53,15,0.16));
+  border-color: rgba(251,191,36,0.34);
+  color: #fcd34d;
+}
+html[data-theme="dark"] .alloc-v2 .alloc-subscription-note.warn{
+  background: linear-gradient(180deg, rgba(127,29,29,0.34), rgba(127,29,29,0.16));
+  border-color: rgba(248,113,113,0.34);
+  color: #fca5a5;
+}
+html[data-theme="dark"] .alloc-v2-locked-pill{
+  background: rgba(148,163,184,0.10);
+  border-color: rgba(148,163,184,0.22);
+}
+html[data-theme="dark"] .alloc-v2-locked-pill.is-editable{
+  background: rgba(129,140,248,0.14);
+  border-color: rgba(129,140,248,0.28);
+}
+html[data-theme="dark"] .alloc-v2-locked-pill-input .target-input-v2:focus{
+  background: rgba(15,23,42,0.92);
+  border-color: rgba(129,140,248,0.50);
+  box-shadow: 0 0 0 3px rgba(129,140,248,0.22);
+}
+html[data-theme="dark"] .alloc-v2-details-btn{
+  background: rgba(20,26,42,0.92);
+  border-color: rgba(148,163,184,0.24);
+  color: #e6edf7;
+}
+html[data-theme="dark"] .alloc-v2-details-btn:hover,
+html[data-theme="dark"] .alloc-v2-details[open] .alloc-v2-details-btn{
+  background: rgba(148,163,184,0.10);
+  border-color: rgba(148,163,184,0.36);
+}
+html[data-theme="dark"] .alloc-v2 .alloc-focus-panel{
+  background: rgba(20,26,42,0.98);
+  border-color: rgba(148,163,184,0.24);
+  box-shadow: 0 24px 52px rgba(0,0,0,0.48);
+}
+html[data-theme="dark"] .alloc-v2-card-footer-value{
+  background: rgba(148,163,184,0.10);
+  border-color: rgba(148,163,184,0.22);
+}
+html[data-theme="dark"] .alloc-v2-card-footer-value.good-budget,
+html[data-theme="dark"] .alloc-v2-card-footer-value.value-positive{
+  background: rgba(52,211,153,0.14);
+  border-color: rgba(52,211,153,0.34);
+  color: #86efac;
+}
+html[data-theme="dark"] .alloc-v2-card-footer-value.remaining-low{
+  background: rgba(251,191,36,0.14);
+  border-color: rgba(251,191,36,0.34);
+  color: #fcd34d;
+}
+html[data-theme="dark"] .alloc-v2-card-footer-value.remaining-negative{
+  background: rgba(248,113,113,0.14);
+  border-color: rgba(248,113,113,0.34);
+  color: #fca5a5;
+}
+html[data-theme="dark"] .alloc-v2-lock-note{
+  background: rgba(120,53,15,0.30);
+  border-color: rgba(251,191,36,0.30);
+  color: #fcd34d;
+}
+html[data-theme="dark"] .alloc-v2-lock-note-icon{ color: #fcd34d; }
+html[data-theme="dark"] .alloc-v2-show-all-btn{
+  background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+  box-shadow: 0 8px 22px rgba(79,70,229,0.36);
+}
+
+/* ============================================================
+   Budget Allocation v2 — polish pass
+   Fixes from first preview round:
+   1. Footer "Remaining" pill visibility (it was being collapsed)
+   2. Title block breathing room (Living Costs subtitle truncation)
+   3. Locked-pill width + % symbol wrap fix
+   4. Card amounts row alignment
+   ============================================================ */
+
+/* (1) Locked allocation pill — tighten so the % stays inline, and reduce label/value gap */
+.alloc-v2-locked-pill{
+  gap: 5px;
+  padding: 4px 7px 4px 8px;
+  flex: 0 0 auto;
+  max-width: 130px;
+}
+.alloc-v2-locked-pill-label{
+  font-size: 0.5rem;
+  letter-spacing: 0.05em;
+  line-height: 1.0;
+}
+.alloc-v2-locked-pill-input{
+  gap: 0;
+  align-items: center;
+}
+.alloc-v2-locked-pill-input .target-input-v2{
+  width: 38px;
+  height: 20px;
+  padding: 0 2px;
+  font-size: 0.78rem;
+}
+.alloc-v2-pct-symbol{
+  font-size: 0.78rem;
+  margin-left: 1px;
+}
+.alloc-v2-lock-icon{
+  width: 11px;
+  height: 11px;
+}
+/* Read-only (savings, fixed) locked-pill value gets a hair more breathing room */
+.alloc-v2-locked-pill-value:not(.alloc-v2-locked-pill-input){
+  font-size: 0.8rem;
+  padding-left: 1px;
+}
+
+/* (2) Title block: ensure ellipsis kicks in cleanly, give it priority for space */
+.alloc-v2-card-head{
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center; /* center icon vertically with the title block */
+  gap: 11px;
+}
+.alloc-v2-card-title{
+  font-size: 0.93rem;
+}
+.alloc-v2-card-subtitle{
+  font-size: 0.71rem;
+}
+.alloc-v2-card-shared-hint{
+  font-size: 0.71rem;
+}
+/* When a card has a shared-pending hint, give the title block top-align so it stacks nicely */
+.alloc-v2-card-head:has(.alloc-v2-card-shared-hint){
+  align-items: flex-start;
+}
+
+/* (3) Card padding tightening for narrower card widths */
+.alloc-v2-card{
+  padding: 13px 13px 13px 15px; /* extra left for the accent stripe */
+  gap: 11px;
+}
+
+/* (4) Footer row layout — explicit columns so the Remaining chip is always visible */
+.alloc-v2-card-footer{
+  display: grid;
+  grid-template-columns: auto auto 1fr; /* [label] [value chip] [details button at end] */
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--av2-divider);
+}
+.alloc-v2-card-footer-label{
+  font-size: 0.76rem;
+  color: var(--av2-text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.alloc-v2-card-footer-value{
+  /* Force visible chip in column 2 */
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  min-width: 64px;
+  padding: 4px 11px;
+  border-radius: 9px;
+  border: 1px solid rgba(15,23,42,0.08);
+  background: rgba(15,23,42,0.04);
+  color: var(--av2-text);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.alloc-v2 .alloc-v2-details{
+  justify-self: end;
+}
+
+/* (5) Amounts row: prevent the % chip wrapping below the amounts */
+.alloc-v2-card-amounts{
+  min-width: 0;
+}
+.alloc-v2-card-amounts-row{
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.alloc-v2-card-amount-current,
+.alloc-v2-card-amount-target{
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.alloc-v2-card-pct{
+  margin-left: auto;
+  padding-left: 4px;
+  flex: 0 0 auto;
+}
+
+/* (6) State refinement: remaining===0 → "near limit" (amber), remaining<0 → "over" (red)
+   Done in JS classification — but also guarantee Living Costs at 100% gets amber bar
+   even when state happens to be is-good. The JS already passes warn-80/100 via fillClass,
+   so no CSS change needed here. */
+
+/* (7) Cosmetic: shadow accent under hero card on hover */
+.alloc-v2-hero-card{ transition: transform 160ms ease, box-shadow 160ms ease; }
+.alloc-v2-hero-card:hover{
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.12) inset,
+    0 -1px 0 rgba(0,0,0,0.20) inset,
+    0 14px 30px rgba(4,77,57,0.28);
+}
+
+/* (8) When a card has many narrow columns of long currency, allow currency to compact */
+@media (max-width: 1240px){
+  .alloc-v2-card-amount-current,
+  .alloc-v2-card-amount-target{ font-size: 0.84rem; }
+}
+
+/* (9) Dark theme footer chip background fallback */
+html[data-theme="dark"] .alloc-v2-card-footer-value{
+  background: rgba(148,163,184,0.10);
+  border-color: rgba(148,163,184,0.22);
+  color: var(--av2-text);
+}
+
+/* ============================================================
+   Budget Allocation v2 — neutralize legacy !important rules
+   The legacy ".overview-allocation-card .alloc-focus-remaining" and
+   ".alloc-focus-details" rules use grid-area:remaining/details with
+   !important, designed for the old .alloc-focus-row template.
+   Inside .alloc-v2 we have a different grid; neutralize them.
+   ============================================================ */
+.overview-allocation-card .alloc-v2 .alloc-focus-remaining{
+  grid-area: auto !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 4px 11px !important;
+  border-radius: 9px !important;
+}
+.overview-allocation-card .alloc-v2 .alloc-focus-details{
+  grid-area: auto !important;
+  width: auto !important;
+  display: inline-block !important;
+  position: relative !important;
+}
+.overview-allocation-card .alloc-v2 .alloc-focus-details > summary{
+  display: inline-flex !important;
+}
+
+/* The legacy ".alloc-focus-details-btn" rule sets width:100% to fill the old grid cell.
+   Inside a card-footer we want the button to size to its content. */
+.alloc-v2 .alloc-focus-details-btn.alloc-v2-details-btn{
+  width: auto;
+}
+
+/* The legacy fallback rule (line ~19608) forces .alloc-focus-row > details into grid-column:4.
+   That selector requires .alloc-focus-row parent; we don't have one here, so it doesn't
+   match — no override needed. */
+
+/* ============================================================
+   Budget Allocation v2 — locked-pill final polish
+   ============================================================ */
+.alloc-v2-locked-pill{
+  max-width: none;
+  padding: 4px 6px 4px 8px;
+  gap: 4px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.alloc-v2-locked-pill-label{
+  font-size: 0.48rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.alloc-v2-locked-pill-value{
+  display: inline-flex;
+  align-items: baseline;
+  flex: 0 0 auto;
+}
+.alloc-v2-locked-pill-input{
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  flex: 0 0 auto;
+}
+.alloc-v2-locked-pill-input .target-input-v2{
+  width: 44px;       /* enough for "XX.XX" in monospace 0.76rem */
+  height: 18px;
+  padding: 0 1px;
+  font-size: 0.76rem;
+  text-align: right;
+}
+.alloc-v2-pct-symbol{
+  font-size: 0.76rem;
+  margin-left: 0;
+  padding-left: 1px;
+}
+.alloc-v2-lock-icon{
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
+}
+/* Read-only value (savings, fixed costs): no input, just text */
+.alloc-v2-locked-pill-value:not(.alloc-v2-locked-pill-input){
+  font-size: 0.76rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* Card head: prevent the lock pill from squashing the title block too narrow */
+.alloc-v2-card-head{
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+}
+.alloc-v2-card-icon{
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+/* Title block compaction */
+.alloc-v2-card-title{
+  font-size: 0.9rem;
+}
+
+/* Amounts row: monospace font tracks long currency cleanly */
+.alloc-v2-card-amount-current,
+.alloc-v2-card-amount-target{
+  font-size: 0.84rem;
+}
+
+/* Shared-pending hint: don't truncate "Shared pending: €189.97" */
+.alloc-v2-card-shared-hint{
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.3;
+}
+
+
+/* ============================================================
+   Budget Allocation — minimal refinements requested
+   Scope: .alloc-v2 only. No shared Income/Savings styles touched.
+   - usage % moved to tile top-right
+   - progress bar removed
+   - allocation target remains in donut as LOCKED / ALLOCATE
+   - dropdown panels stay above tiles
+   ============================================================ */
+.alloc-v2 .alloc-v2-card-head{
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 4px 11px;
+}
+.alloc-v2 .alloc-v2-card-head .alloc-v2-card-icon{
+  grid-row: 1;
+  grid-column: 1;
+  align-self: start;
+}
+.alloc-v2 .alloc-v2-card-head .alloc-v2-card-title-wrap{
+  grid-row: 1;
+  grid-column: 2;
+  align-self: center;
+}
+.alloc-v2 .alloc-v2-card-head .alloc-v2-card-usage-pct{
+  grid-row: 1;
+  grid-column: 3;
+}
+/* Subtitle + shared-pending hint flow full-width below, under the emoji. */
+.alloc-v2 .alloc-v2-card-meta{
+  grid-row: 2;
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.alloc-v2 .alloc-v2-card-meta:empty{
+  display: none;
+}
+.alloc-v2 .alloc-v2-card-usage-pct{
+  justify-self: end;
+  align-self: start;
+  position: relative;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.alloc-v2 .alloc-v2-card-usage-ring{
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.alloc-v2 .alloc-v2-card-usage-ring-track{
+  fill: none;
+  stroke: rgba(15,23,42,0.10);
+  stroke-width: 3;
+}
+.alloc-v2 .alloc-v2-card-usage-ring-fill{
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke: var(--av2-card-accent);
+  transition: stroke-dashoffset 420ms ease;
+}
+.alloc-v2 .alloc-v2-card-usage-ring.is-ok .alloc-v2-card-usage-ring-fill{ stroke: var(--av2-card-accent); }
+.alloc-v2 .alloc-v2-card-usage-ring.is-warn .alloc-v2-card-usage-ring-fill{ stroke: var(--av2-low); }
+.alloc-v2 .alloc-v2-card-usage-ring.is-over .alloc-v2-card-usage-ring-fill{ stroke: var(--av2-over); }
+.alloc-v2 .alloc-v2-card-usage-pct-value{
+  position: relative;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.6rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--av2-text-muted);
+  white-space: nowrap;
+}
+.alloc-v2 .alloc-v2-card-usage-pct.over .alloc-v2-card-usage-pct-value{ color: var(--av2-over); }
+.alloc-v2 .alloc-v2-card-usage-pct.low .alloc-v2-card-usage-pct-value{ color: var(--av2-low); }
+.alloc-v2 .alloc-v2-card-title{
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.14;
+  max-width: 100%;
+}
+.alloc-v2 .alloc-v2-card-bar,
+.alloc-v2 .alloc-v2-card-bar-fill{
+  display: none !important;
+}
+.alloc-v2 .alloc-v2-card-amounts{
+  gap: 5px;
+}
+/* Allocation target line sits above the current/allocated amounts. */
+.alloc-v2 .alloc-v2-card-alloc-line{
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+.alloc-v2 .alloc-v2-card-amounts-row{
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto minmax(0, auto);
+  align-items: baseline;
+  justify-content: start;
+  column-gap: 9px;
+  min-width: 0;
+}
+.alloc-v2 .alloc-v2-card-amount-current,
+.alloc-v2 .alloc-v2-card-amount-target{
+  overflow: visible;
+  text-overflow: clip;
+  max-width: none;
+  white-space: nowrap;
+}
+.alloc-v2 .alloc-v2-card-donut-text{
+  width: 48px;
+  line-height: 1;
+  gap: 1px;
+}
+.alloc-v2 .alloc-v2-card-donut-state{
+  display: inline-block;
+  font-size: 0.5rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: var(--av2-text-muted);
+  text-transform: uppercase;
+  line-height: 1;
+}
+.alloc-v2 .alloc-v2-card-donut-pct{
+  display: inline-block;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: var(--av2-text);
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+.alloc-v2 .alloc-v2-card-donut-input{
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  max-width: none;
+  line-height: 1;
+}
+.alloc-v2 .alloc-v2-card-donut-input .target-input-v2{
+  width: 42px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: var(--av2-text);
+  text-align: right;
+  line-height: 1;
+}
+.alloc-v2 .alloc-v2-card-donut-input .target-input-v2:focus{
+  outline: none;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.18);
+}
+.alloc-v2 .alloc-v2-card-donut-input .target-input-v2:disabled{
+  cursor: not-allowed;
+  opacity: 1;
+}
+.alloc-v2 .alloc-v2-card-donut-input .target-input-v2::-webkit-outer-spin-button,
+.alloc-v2 .alloc-v2-card-donut-input .target-input-v2::-webkit-inner-spin-button{
+  -webkit-appearance: none;
+  margin: 0;
+}
+.alloc-v2 .alloc-v2-card-donut-input .target-input-v2[type=number]{ -moz-appearance: textfield; }
+.alloc-v2 .alloc-v2-card-donut-input .alloc-v2-pct-symbol{
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.74rem;
+  font-weight: 900;
+  color: var(--av2-text-muted);
+  padding-left: 0;
+}
+.alloc-v2 .alloc-v2-card-donut-lock{
+  margin-top: 0;
+  align-self: center;
+}
+.alloc-v2 .alloc-v2-card-donut-lock .alloc-v2-lock-icon{
+  width: 10px;
+  height: 10px;
+}
+.alloc-v2 .alloc-focus-panel{
+  z-index: 3000 !important;
+}
+.alloc-v2 .alloc-v2-details[open]{
+  z-index: 3001;
+}
+@media (max-width: 1120px){
+  .alloc-v2 .alloc-v2-card-amount-current,
+  .alloc-v2 .alloc-v2-card-amount-target{ font-size: 0.78rem; }
+}
+
+
+/* veyra refinement: Budget Allocation cards
+   - Remove the visible "Remaining" label from the card footer.
+   - Cards in a row stay equal height (CSS grid stretch). The header is packed
+     at the top, the footer pins to the bottom, and the flexible slack sits
+     BETWEEN the header and the progress block so the LOCKED/% line and the
+     current/allocated amounts sit just above the divider — aligned across
+     every card regardless of how tall its header is. */
+.alloc-v2 .alloc-v2-card{
+  grid-template-rows: auto 1fr auto !important;
+  align-items: stretch;
+}
+.alloc-v2 .alloc-v2-card-head{
+  align-self: start;
+}
+.alloc-v2 .alloc-v2-card-progress{
+  align-self: end;
+  min-height: 0;
+}
+.alloc-v2 .alloc-v2-card-amounts,
+.alloc-v2 .alloc-v2-card-amounts-row{
+  align-self: end;
+}
+.alloc-v2 .alloc-v2-card-footer{
+  align-self: end;
+  grid-template-columns: 1fr !important;
+  grid-template-areas: none !important;
+  grid-auto-flow: row;
+  align-items: stretch;
+  gap: 8px;
+}
+/* Stacked footer: Remaining pill on top (left), action button full-width below.
+   The footer children reuse legacy .alloc-focus-remaining / .alloc-focus-details
+   class names, which older .overview-allocation-card rules pin to named grid
+   areas with !important. Reset that placement here so they flow in one column. */
+.alloc-v2 .alloc-v2-card-footer .alloc-v2-card-footer-value,
+.overview-allocation-card .alloc-v2 .alloc-v2-card-footer .alloc-focus-remaining{
+  grid-area: auto !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  justify-self: start !important;
+  width: auto !important;
+}
+.alloc-v2 .alloc-v2-card-footer .alloc-v2-details,
+.overview-allocation-card .alloc-v2 .alloc-v2-card-footer .alloc-focus-details{
+  grid-area: auto !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  justify-self: stretch !important;
+  width: 100% !important;
+  display: block !important;
+}
+.alloc-v2 .alloc-v2-card-footer .alloc-v2-details > summary{
+  width: 100%;
+}
+.alloc-v2 .alloc-v2-card-footer .alloc-v2-details-btn{
+  width: 100%;
+  justify-content: center;
+}
+.alloc-v2 .alloc-v2-card-footer-label{
+  display: none !important;
+}
+@media (max-width: 760px){
+  .alloc-v2 .alloc-v2-card{
+    grid-template-rows: auto auto auto !important;
+  }
+  .alloc-v2 .alloc-v2-card-head{
+    min-height: 0;
+  }
+}
+
+/* ── Drag-to-reorder allocation cards ─────────────────────────────────────── */
+.alloc-v2 .alloc-v2-card{
+  /* room is already present; handle is absolutely positioned top-center */
+}
+.alloc-v2 .alloc-v2-card-drag-handle{
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  width: 30px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(15,23,42,0.28);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 140ms ease, color 140ms ease, background 140ms ease;
+}
+.alloc-v2 .alloc-v2-card-drag-handle svg{ transform: rotate(90deg); }
+.alloc-v2 .alloc-v2-card:hover .alloc-v2-card-drag-handle{ opacity: 1; }
+.alloc-v2 .alloc-v2-card-drag-handle:hover{
+  color: rgba(15,23,42,0.55);
+  background: rgba(15,23,42,0.05);
+}
+.alloc-v2 .alloc-v2-card-drag-handle:active{ cursor: grabbing; }
+/* Always show the handle on touch devices (no hover) */
+@media (hover: none){
+  .alloc-v2 .alloc-v2-card-drag-handle{ opacity: 0.6; }
+}
+
+.alloc-v2 .alloc-v2-card.alloc-is-dragging{
+  opacity: 0.5;
+  cursor: grabbing;
+}
+/* Drop indicators: a colored bar on the side where the card will land */
+.alloc-v2 .alloc-v2-card.alloc-drag-over-before::after,
+.alloc-v2 .alloc-v2-card.alloc-drag-over-after::after{
+  content: "";
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--av2-card-accent, #6366f1);
+  z-index: 5;
+}
+.alloc-v2 .alloc-v2-card.alloc-drag-over-before::after{ left: -7px; }
+.alloc-v2 .alloc-v2-card.alloc-drag-over-after::after{ right: -7px; }
+
+
+/* v1324 — Budget Allocation popover/tooltip containment fix. */
+.alloc-focus-details[open],
+.alloc-focus-details[open] .alloc-focus-details-btn{
+  position:relative;
+  z-index:10020;
+}
+.alloc-focus-panel{
+  z-index:10030 !important;
+}
+.shared-outstanding-details{
+  position:relative;
+  z-index:10040;
+}
+.shared-outstanding-panel{
+  z-index:10050 !important;
+}
+
+
+/* v1326 — Surgical Budget Allocation popup stability.
+   Keeps native Details/Manage Shared panels on their original <details>/<summary> behavior,
+   and only raises the shared-expenses hover panel above category tiles. */
+.overview-allocation-card,
+.overview-allocation-card .allocation-section,
+.overview-allocation-card .alloc-v2,
+.overview-allocation-card .alloc-v2-cards-wrap,
+.overview-allocation-card .alloc-v2-cards,
+.overview-allocation-card .alloc-v2-card{
+  overflow: visible;
+}
+.alloc-v2 .alloc-focus-details[open]{
+  z-index: 10020;
+}
+.alloc-v2 .alloc-focus-details[open] .alloc-focus-panel{
+  z-index: 10030 !important;
+}
+.shared-outstanding-details{
+  position: relative;
+  z-index: 10040;
+}
+.shared-outstanding-panel{
+  z-index: 10050 !important;
+}
