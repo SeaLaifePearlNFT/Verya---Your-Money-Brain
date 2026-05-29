@@ -216,6 +216,7 @@
 
 
 <link rel="stylesheet" href="styles/smart-insights.css">
+<link rel="stylesheet" href="styles/user-guide.css">
 </head>
 <body>
 <!-- Theme toggle — injected for dark mode support -->
@@ -330,7 +331,7 @@
 <input accept=".csv" id="csvImportFile" style="display:none" type="file"/>
 <button class="secondary" id="restoreBackupBtn" style="display:none" title="Restore the automatic backup taken before your last import"><span class="btn-icon">⏮</span> Restore backup</button>
 <button class="secondary" id="noteDictionaryBtn" onclick="window.openNoteDictionaryModal &amp;&amp; window.openNoteDictionaryModal()" type="button"><span class="btn-icon">🧠</span> Note Dictionary</button>
-<button class="secondary sidebar-guide-btn" id="userGuideBtn" type="button" title="Open the beginner's guide"><span class="btn-icon">📖</span> User Guide</button>
+<button class="secondary sidebar-guide-btn setup-wizard-sidebar-btn" id="setupWizardBtn" type="button" title="Start the first-time setup wizard"><span class="btn-icon">🧭</span> Setup Wizard</button>
 <div class="customize-cards-anchor sidebar-customize-anchor" id="customizeCardsAnchor">
 <button class="secondary sidebar-customize-btn" id="customizeCardsBtn" title="Show or hide overview cards" type="button" aria-haspopup="dialog" aria-expanded="false"><span class="btn-icon">☰</span> Customise</button>
 <div aria-label="Toggle overview cards" class="card-visibility-popover" id="cardVisibilityPopover" role="dialog">
@@ -837,7 +838,7 @@
 <script src="js/features/csv-import.js"></script>
 
 <!-- ═══════════════════════════════════════════════════════════
-     USER GUIDE MODAL — v1215
+     USER GUIDE MODAL — v2 guide hub
      Uses the existing cbm-overlay / cbm-modal layout wrapper.
      ═══════════════════════════════════════════════════════════ -->
 <div class="cbm-overlay guide-overlay" id="guideOverlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="guideTitle">

@@ -9029,6 +9029,7 @@ function openCategoryTrendsModal() {
       const maxVal = Number(trendModel.maxVal || 1);
 
       title.textContent = `All Category Trends · ${month.name}`;
+      modal.classList.add('category-trends-modal-modern');
       meta.textContent = trendModel.modalMeta || (rows.length
         ? `${rows.length} categories shown in the same order as the Expenses tab.`
         : "No category trend data yet.");
@@ -9647,10 +9648,13 @@ function renderCategoryTrends(month) {
         : { selectedRows: [], monthLabels: [], maxVal: 1, hasPreviousMonth: false };
       if (!trendModel.hasPreviousMonth) {
         wrap.innerHTML = `
-          <div class="trends-head">
-            ${renderUnifiedCardHeader({ title: 'Category Trends' })}
+          <div class="trends-head trends-head-modern">
+            <div class="trends-title-block">
+              <span class="trends-eyebrow">Category movement</span>
+              <div class="trends-title-row"><h3>Category Trends</h3></div>
+              <p>Last 3 months per category — fixed buckets use committed-plan logic, variable buckets use pace.</p>
+            </div>
           </div>
-          <div class="trends-sub">Last 3 months per category — fixed buckets use committed-plan logic, variable buckets use pace.</div>
           <div class="empty">Add at least one previous month to see trends.</div>
         `;
         return;
@@ -9661,15 +9665,20 @@ function renderCategoryTrends(month) {
       const maxVal = Number(trendModel.maxVal || 1);
 
       const trendsTooltip = 'Top 3 automatically selected by target gap, committed items, and recent movement.';
-      const trendsAction = '<button class="trends-open-btn" type="button" onclick="openCategoryTrendsModal()">View all</button>';
       wrap.innerHTML = `
-        <div class="trends-head">
-          ${renderUnifiedCardHeader({
-            title: 'Category Trends',
-            tooltipId: 'categoryTrendsSelectionTooltip',
-            tooltipHtml: trendsTooltip,
-            rightHtml: trendsAction
-          })}
+        <div class="trends-head trends-head-modern">
+          <div class="trends-title-block">
+            <span class="trends-eyebrow">Category movement</span>
+            <div class="trends-title-row">
+              <h3>Category Trends</h3>
+              <span class="inline-info-wrap">
+                <button type="button" class="inline-info-trigger" aria-label="How category trends are selected">i</button>
+                <span class="inline-info-tooltip">${trendsTooltip}</span>
+              </span>
+            </div>
+            <p>Top categories selected by target gap, recent movement, and committed impact.</p>
+          </div>
+          <button class="trends-open-btn trends-open-btn-modern" type="button" onclick="openCategoryTrendsModal()">View all</button>
         </div>
         <div class="trend-insight-list">
           ${topRows.map(function(row) { return trendInsightRowHtml(row, maxVal, monthLabels, false); }).join("")}
@@ -13415,10 +13424,11 @@ function renderRows(targetId, rows, kind) {
       const w = canvasMetrics.w;
       const h = canvasMetrics.h;
       const cx = w / 2;
-      const cy = h / 2 - 2;
-      const outerR = Math.min(w, h) * 0.36;
-      const innerR = outerR * 0.46;
-      const depth = Math.max(14, Math.round(outerR * 0.13));
+      const cy = h / 2;
+      const outerR = Math.min(w, h) * 0.38;
+      const innerR = outerR * 0.58;
+      const depth = 0;
+      const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark' || document.body.classList.contains('dark-mode');
       ctx.clearRect(0, 0, w, h);
 
       const items = chartBreakdown(month);
@@ -13491,27 +13501,18 @@ function renderRows(targetId, rows, kind) {
       const hitRegions = [];
       let startAngle = -Math.PI / 2;
 
-      // soft base shadow
+      // modern soft base halo
       ctx.save();
-      ctx.fillStyle = "rgba(15,23,42,0.10)";
+      const halo = ctx.createRadialGradient(cx, cy, innerR * 0.7, cx, cy, outerR * 1.18);
+      halo.addColorStop(0, isDarkTheme ? "rgba(129,140,248,0.04)" : "rgba(99,102,241,0.05)");
+      halo.addColorStop(1, isDarkTheme ? "rgba(15,23,42,0.00)" : "rgba(30,64,120,0.00)");
+      ctx.fillStyle = halo;
       ctx.beginPath();
-      ctx.ellipse(cx, cy + depth + 13, outerR * 0.96, outerR * 0.20, 0, 0, Math.PI * 2);
+      ctx.arc(cx, cy, outerR * 1.14, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
-      // layered extrusion, bottom to top
-      for (let layer = depth; layer >= 1; layer--) {
-        let a = -Math.PI / 2;
-        items.forEach((item, idx) => {
-          const angle = (item.value / total) * Math.PI * 2;
-          const end = a + angle;
-          const offset = segmentOffsetFor(a, end, idx);
-          drawSegment(a, end, outerR, innerR, layer, shade(colors[idx % colors.length], -42), offset.x, offset.y);
-          a = end;
-        });
-      }
-
-      // top face with a subtle bevel highlight
+      // top face with a subtle modern highlight
       items.forEach((item, idx) => {
         const angle = (item.value / total) * Math.PI * 2;
         const endAngle = startAngle + angle;
@@ -13527,10 +13528,10 @@ function renderRows(targetId, rows, kind) {
 
       // inner cutout and center label
       ctx.save();
-      ctx.shadowColor = "rgba(15,23,42,0.10)";
-      ctx.shadowBlur = 12;
-      ctx.shadowOffsetY = 4;
-      ctx.fillStyle = "rgba(255,255,255,0.96)";
+      ctx.shadowColor = isDarkTheme ? "rgba(0,0,0,0.32)" : "rgba(15,23,42,0.10)";
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetY = 5;
+      ctx.fillStyle = isDarkTheme ? "rgba(15,23,42,0.96)" : "rgba(255,255,255,0.96)";
       ctx.beginPath();
       ctx.arc(cx, cy, innerR * 0.96, 0, Math.PI * 2);
       ctx.fill();
@@ -13567,10 +13568,10 @@ function renderRows(targetId, rows, kind) {
 
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = "#64748b";
+      ctx.fillStyle = isDarkTheme ? "#94a3b8" : "#64748b";
       ctx.font = "800 " + centerLabelSize + "px Geist, ui-sans-serif, sans-serif";
       ctx.fillText("Total", cx, cy - Math.round(innerR * 0.22));
-      ctx.fillStyle = "#122033";
+      ctx.fillStyle = isDarkTheme ? "#f8fafc" : "#122033";
       ctx.font = "850 " + centerValueSize + "px Geist Mono, ui-monospace, monospace";
       ctx.fillText(centerValue, cx, cy + Math.round(innerR * 0.16));
       ctx.textBaseline = "alphabetic";
@@ -13595,13 +13596,13 @@ function renderRows(targetId, rows, kind) {
         ctx.shadowBlur = 14;
         ctx.shadowOffsetY = 6;
         roundedRect(tagX, tagY, tagW, tagH, 999);
-        ctx.fillStyle = "rgba(255,255,255,0.96)";
+        ctx.fillStyle = isDarkTheme ? "rgba(15,23,42,0.96)" : "rgba(255,255,255,0.96)";
         ctx.fill();
         ctx.shadowColor = "transparent";
         ctx.lineWidth = 1;
-        ctx.strokeStyle = "rgba(111,135,154,0.18)";
+        ctx.strokeStyle = isDarkTheme ? "rgba(148,163,184,0.26)" : "rgba(111,135,154,0.18)";
         ctx.stroke();
-        ctx.fillStyle = "#122033";
+        ctx.fillStyle = isDarkTheme ? "#f8fafc" : "#122033";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(tagText, tagX + tagW / 2, tagY + tagH / 2 + 0.5);
@@ -20186,4 +20187,25 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
     } else {
       bootstrapDashboardApplication();
     }
+
+
+/* veyra-close-x-hardening: ensure Category Trends close button renders as an X even when host HTML still says "Close" */
+(function(){
+  function syncCategoryTrendsCloseX(){
+    var btn = document.getElementById('categoryTrendsCloseBtn');
+    if (!btn) return;
+    btn.setAttribute('aria-label', 'Close Category Trends');
+    btn.textContent = '×';
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', syncCategoryTrendsCloseX);
+  } else {
+    syncCategoryTrendsCloseX();
+  }
+  document.addEventListener('click', function(event){
+    if (event.target && event.target.closest && event.target.closest('#categoryTrendsModal')) {
+      setTimeout(syncCategoryTrendsCloseX, 0);
+    }
+  }, true);
+})();
 
