@@ -1897,7 +1897,7 @@
      ═══════════════════════════════════════════════════════════ */
   function injectOverviewWidget(){
     if(document.getElementById('ccOverviewWidget')) return;
-    let anchor=document.querySelector('.status-banner');
+    let anchor=document.querySelector('.ov-hero')||document.getElementById('finStateBanner');
     if(!anchor) return;
     let widget=document.createElement('div');
     widget.className='cc-overview-widget'; widget.id='ccOverviewWidget';

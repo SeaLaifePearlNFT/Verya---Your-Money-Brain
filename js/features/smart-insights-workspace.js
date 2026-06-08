@@ -8,6 +8,11 @@
     var engine = (window.InsightEngine && typeof window.InsightEngine.analyze === 'function') ? window.InsightEngine.analyze(month) : null;
     var projection = engine ? Number(engine.forecast.projectedAvailableEnd || 0) : 0;
     var burnPct = engine ? Number(engine.budget.forecastEndPct || 0) : 0;
+    var forecastCard = engine && engine.cardModels ? engine.cardModels.forecastCard : null;
+    if (forecastCard && forecastCard.monthClosed) {
+      projection = Number(forecastCard.closedForecastFinalAmount || projection || 0);
+      if (forecastCard.burnDisplay) burnPct = Number(forecastCard.burnDisplay.forecastEndPct || burnPct || 0);
+    }
     var due = engine ? Number(engine.subscriptions.unpaidTotal || 0) : 0;
     var dueCount = engine ? Number(engine.subscriptions.dueCount || 0) : 0;
     var signals = (engine && engine.signals) ? engine.signals : null;

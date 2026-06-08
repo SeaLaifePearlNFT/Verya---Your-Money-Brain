@@ -2,15 +2,26 @@
   'use strict';
 
   /* =====================================================================
-     ACHIEVEMENTS TAB v749
-     Changes from v737:
-     A. Storage v5: month-scoped cadence locking, Sunday-based weekly schedule
-     B. Weekly is progressive in-month (Sunday checkpoints), Monthly unchanged
-     C. Cadence locked per month on first completion — not global
-     D. History: Year → Month → Weekly tree (collapsible)
-     E. KPI row: Monthly unchanged; Weekly shows delta vs previous weekly entry
-     F. Achievement pill: month-aware, cadence-aware
-     G. Migration: v4 → v5 with fallback safety
+     ACHIEVEMENTS TAB v754
+     Changes from v753:
+     A. Full UI redesign. Hero "momentum band" (level ring, Check-In Streak with
+        flame, consistency dots, reviews, XP bar) replaces the 4 flat KPI tiles
+        AND the separate momentum card. New .ax-* classes; uses --font-display
+        (Bricolage Grotesque) for hero/heading numerals.
+     B. Progress card is now an SVG donut (unlocked/in-progress/locked) + a
+        "recently unlocked" strip.
+     C. Check-in card + Targets grid re-skinned via id-scoped CSS
+        (#achCheckinPanel / #achBadgeSection) so overrides beat the
+        view-scoped dark rules in smart-insights.css. Targets get medallions,
+        accent bars, hover lift; Create Target is a purple gradient button.
+     D. Removed the insight strip and the orphaned renderMomentumCard.
+     ---------------------------------------------------------------------
+     v753: "Your momentum" card (streak/consistency/XP) replaced financial cards.
+     v752: History moved into a modal opened from the check-in card.
+     v751: Combined Recent + Completed modal; main page shows Targets only.
+     v750: Single check-in card; control row + Required toggle; self-ticked
+           checklist gated on all four.
+     v749 baseline: Storage v5, cadence-aware pill, v4→v5 migration.
      ===================================================================== */
 
   let CHECKIN_STORAGE_KEY_V4 = 'budget_checkin_v4';
@@ -112,7 +123,7 @@
   }
 
   function emptyV5State() {
-    return { version: 5, selectedCadenceDraft: 'monthly', years: {} };
+    return { version: 5, selectedCadenceDraft: 'monthly', checkinMandatory: false, years: {} };
   }
 
   function getOrCreateMonthRecord(state, monthKey) {
@@ -487,6 +498,13 @@
           let snap = rec && rec.monthly ? rec.monthly.snapshot : null;
           if (!snap || snap.check_in_status !== 'completed') showPill = true;
         }
+      }
+      // Mandatory mode: keep the reminder lit all month for an incomplete monthly
+      // check-in, regardless of the usual last-5-days window. (Weekly is already
+      // covered above — its pill lights whenever a due Sunday entry is open.)
+      if (!showPill && state.checkinMandatory === true && locked !== 'weekly') {
+        let snap = rec && rec.monthly ? rec.monthly.snapshot : null;
+        if (!snap || snap.check_in_status !== 'completed') showPill = true;
       }
       pill.style.display = showPill ? '' : 'none';
     } catch(e) { pill.style.display = 'none'; }
@@ -1142,6 +1160,95 @@
   }
 
   // Always renders all 3 KPI blocks. Before first check-in they show a dimmed empty state.
+  /* =====================================================================
+     MOMENTUM ENGINE (v753) — streak, consistency, XP/level
+     Reuses existing data: completed check-ins per month (state.years) and
+     completed badge XP (level * 25). Replaces the financial "Needs Attention"
+     content, which belongs in Overview/Smart Insights, not Achievements.
+     ===================================================================== */
+
+  function monthHasCompletedCheckin(mRec) {
+    if (!mRec) return false;
+    if (mRec.monthly && mRec.monthly.snapshot && mRec.monthly.snapshot.completed_at) return true;
+    if (mRec.weekly && mRec.weekly.entries && mRec.weekly.entries.some(function(e) { return e.status === 'completed'; })) return true;
+    return false;
+  }
+
+  // Step a YYYY-MM key by `delta` calendar months (handles year wrap).
+  function shiftMonthKey(mk, delta) {
+    let parts = String(mk).split('-');
+    let y = parseInt(parts[0], 10);
+    let m = parseInt(parts[1], 10) + delta;
+    while (m < 1)  { m += 12; y -= 1; }
+    while (m > 12) { m -= 12; y += 1; }
+    return y + '-' + (m < 10 ? '0' + m : '' + m);
+  }
+
+  function collectCompletedMonthSet(state) {
+    let set = {};
+    let years = state.years || {};
+    Object.keys(years).forEach(function(y) {
+      let months = (years[y] && years[y].months) || {};
+      Object.keys(months).forEach(function(mk) {
+        if (monthHasCompletedCheckin(months[mk])) set[mk] = true;
+      });
+    });
+    return set;
+  }
+
+  // Streak + consistency relative to the real current calendar month (nowMk),
+  // independent of which month is being viewed.
+  function computeMomentumStats(state, nowMk) {
+    let set = collectCompletedMonthSet(state);
+    let keys = Object.keys(set).sort();
+    let totalReviews = keys.length;
+
+    // Longest run of consecutive calendar months ever.
+    let longest = 0, run = 0, prev = null;
+    keys.forEach(function(mk) {
+      if (prev && shiftMonthKey(prev, 1) === mk) run += 1; else run = 1;
+      if (run > longest) longest = run;
+      prev = mk;
+    });
+
+    // Current streak: only "alive" if the latest completed month is this month
+    // or last month (grace for the current period not being done yet).
+    let current = 0;
+    if (keys.length) {
+      let last = keys[keys.length - 1];
+      if (last === nowMk || last === shiftMonthKey(nowMk, -1)) {
+        current = 1;
+        let cursor = last;
+        while (set[shiftMonthKey(cursor, -1)]) { current += 1; cursor = shiftMonthKey(cursor, -1); }
+      }
+    }
+
+    // Consistency over the last 6 months ending at nowMk.
+    let window = 6, hits = 0, dots = [];
+    for (let i = window - 1; i >= 0; i--) {
+      let mk = shiftMonthKey(nowMk, -i);
+      let on = !!set[mk];
+      if (on) hits += 1;
+      dots.push({ mk: mk, on: on });
+    }
+
+    return { current: current, longest: longest, totalReviews: totalReviews, window: window, hits: hits, dots: dots };
+  }
+
+  function computeXpLevel(totalXp) {
+    let perLevel = 100;
+    totalXp = Math.max(0, totalXp | 0);
+    let level = Math.floor(totalXp / perLevel) + 1;
+    let intoLevel = totalXp - (level - 1) * perLevel;
+    let toNext = perLevel - intoLevel;
+    let pct = Math.max(0, Math.min(100, Math.round((intoLevel / perLevel) * 100)));
+    return { level: level, totalXp: totalXp, intoLevel: intoLevel, toNext: toNext, pct: pct, perLevel: perLevel };
+  }
+
+  function totalXpFromEntries(entries) {
+    return (entries || []).reduce(function(sum, e) { return sum + (Number(e.level || 1) * 25); }, 0);
+  }
+
   function renderAlwaysOnKpiRow(vm, rec, cadence) {
     let hasData = false;
     if (cadence === 'weekly') {
@@ -1199,6 +1306,85 @@
       + '<button type="button" class="inline-info-trigger" aria-label="' + escape(label || 'More information') + '" aria-expanded="false" data-inline-info-trigger data-tooltip-html="' + escape(tooltipHtml) + '">' + icon + '</button></span>';
   }
 
+  /* =====================================================================
+     CHECK-IN TIMELINE + CONTROL STRIP (v750)
+     Single source of truth for "last check-in / next due" and the
+     consolidated control row (cadence selector + required toggle).
+     ===================================================================== */
+
+  function fmtShortISO(iso) {
+    if (!iso) return null;
+    try { return new Date(iso).toLocaleDateString('en-BE', { month: 'short', day: 'numeric' }); }
+    catch(e) { return null; }
+  }
+  function fmtShortYMD(ymd) {
+    let p = String(ymd || '').split('-');
+    if (p.length !== 3) return null;
+    return new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]))
+      .toLocaleDateString('en-BE', { month: 'short', day: 'numeric' });
+  }
+
+  // Returns { last, next, nextOpen } — last/next are short date labels or null.
+  // nextOpen indicates the next check-in is actionable right now (not just upcoming).
+  function getCheckinTimeline(rec, mk, selectedCadence) {
+    let out = { last: null, next: null, nextOpen: false };
+    if (selectedCadence === 'weekly') {
+      let entries = (rec && rec.weekly && rec.weekly.entries) ? rec.weekly.entries.slice() : [];
+      entries.sort(function(a, b) { return a.due_date < b.due_date ? -1 : 1; });
+      let completed = entries.filter(function(e) { return e.status === 'completed'; });
+      if (completed.length) out.last = fmtShortISO(completed[completed.length - 1].completed_at);
+      let pending = entries.filter(function(e) { return e.status !== 'completed'; });
+      if (pending.length) {
+        out.next = fmtShortYMD(pending[0].due_date);
+        out.nextOpen = pending[0].status === 'available';
+      }
+    } else {
+      let snap = rec && rec.monthly ? rec.monthly.snapshot : null;
+      if (snap && snap.completed_at) out.last = fmtShortISO(snap.completed_at);
+      let mm = String(mk).match(/^(\d{4})-(\d{2})$/);
+      let isCompleted = !!(snap && snap.check_in_status === 'completed');
+      if (mm && !isCompleted) {
+        let yr = parseInt(mm[1]), mo = parseInt(mm[2]) - 1;
+        let lastDay = new Date(yr, mo + 1, 0);
+        let openDate = new Date(yr, mo, lastDay.getDate() - 4); openDate.setHours(0, 0, 0, 0);
+        let fmt = function(d) { return d.toLocaleDateString('en-BE', { month: 'short', day: 'numeric' }); };
+        if (new Date() >= openDate) { out.next = 'by ' + fmt(lastDay); out.nextOpen = true; }
+        else { out.next = 'opens ' + fmt(openDate); out.nextOpen = false; }
+      }
+    }
+    return out;
+  }
+
+  function renderCheckinMeta(tl) {
+    return '<div class="checkin-meta-row">'
+      + '<div class="checkin-meta-cell"><span class="checkin-meta-key">Last check-in</span>'
+      + '<span class="checkin-meta-val">' + (tl.last ? tl.last : 'Not yet') + '</span></div>'
+      + '<div class="checkin-meta-cell"><span class="checkin-meta-key">Next due</span>'
+      + '<span class="checkin-meta-val' + (tl.nextOpen ? ' is-open' : '') + '">'
+      + (tl.next ? tl.next : 'All caught up') + '</span></div>'
+      + '</div>';
+  }
+
+  function renderMandatoryToggle(state) {
+    let on = state && state.checkinMandatory === true;
+    return '<label class="checkin-mandatory-toggle' + (on ? ' is-on' : '') + '" title="When on, the reminder stays lit until you complete the check-in.">'
+      + '<span class="checkin-mandatory-switch"><input type="checkbox" id="checkinMandatoryToggle"' + (on ? ' checked' : '') + '>'
+      + '<span class="checkin-mandatory-knob"></span></span>'
+      + '<span class="checkin-mandatory-label">Required</span>'
+      + '</label>';
+  }
+
+  // The single consolidated control row: cadence selector/label + optional
+  // "Overdue" badge + the Required toggle. Rendered exactly once per check-in.
+  function renderCheckinControlStrip(rec, mk, selectedCadence, state, showOverdue) {
+    return '<div class="checkin-control-row">'
+      + renderCadenceSelectorV5(rec, mk, selectedCadence)
+      + '<div class="checkin-control-right">'
+      + (showOverdue ? '<span class="checkin-overdue-badge">&#9888; Overdue</span>' : '')
+      + renderMandatoryToggle(state)
+      + '</div></div>';
+  }
+
   function renderCadenceSelectorV5(rec, monthKey, selectedCadence) {
     let locked = rec ? getLockedCadence(rec) : null;
 
@@ -1246,31 +1432,27 @@
       { key: 'reviewed_subscriptions', label: 'Subscriptions reviewed' }
     ];
     let flags = snap.review_flags || snap; // support both weekly entry and monthly snapshot
-    let anyChecked = checkItems.some(function(i) { return flags[i.key]; });
-    let allChecked = checkItems.every(function(i) { return flags[i.key]; });
+    let allChecked   = checkItems.every(function(i) { return flags[i.key]; });
+    let checkedCount = checkItems.filter(function(i) { return flags[i.key]; }).length;
 
-    if (anyChecked) {
-      let listHtml = checkItems.map(function(item) {
-        let chk = !!flags[item.key];
-        return '<label class="checkin-confirm-item' + (chk ? ' is-checked' : '') + '" data-confirm-key="' + item.key + '">'
-          + '<span class="checkin-confirm-checkbox">' + (chk ? '&#10003;' : '') + '</span>'
-          + '<span class="checkin-confirm-item-label">' + item.label + '</span></label>';
-      }).join('');
-      return '<div class="checkin-confirm-panel" id="' + idPrefix + 'checkinConfirmPanel">'
-        + '<div class="checkin-confirm-panel-title">Ready to save this review?</div>'
-        + '<div class="checkin-confirm-list">' + listHtml + '</div>'
-        + '<button class="checkin-confirm-btn" id="' + idPrefix + 'checkinConfirmSaveBtn" type="button"'
-        + (allChecked ? '' : ' disabled') + '>Save review</button>'
-        + '</div>';
-    }
-    return '<div class="checkin-footer">'
-      + '<button class="checkin-cta-btn" id="' + idPrefix + 'checkinCompleteBtn" type="button">Mark all reviewed</button>'
+    // Always show every item, starting unchecked. The user ticks each one as a
+    // conscious review step; Save stays disabled until all four are confirmed.
+    let listHtml = checkItems.map(function(item) {
+      let chk = !!flags[item.key];
+      return '<label class="checkin-confirm-item' + (chk ? ' is-checked' : '') + '" data-confirm-key="' + item.key + '">'
+        + '<span class="checkin-confirm-checkbox">' + (chk ? '&#10003;' : '') + '</span>'
+        + '<span class="checkin-confirm-item-label">' + item.label + '</span></label>';
+    }).join('');
+    return '<div class="checkin-confirm-panel" id="' + idPrefix + 'checkinConfirmPanel">'
+      + '<div class="checkin-confirm-panel-title">Tick each item as you review it (' + checkedCount + '/' + checkItems.length + ')</div>'
+      + '<div class="checkin-confirm-list">' + listHtml + '</div>'
+      + '<button class="checkin-confirm-btn" id="' + idPrefix + 'checkinConfirmSaveBtn" type="button"'
+      + (allChecked ? '' : ' disabled') + '>Save review</button>'
       + '</div>';
   }
 
-  function renderMonthlyCheckinCard(vm, snap, viewedMonth, cadenceHtml) {
+  function renderMonthlyCheckinCard(vm, snap, viewedMonth, controlHtml, timeline) {
     let completed = snap && snap.check_in_status === 'completed';
-    let periodLabel = snap ? snap.period_label : (viewedMonth ? viewedMonth.name : 'This month');
 
     let avail = checkinAvailability(viewedMonth);
 
@@ -1288,18 +1470,15 @@
         + '</div>';
     } else if (!avail.available) {
       footerHtml = '<div class="checkin-footer" style="display:flex;align-items:center;gap:8px;">'
-        + '<span style="font-size:0.68rem;color:var(--muted);">&#128274; Available from ' + avail.openLabel + '</span>'
+        + '<span style="font-size:0.68rem;color:var(--muted);">&#128274; Opens ' + avail.openLabel + '</span>'
         + '</div>';
     } else {
       footerHtml = renderConfirmChecklistFooter(snap || { reviewed_income: false, reviewed_savings: false, reviewed_expenses: false, reviewed_subscriptions: false });
     }
 
     return '<div class="checkin-card ui-3d-panel ui-3d-ach-checkin"' + (!avail.available && !completed ? ' style="opacity:0.7;"' : '') + '>'
-      + (cadenceHtml ? '<div class="checkin-cadence-inline">' + cadenceHtml + '</div>' : '')
-      + '<div class="checkin-card-head">'
-      + '<span class="checkin-card-title">Monthly Review</span>'
-      + '<span class="checkin-period-badge">' + periodLabel + '</span>'
-      + '</div>'
+      + (controlHtml ? '<div class="checkin-cadence-inline">' + controlHtml + '</div>' : '')
+      + (timeline ? renderCheckinMeta(timeline) : '')
       + '<div class="checkin-status-line ' + statusClass + '">' + vm.summary + '</div>'
       + footerHtml
       + '</div>';
@@ -1309,13 +1488,16 @@
      WEEKLY CHECK-IN CARD — new v5
      ===================================================================== */
 
-  function renderWeeklyCheckinCard(entry, rec, vm, totalSundays, cadenceHtml) {
+  function renderWeeklyCheckinCard(entry, rec, vm, totalSundays, controlHtml, timeline) {
+    let stripHtml = (controlHtml ? '<div class="checkin-cadence-inline">' + controlHtml + '</div>' : '')
+      + (timeline ? renderCheckinMeta(timeline) : '');
+
     if (!entry) {
       // No entry available yet — show locked placeholder
       let sundays = totalSundays || [];
       let nextLocked = sundays.find(function(s) { return !isSundayReached(s); });
       return '<div class="weekly-checkin-card ui-3d-panel ui-3d-ach-checkin is-locked">'
-        + (cadenceHtml ? '<div class="checkin-cadence-inline">' + cadenceHtml + '</div>' : '')
+        + stripHtml
         + '<div class="weekly-card-head">'
         + '<div><div class="weekly-card-title">Weekly Review</div></div>'
         + '</div>'
@@ -1357,11 +1539,10 @@
     }
 
     return '<div class="' + cardClass + '">'
-      + (cadenceHtml ? '<div class="checkin-cadence-inline">' + cadenceHtml + '</div>' : '')
+      + stripHtml
       + '<div class="weekly-card-head">'
       + '<div>'
       + '<div class="weekly-card-title">' + seqLabel + '</div>'
-      + '<div class="weekly-card-seq">Due ' + dueLabel + '</div>'
       + '</div>'
       + '</div>'
       + bodyHtml
@@ -1421,8 +1602,7 @@
 
   function buildHistoryTree(state) {
     let years = Object.keys(state.years).sort().reverse();
-    let html = '<div class="achievements-section ui-3d-panel ui-3d-ach-section ui-3d-ach-history"><div class="achievements-section-head"><h4>History</h4><span class="achievements-section-sub">Year \u2192 Month \u2192 Weekly</span></div>';
-    html += '<div class="history-tree" style="padding:0 12px 12px;">';
+    let html = '<div class="history-tree" style="padding:4px 2px 2px;">';
 
     years.forEach(function(yr) {
       let yearRec = state.years[yr];
@@ -1503,7 +1683,7 @@
       html += '</div>'; // close year-group
     });
 
-    html += '</div></div>'; // close history-tree, achievements-section
+    html += '</div>'; // close history-tree
     return html;
   }
 
@@ -1538,53 +1718,24 @@
 
     let vm = buildAchievementsViewModel(viewedMonth);
 
-    let mode = selectedCadence;
-    let fpSignals = getFinancialProgressSignals(viewedMonth, mode);
-    let fpMapped  = mapSignalsToProgressCard(fpSignals);
-    let fpHtml    = renderFinancialProgressEngineCard(fpMapped);
-
-    let cadenceHtml = renderCadenceSelectorV5(rec, mk, selectedCadence);
+    let mandatory = state.checkinMandatory === true;
     let checkinHtml = '';
     if (selectedCadence === 'weekly') {
       ensureWeeklyEntriesForMonth(rec, mk);
       refreshWeeklyEntryStatuses(rec);
       let sundays = getMonthSundays(mk);
       let activeEntry = getCurrentWeeklyEntry(rec);
-      if (locked === 'monthly') {
-        checkinHtml = '<div class="checkin-lock-message checkin-lock-card ui-3d-panel ui-3d-ach-checkin">'
-          + '<div class="checkin-cadence-inline">' + cadenceHtml + '</div>'
-          + '<div class="checkin-lock-message-body">&#128274; <strong>This month is tracked Monthly.</strong> Weekly tracking can start next month.</div>'
-          + '</div>';
-      } else {
-        let weeklyLockMsg = getCadenceLockMessage(rec, mk);
-        if (weeklyLockMsg && !locked) {
-          checkinHtml += '<div class="checkin-lock-message checkin-lock-card ui-3d-panel ui-3d-ach-checkin">'
-            + '<div class="checkin-cadence-inline">' + cadenceHtml + '</div>'
-            + '<div class="checkin-lock-message-body">' + weeklyLockMsg + '</div>'
-            + '</div>';
-        }
-        checkinHtml += renderWeeklyCheckinCard(activeEntry, rec, vm, sundays, cadenceHtml);
-      }
+      let weeklyOverdue = mandatory && activeEntry && activeEntry.status === 'available';
+      let controlHtml = renderCheckinControlStrip(rec, mk, selectedCadence, state, !!weeklyOverdue);
+      let timeline = getCheckinTimeline(rec, mk, selectedCadence);
+      checkinHtml = renderWeeklyCheckinCard(activeEntry, rec, vm, sundays, controlHtml, timeline);
     } else {
       let mSnap = ensureMonthlySnapshot(rec, mk);
-      checkinHtml = renderMonthlyCheckinCard(vm, mSnap, viewedMonth, cadenceHtml);
-    }
-
-    let kpiHtml = renderAlwaysOnKpiRow(vm, rec, selectedCadence);
-
-    let bottomHtml = '';
-    let hasHistory = Object.keys(state.years).some(function(y) {
-      return Object.keys(state.years[y].months).some(function(m) {
-        return m !== mk && monthHasData(state.years[y].months[m]);
-      });
-    });
-    if (hasHistory) bottomHtml += buildHistoryTree(state);
-    if (!bottomHtml) {
-      bottomHtml = '<div class="achievements-section">'
-        + '<div class="achievements-section-head"><h4>History</h4>'
-        + '<span class="achievements-section-sub">Year \u2192 Month \u2192 Weekly</span></div>'
-        + '<div style="padding:20px 16px;text-align:center;font-size:0.67rem;color:var(--muted);">Your review history will appear here.</div>'
-        + '</div>';
+      let mAvail = checkinAvailability(viewedMonth);
+      let monthlyOverdue = mandatory && mAvail.available && mSnap.check_in_status !== 'completed';
+      let controlHtml = renderCheckinControlStrip(rec, mk, selectedCadence, state, !!monthlyOverdue);
+      let timeline = getCheckinTimeline(rec, mk, selectedCadence);
+      checkinHtml = renderMonthlyCheckinCard(vm, mSnap, viewedMonth, controlHtml, timeline);
     }
 
     let badgeHtml = renderBadgeSystem(viewedMonth, state, mk, selectedCadence);
@@ -1603,39 +1754,80 @@
     let monthlyCompleted = !!(rec.monthly && rec.monthly.snapshot && rec.monthly.snapshot.completed_at);
     let weeklyCompletedCount = rec.weekly && rec.weekly.entries ? rec.weekly.entries.filter(function(e) { return e.status === 'completed'; }).length : 0;
     let checkinComplete = selectedCadence === 'weekly' ? weeklyCompletedCount > 0 : monthlyCompleted;
-    let nextRewardCount = Math.max(1, Math.max(activeTargetCount, 1) - completedCount + 1);
-    let momentumTitle = vm && vm.summary ? vm.summary : 'Keep building momentum';
-    let stateTitle = (vm && vm.cash && vm.cash.state === 'critical') ? 'Needs Attention' : 'On Track';
 
-    let recentHtml = '';
-    let recentEntries = completedEntries.slice(-4).reverse();
-    if (recentEntries.length) {
-      recentHtml = recentEntries.map(function(entry) {
-        let formatted = formatCompletedBadgeEntry(entry, { compact: true });
-        return '<article class="phase4-achievement-recent-card">'
-          + '<div class="phase4-achievement-recent-icon">' + formatted.icon + '</div>'
-          + '<div class="phase4-achievement-recent-copy"><div class="phase4-achievement-recent-title">' + badgeEsc(formatted.title) + '</div><div class="phase4-achievement-recent-sub">' + badgeEsc(formatted.subtitle || 'Unlocked achievement') + '</div></div>'
-          + '<div class="phase4-achievement-xp">+' + (Number(entry.level || 1) * 25) + ' XP</div>'
-          + '</article>';
-      }).join('');
-    } else {
-      recentHtml = '<div class="phase4-achievement-empty">Complete an active target to show recent achievements here.</div>';
+    // Momentum: streak + consistency (relative to the real current month) and XP/level.
+    let nowMk = calMonthKey();
+    let momentumStats = computeMomentumStats(state, nowMk);
+    let xpInfo = computeXpLevel(totalXpFromEntries(completedEntries));
+
+    // Ring/donut geometry
+    let RING_C = 339.3;                                   // 2π·54
+    let ringOff = (RING_C * (1 - xpInfo.pct / 100)).toFixed(1);
+    let DON_C = 251.3;                                    // 2π·40
+    let donutPct = totalAchievementSlots ? (completedCount / totalAchievementSlots) : 0;
+    let donutOff = (DON_C * (1 - donutPct)).toFixed(1);
+    let lockedCount = Math.max(totalAchievementSlots - completedCount - activeTargetCount, 0);
+
+    let dotsHtml = momentumStats.dots.map(function(d) {
+      return '<span class="ax-dot' + (d.on ? ' on' : '') + '"></span>';
+    }).join('');
+
+    let streakUnit = momentumStats.current === 1 ? 'month' : 'months';
+
+    let recentTwo = completedEntries.slice(0, 2);
+    let recentBlock = '';
+    if (recentTwo.length) {
+      recentBlock = '<div class="ax-recent"><div class="ax-recent-title">Recently unlocked</div>'
+        + recentTwo.map(function(e) {
+            let f = formatCompletedBadgeEntry(e, { compact: true });
+            return '<div class="ax-rbadge"><span class="ax-ri">' + f.icon + '</span>'
+              + '<span class="ax-rt">' + badgeEsc(f.title) + '<small>' + badgeEsc(f.subtitle || 'Unlocked achievement') + '</small></span>'
+              + '<span class="ax-rxp">+' + (Number(e.level || 1) * 25) + '</span></div>';
+          }).join('')
+        + '</div>';
     }
 
+    let flameSvg = '<svg class="ax-flame" viewBox="0 0 32 40" aria-hidden="true"><defs><linearGradient id="axFlame" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fde68a"/><stop offset=".5" stop-color="#f59e0b"/><stop offset="1" stop-color="#ea580c"/></linearGradient></defs><path fill="url(#axFlame)" d="M16 0c2 6-3 9-3 14 0 2 1 3 2 4 1-1 2-3 2-5 4 3 7 8 7 14 0 7-5 13-11 13S2 34 2 27c0-8 9-11 14-27z"/></svg>';
+
     let html = ''
-      + '<section class="phase4-achievement-hero">'
-        + '<article class="phase4-achievement-kpi primary"><div class="phase4-achievement-kpi-label">Monthly momentum</div><div class="phase4-achievement-kpi-value text-value">' + esc(stateTitle) + '</div><div class="phase4-achievement-kpi-sub">' + esc(momentumTitle) + '</div><button class="phase4-achievement-link" type="button" data-ach-scroll="#achFinancialProgressPanel">View details →</button></article>'
-        + '<article class="phase4-achievement-kpi"><div class="phase4-achievement-kpi-label">Check-in status</div><div class="phase4-achievement-kpi-value text-value">' + (checkinComplete ? 'Completed' : 'Open') + '</div><div class="phase4-achievement-kpi-sub">' + (selectedCadence === 'weekly' ? weeklyCompletedCount + ' weekly check-in' + (weeklyCompletedCount === 1 ? '' : 's') + ' completed' : (checkinComplete ? 'Monthly check-in completed' : 'Monthly review still open')) + '</div><button class="phase4-achievement-link" type="button" data-ach-scroll="#achCheckinPanel">Review check-in →</button></article>'
-        + '<article class="phase4-achievement-kpi"><div class="phase4-achievement-kpi-label">Achievements earned</div><div class="phase4-achievement-kpi-value">' + completedCount + '</div><div class="phase4-achievement-kpi-sub">Achievements unlocked so far</div><button class="phase4-achievement-link" type="button" id="phase4CompletedBadgesHeroBtn">View all →</button></article>'
-        + '<article class="phase4-achievement-kpi reward"><div class="phase4-achievement-kpi-label">Next reward</div><div class="phase4-achievement-kpi-value text-value">' + nextRewardCount + ' to go</div><div class="phase4-achievement-kpi-sub">You’re close to your next achievement</div><button class="phase4-achievement-link" type="button" data-ach-scroll="#achBadgeSection">See next reward →</button></article>'
+      + '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>'
+      + '<linearGradient id="axRingGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#10b981"/></linearGradient>'
+      + '<linearGradient id="axDonutGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#10b981"/><stop offset="1" stop-color="#5e17eb"/></linearGradient>'
+      + '</defs></svg>'
+
+      // ── HERO momentum band ──
+      + '<section class="ax-hero">'
+        + '<div class="ax-ring">'
+          + '<svg viewBox="0 0 128 128" aria-hidden="true"><circle class="ax-ring-track" cx="64" cy="64" r="54"/><circle class="ax-ring-prog" cx="64" cy="64" r="54" style="stroke-dasharray:' + RING_C + ';stroke-dashoffset:' + ringOff + '"/></svg>'
+          + '<div class="ax-ring-core"><span class="ax-ring-lv">LEVEL</span><span class="ax-ring-num">' + xpInfo.level + '</span><span class="ax-ring-xp">' + xpInfo.totalXp + ' XP</span></div>'
+        + '</div>'
+        + '<div class="ax-streak">'
+          + '<span class="ax-streak-label">Check-In Streak</span>'
+          + '<div class="ax-streak-row">' + flameSvg + '<span class="ax-streak-big">' + momentumStats.current + '</span><span class="ax-streak-unit">' + streakUnit + '</span></div>'
+          + '<span class="ax-streak-best">🏆 Personal best · ' + momentumStats.longest + ' month' + (momentumStats.longest === 1 ? '' : 's') + '</span>'
+        + '</div>'
+        + '<div class="ax-cluster">'
+          + '<div class="ax-mini"><div class="ax-mini-label">Consistency</div><div class="ax-mini-val">' + momentumStats.hits + '<span class="ax-mini-sub">/' + momentumStats.window + ' mo</span></div><div class="ax-dots">' + dotsHtml + '</div></div>'
+          + '<div class="ax-mini"><div class="ax-mini-label">Reviews logged</div><div class="ax-mini-val">' + momentumStats.totalReviews + ' <span class="ax-mini-sub">check-ins</span></div></div>'
+        + '</div>'
+        + '<div class="ax-xpbar-wrap">'
+          + '<div class="ax-xpbar-top"><span class="l">Level ' + xpInfo.level + ' → Level ' + (xpInfo.level + 1) + '</span><span class="ax-reward">✦ ' + xpInfo.toNext + ' XP to your next reward</span></div>'
+          + '<div class="ax-xpbar"><span style="width:' + xpInfo.pct + '%"></span></div>'
+        + '</div>'
       + '</section>'
+
+      // ── Check-in + Progress ──
       + '<section class="phase4-achievement-main-grid">'
-        + '<article class="phase4-achievement-panel" id="achCheckinPanel"><div class="phase4-achievement-panel-head"><div><h3>Monthly Check-in</h3><p>Review your progress and get personalized insights.</p></div></div>' + checkinHtml + '<div class="phase4-achievement-help"><strong>Your check-in helps you:</strong><span>✓ Track financial habits</span><span>✓ Get personalized insights</span><span>✓ Unlock achievements</span></div></article>'
-        + '<article class="phase4-achievement-panel progress-panel"><div class="phase4-achievement-panel-head"><div><h3>Achievement Progress</h3><p>Your progress towards unlocking all achievements.</p></div><strong>' + completedCount + ' / ' + totalAchievementSlots + '</strong></div><div class="phase4-achievement-progress-track"><span style="width:' + progressPct + '%"></span></div><div class="phase4-achievement-progress-meta"><div><strong>' + completedCount + '</strong><span>Unlocked</span></div><div><strong>' + activeTargetCount + '</strong><span>In Progress</span></div><div><strong>' + Math.max(totalAchievementSlots - completedCount - activeTargetCount, 0) + '</strong><span>Locked</span></div></div><button class="phase4-achievement-link standalone" id="phase4CompletedBadgesProgressBtn" type="button">View all achievements →</button></article>'
+        + '<article class="phase4-achievement-panel" id="achCheckinPanel"><div class="phase4-achievement-panel-head"><div class="ax-head-txt"><div class="ax-icon-badge">✓</div><div><h3>' + (selectedCadence === 'weekly' ? 'Weekly' : 'Monthly') + ' Check-in</h3><p>Review your progress and lock it in</p></div></div><button class="phase4-achievement-link standalone" id="checkinHistoryBtn" type="button">View history →</button></div>' + checkinHtml + '</article>'
+        + '<article class="phase4-achievement-panel ax-progress-card"><div class="phase4-achievement-panel-head"><div class="ax-head-txt"><div class="ax-icon-badge purple">★</div><div><h3>Progress</h3><p>Toward unlocking everything</p></div></div><button class="phase4-achievement-link standalone" id="phase4CompletedBadgesProgressBtn" type="button">View all →</button></div>'
+          + '<div class="ax-progress-body">'
+            + '<div class="ax-pring"><svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true"><circle class="ax-pring-track" cx="48" cy="48" r="40"/><circle class="ax-pring-fill" cx="48" cy="48" r="40" style="stroke-dasharray:' + DON_C + ';stroke-dashoffset:' + donutOff + '"/></svg><div class="ax-pring-core"><b>' + completedCount + '/' + totalAchievementSlots + '</b><span>UNLOCKED</span></div></div>'
+            + '<div class="ax-pring-stats"><div class="ax-rstat"><span class="rl">Unlocked</span><span class="rv">' + completedCount + '</span></div><div class="ax-rstat"><span class="rl">In progress</span><span class="rv">' + activeTargetCount + '</span></div><div class="ax-rstat"><span class="rl">Locked</span><span class="rv">' + lockedCount + '</span></div></div>'
+          + '</div>'
+          + recentBlock
+        + '</article>'
       + '</section>'
-      + '<section class="phase4-achievement-panel recent-panel"><div class="phase4-achievement-panel-head"><div><h3>Recent Achievements</h3><p>Your latest unlocked achievements and active targets.</p></div><button class="phase4-achievement-link standalone" id="phase4CompletedBadgesRecentBtn" type="button">View all achievements →</button></div><div class="phase4-achievement-recent-grid">' + recentHtml + '</div><div class="phase4-achievement-targets-wrap">' + badgeHtml + '</div></section>'
-      + '<section class="phase4-achievement-insight-strip"><strong>✦ Keep it up!</strong><span>You’re building stronger financial habits. Small consistent actions lead to big results.</span><button class="feature-action-btn" type="button" data-ach-scroll="#achFinancialProgressPanel">View Insights</button></section>'
-      + '<section class="phase4-achievement-hidden-logic" id="achFinancialProgressPanel">' + fpHtml + '<div class="ach-kpi-row">' + kpiHtml + '</div>' + bottomHtml + '</section>';
+      + '<section class="phase4-achievement-targets-wrap is-standalone">' + badgeHtml + '</section>';
 
     container.innerHTML = html;
 
@@ -1648,7 +1840,16 @@
     });
 
     ensureBadgeCustomizationOverlay(selectedCadence);
-    wireBadgeSystemEvents(selectedCadence);
+    wireBadgeSystemEvents(selectedCadence, mk);
+
+    // ── Wire "View all achievements" entry points (hero KPI + progress card)
+    //    to the combined Achievements modal (Recent Achievements + Completed Badges).
+    let progressViewAll = document.getElementById('phase4CompletedBadgesProgressBtn');
+    if (progressViewAll) progressViewAll.addEventListener('click', function() { openCompletedBadgesModal(mk); });
+
+    // ── Wire "View history" (check-in card) to the Check-in History modal.
+    let historyBtn = document.getElementById('checkinHistoryBtn');
+    if (historyBtn) historyBtn.addEventListener('click', function() { openCheckinHistoryModal(); });
 
     // ── Wire cadence select — immediate change, no Apply/Cancel
     let selectEl = document.getElementById('checkinCadenceSelect');
@@ -1656,6 +1857,17 @@
       selectEl.addEventListener('change', function() {
         state.selectedCadenceDraft = selectEl.value;
         saveV5State(state);
+        window.renderAchievementsTab();
+      });
+    }
+
+    // ── Wire "Required" toggle — reminder-only enforcement (pill + overdue badge)
+    let mandatoryToggle = document.getElementById('checkinMandatoryToggle');
+    if (mandatoryToggle) {
+      mandatoryToggle.addEventListener('change', function() {
+        state.checkinMandatory = !!mandatoryToggle.checked;
+        saveV5State(state);
+        updateAchievementsPill();
         window.renderAchievementsTab();
       });
     }
@@ -1689,19 +1901,6 @@
         }
       });
     });
-
-    // Monthly: "Complete check-in"
-    let cBtn = document.getElementById('checkinCompleteBtn');
-    if (cBtn) {
-      cBtn.addEventListener('click', function() {
-        let pRec = persistedRec();
-        let mSnap = ensureMonthlySnapshot(pRec, mk);
-        mSnap.reviewed_income = mSnap.reviewed_savings =
-          mSnap.reviewed_expenses = mSnap.reviewed_subscriptions = true;
-        saveV5State(state);
-        window.renderAchievementsTab();
-      });
-    }
 
     // Monthly: "Confirm and save"
     let sBtn = document.getElementById('checkinConfirmSaveBtn');
@@ -1741,22 +1940,7 @@
       return getNextAvailableWeeklyEntry(pRec);
     }
 
-    // Weekly: "Complete check-in"
-    let wcBtn = document.getElementById('weekly_checkinCompleteBtn');
-    if (wcBtn) {
-      wcBtn.addEventListener('click', function() {
-        let avEntry = availableWeeklyEntry();
-        if (avEntry) {
-          if (!avEntry.review_flags) avEntry.review_flags = {};
-          avEntry.review_flags.reviewed_income = avEntry.review_flags.reviewed_savings =
-            avEntry.review_flags.reviewed_expenses = avEntry.review_flags.reviewed_subscriptions = true;
-          saveV5State(state);
-          window.renderAchievementsTab();
-        }
-      });
-    }
-
-    // Weekly: "Confirm and save"
+    // Weekly: "Save review"
     let wsBtn = document.getElementById('weekly_checkinConfirmSaveBtn');
     if (wsBtn) {
       wsBtn.addEventListener('click', function() {
@@ -1786,30 +1970,6 @@
         }
       });
     }
-
-    // ── Wire history tree collapsibles
-    container.querySelectorAll('.history-year-header').forEach(function(h) {
-      h.addEventListener('click', function() {
-        let grp = h.closest('.history-year-group');
-        if (!grp) return;
-        grp.classList.toggle('is-expanded');
-      });
-    });
-    container.querySelectorAll('.history-month-header').forEach(function(h) {
-      h.addEventListener('click', function() {
-        let row = h.closest('.history-month-row');
-        if (!row) return;
-        row.classList.toggle('is-expanded');
-      });
-    });
-    container.querySelectorAll('.history-weekly-subgroup-header').forEach(function(h) {
-      h.addEventListener('click', function(e) {
-        e.stopPropagation();
-        let grp = h.closest('.history-weekly-subgroup');
-        if (!grp) return;
-        grp.classList.toggle('is-expanded');
-      });
-    });
   
   };
 
@@ -3720,7 +3880,6 @@
       + renderOpenBudgetMasterSlot(bs)
       + renderCustomTargetEmptySlots(bs)
       + '</div></div></div>'
-      + renderCompletedBadgesCard(bs, mk)
       + '</div>';
     return html;
   }
@@ -3771,70 +3930,6 @@
       subtitle: subtitle,
       icon: badgeEsc(entry.icon || '🏆')
     };
-  }
-
-  function getCompletedBadgeHighlights(entries) {
-    let saverBest = null;
-    let budgetBest = null;
-    let checkinBest = { weekly: null, monthly: null };
-
-    entries.forEach(function(entry) {
-      if (!entry) return;
-      if (entry.series === 'the_saver') {
-        if (!saverBest || Number(entry.level || 0) > Number(saverBest.level || 0) || (Number(entry.level || 0) === Number(saverBest.level || 0) && String(entry.completedAt || '') > String(saverBest.completedAt || ''))) {
-          saverBest = entry;
-        }
-        return;
-      }
-      if (entry.series === 'budget_master') {
-        let budgetPrev = budgetBest;
-        let budgetPrevCount = budgetPrev ? Number(budgetPrev.count || 0) : -1;
-        let budgetNextCount = Number(entry.count || 0);
-        if (!budgetPrev || budgetNextCount > budgetPrevCount || (budgetNextCount === budgetPrevCount && Number(entry.level || 0) > Number(budgetPrev.level || 0)) || (budgetNextCount === budgetPrevCount && Number(entry.level || 0) === Number(budgetPrev.level || 0) && String(entry.completedAt || '') > String(budgetPrev.completedAt || ''))) {
-          budgetBest = entry;
-        }
-        return;
-      }
-      if (entry.series === 'checkin_streak') {
-        let mode = entry.mode === 'weekly' ? 'weekly' : 'monthly';
-        let prev = checkinBest[mode];
-        let prevCount = prev ? Number(prev.count || 0) : -1;
-        let nextCount = Number(entry.count || 0);
-        if (!prev || nextCount > prevCount || (nextCount === prevCount && Number(entry.level || 0) > Number(prev.level || 0)) || (nextCount === prevCount && Number(entry.level || 0) === Number(prev.level || 0) && String(entry.completedAt || '') > String(prev.completedAt || ''))) {
-          checkinBest[mode] = entry;
-        }
-      }
-    });
-
-    let customBest = {};
-    entries.forEach(function(entry) {
-      if (!(entry && entry.series === 'custom_target')) return;
-      let prev = customBest[entry.targetId];
-      if (!prev || Number(entry.level || 0) > Number(prev.level || 0) || (Number(entry.level || 0) === Number(prev.level || 0) && String(entry.completedAt || '') > String(prev.completedAt || ''))) {
-        customBest[entry.targetId] = entry;
-      }
-    });
-
-    let out = [];
-    if (checkinBest.weekly) out.push({ entry: checkinBest.weekly, highlight: true });
-    if (checkinBest.monthly) out.push({ entry: checkinBest.monthly, highlight: true });
-    if (budgetBest) out.push({ entry: budgetBest, highlight: true });
-    if (saverBest) out.push({ entry: saverBest, highlight: false });
-    Object.keys(customBest).map(function(key) { return customBest[key]; }).sort(function(a, b) {
-      return String(b.completedAt || '').localeCompare(String(a.completedAt || ''));
-    }).slice(0, 2).forEach(function(entry) {
-      out.push({ entry: entry, highlight: false });
-    });
-    return out;
-  }
-
-  function renderCompletedBadgeRow(entry, opts) {
-    let formatted = formatCompletedBadgeEntry(entry, opts);
-    opts = opts || {};
-    return '<div class="completed-badge-row' + (opts.highlight ? ' is-highlight' : '') + '">'
-      + '<div class="completed-badge-icon">' + formatted.icon + '</div>'
-      + '<div class="completed-badge-copy"><div class="completed-badge-title">' + formatted.title + '</div><div class="completed-badge-sub">' + formatted.subtitle + '</div></div>'
-      + '</div>';
   }
 
   function getCompletedBadgeGalleryEntries(bs, mk) {
@@ -3914,45 +4009,44 @@
       + '</div>';
   }
 
-  function renderCompletedBadgesCard(bs, mk) {
-    let entries = getCompletedBadgeEntriesUpToMonth(bs, mk);
-    let html = '<div class="achievements-section completed-badges-section">'
-      + '<div class="achievements-section-head"><h4>Completed Badges</h4><button class="completed-badges-all-btn" id="completedBadgesAllBtn" type="button">All Completed Badges</button></div>';
-
-    if (!entries.length) {
-      html += '<div class="completed-badges-empty">Complete an active target to log a validated badge here.</div></div>';
-      return html;
-    }
-
-    let highlights = getCompletedBadgeHighlights(entries);
-    html += '<div class="completed-badge-list">';
-    highlights.forEach(function(item) {
-      html += renderCompletedBadgeRow(item.entry, { highlight: !!item.highlight, compact: true });
-    });
-    html += '</div></div>';
-    return html;
-  }
-
   function renderCompletedBadgesModal(bs, mk) {
     let entries = getCompletedBadgeGalleryEntries(bs, mk);
-    let tooltipHtml = '<ul class="info-tooltip-list"><li>The main card keeps the view compact by showing your strongest current highlights.</li><li>This full history keeps every earned badge visible.</li></ul>';
-    let infoBtn = buildInlineInfoHtml('completedBadgesModalInfo', tooltipHtml, 'About completed badges view');
-    let html = '<div class="cbm-modal completed-badges-modal">'
-      + '<div class="cbm-header"><div class="completed-badges-modal-head"><div class="completed-badges-modal-title-row"><div class="cbm-title">All Completed Badges</div>' + infoBtn + '</div></div><button class="cbm-close-btn" type="button" data-completed-badges-close="1">&#x2715;</button></div>'
-      + '<div class="badge-config-body">';
+    let recent = getCompletedBadgeEntriesUpToMonth(bs, mk).slice(0, 6);
+    let tooltipHtml = '<ul class="info-tooltip-list"><li>Recent Achievements shows your most recently unlocked badges.</li><li>Completed Badges is the full validated history of every badge earned.</li></ul>';
+    let infoBtn = buildInlineInfoHtml('completedBadgesModalInfo', tooltipHtml, 'About the achievements view');
 
-    if (!entries.length) {
-      html += '<div class="completed-badge-modal-empty">No completed badges yet.</div>';
+    // Recent Achievements section (reuses the main-page recent-card markup)
+    let recentHtml;
+    if (recent.length) {
+      recentHtml = '<div class="cbm-recent-grid">' + recent.map(function(entry) {
+        let f = formatCompletedBadgeEntry(entry, { compact: true });
+        return '<article class="phase4-achievement-recent-card">'
+          + '<div class="phase4-achievement-recent-icon">' + f.icon + '</div>'
+          + '<div class="phase4-achievement-recent-copy"><div class="phase4-achievement-recent-title">' + f.title + '</div><div class="phase4-achievement-recent-sub">' + (f.subtitle || 'Unlocked achievement') + '</div></div>'
+          + '<div class="phase4-achievement-xp">+' + (Number(entry.level || 1) * 25) + ' XP</div>'
+          + '</article>';
+      }).join('') + '</div>';
     } else {
-      html += '<div class="completed-badge-modal-grid">';
-      entries.forEach(function(entry) {
-        html += renderCompletedBadgeModalTile(entry);
-      });
-      html += '</div>';
+      recentHtml = '<div class="completed-badge-modal-empty">Complete an active target to unlock your first achievement.</div>';
     }
 
-    html += '</div><div class="cbm-footer"><button class="cbm-btn-primary" type="button" data-completed-badges-close="1">Close</button></div></div>';
-    return html;
+    // Completed Badges section (full validated history)
+    let completedHtml;
+    if (!entries.length) {
+      completedHtml = '<div class="completed-badge-modal-empty">No completed badges yet.</div>';
+    } else {
+      completedHtml = '<div class="completed-badge-modal-grid">'
+        + entries.map(function(entry) { return renderCompletedBadgeModalTile(entry); }).join('')
+        + '</div>';
+    }
+
+    return '<div class="cbm-modal completed-badges-modal achievements-modal">'
+      + '<div class="cbm-header"><div class="completed-badges-modal-head"><div class="completed-badges-modal-title-row"><div class="cbm-title">Achievements</div>' + infoBtn + '</div></div><button class="cbm-close-btn" type="button" data-completed-badges-close="1">&#x2715;</button></div>'
+      + '<div class="badge-config-body">'
+      + '<div class="cbm-section"><div class="cbm-section-head">Recent Achievements</div>' + recentHtml + '</div>'
+      + '<div class="cbm-section"><div class="cbm-section-head">Completed Badges</div>' + completedHtml + '</div>'
+      + '</div>'
+      + '<div class="cbm-footer"><button class="cbm-btn-primary" type="button" data-completed-badges-close="1">Close</button></div></div>';
   }
 
   function renderBadgeSystem(month, achievementsState, mk, selectedCadence) {
@@ -3977,7 +4071,6 @@
     });
     html += renderCustomTargetEmptySlots(bs);
     html += '</div></div>';
-    html += renderCompletedBadgesCard(bs, mk);
     html += '</div>';
     return html;
   }
@@ -4200,13 +4293,98 @@
     if (overlay) overlay.classList.remove('cbm-open');
   }
 
+  /* ─────────────────────────────────────────────────────────────
+     CHECK-IN HISTORY MODAL (v752)
+     History (Year → Month → Weekly) now lives in a modal opened from
+     a button in the check-in card, instead of on the main page.
+     The overlay is body-level (robust fixed positioning) but tagged
+     data-view="achievements" so the existing view-scoped history
+     styling (light AND dark) applies to its contents.
+     ───────────────────────────────────────────────────────────── */
+
+  function bindHistoryTreeCollapsibles(root) {
+    if (!root) return;
+    root.querySelectorAll('.history-year-header').forEach(function(h) {
+      h.addEventListener('click', function() {
+        let grp = h.closest('.history-year-group');
+        if (grp) grp.classList.toggle('is-expanded');
+      });
+    });
+    root.querySelectorAll('.history-month-header').forEach(function(h) {
+      h.addEventListener('click', function() {
+        let row = h.closest('.history-month-row');
+        if (row) row.classList.toggle('is-expanded');
+      });
+    });
+    root.querySelectorAll('.history-weekly-subgroup-header').forEach(function(h) {
+      h.addEventListener('click', function(e) {
+        e.stopPropagation();
+        let grp = h.closest('.history-weekly-subgroup');
+        if (grp) grp.classList.toggle('is-expanded');
+      });
+    });
+  }
+
+  function renderCheckinHistoryModal(state) {
+    let hasHistory = Object.keys(state.years || {}).some(function(y) {
+      return Object.keys(state.years[y].months).some(function(m) {
+        return monthHasData(state.years[y].months[m]);
+      });
+    });
+    let body = hasHistory
+      ? buildHistoryTree(state)
+      : '<div class="completed-badge-modal-empty" style="text-align:center;padding:26px 8px;">Your review history will appear here once you complete check-ins.</div>';
+    return '<div class="cbm-modal checkin-history-modal">'
+      + '<div class="cbm-header"><div><div class="cbm-title">Check-in History</div><div class="cbm-sub">Year \u2192 Month \u2192 Weekly</div></div><button class="cbm-close-btn" type="button" data-checkin-history-close="1">&#x2715;</button></div>'
+      + '<div class="cbm-history-body">' + body + '</div>'
+      + '<div class="cbm-footer"><button class="cbm-btn-primary" type="button" data-checkin-history-close="1">Close</button></div>'
+      + '</div>';
+  }
+
+  function bindCheckinHistoryOverlayEvents(overlay) {
+    if (!overlay || overlay.__historyEventsBound) return overlay;
+    overlay.__historyEventsBound = true;
+    overlay.addEventListener('click', function(event) {
+      let closeTarget = event.target.closest('[data-checkin-history-close]');
+      if (closeTarget || event.target === overlay) {
+        event.preventDefault();
+        closeCheckinHistoryModal();
+      }
+    });
+    return overlay;
+  }
+
+  function ensureCheckinHistoryOverlay(state) {
+    let existing = document.getElementById('checkinHistoryOverlay');
+    if (existing) {
+      existing.innerHTML = renderCheckinHistoryModal(state);
+      bindHistoryTreeCollapsibles(existing);
+      return bindCheckinHistoryOverlayEvents(existing);
+    }
+    let overlay = document.createElement('div');
+    overlay.id = 'checkinHistoryOverlay';
+    overlay.className = 'cbm-overlay';
+    overlay.setAttribute('data-view', 'achievements');
+    overlay.innerHTML = renderCheckinHistoryModal(state);
+    document.body.appendChild(overlay);
+    bindHistoryTreeCollapsibles(overlay);
+    return bindCheckinHistoryOverlayEvents(overlay);
+  }
+
+  function openCheckinHistoryModal() {
+    let overlay = ensureCheckinHistoryOverlay(loadAchievementsState());
+    overlay.classList.add('cbm-open');
+  }
+
+  function closeCheckinHistoryModal() {
+    let overlay = document.getElementById('checkinHistoryOverlay');
+    if (overlay) overlay.classList.remove('cbm-open');
+  }
+
   function wireBadgeSystemEvents(selectedCadence, monthKey) {
     let effectiveCadence = selectedCadence === 'weekly' ? 'weekly' : 'monthly';
     let openBtn = document.getElementById('badgeCustomizeBtn');
     if (openBtn) openBtn.onclick = function() { openBadgeCustomization(effectiveCadence); };
-
-    let allCompletedBtn = document.getElementById('completedBadgesAllBtn');
-    if (allCompletedBtn) allCompletedBtn.onclick = function() { openCompletedBadgesModal(monthKey || calMonthKey()); };
 
     document.querySelectorAll('#achBadgeSection [data-delete-active-badge]').forEach(function(btn) {
       btn.onclick = function(event) {

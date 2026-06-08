@@ -5753,6 +5753,53 @@
       return !!linkedRolloverTargetForMonth(month) && isClosedMonth(month);
     }
 
+    function linkedRolloverSourceForMonth(month, monthListOverride) {
+      if (!month || !month.rolloverLink || !month.rolloverLink.sourceMonthName) return null;
+      const months = Array.isArray(monthListOverride) && monthListOverride.length
+        ? monthListOverride
+        : (state && Array.isArray(state.months) ? state.months : []);
+      return months.find(function(candidate) {
+        return candidate && candidate.name === month.rolloverLink.sourceMonthName;
+      }) || null;
+    }
+
+    function linkedRolloverIncomeRow(month) {
+      return month && Array.isArray(month.income)
+        ? month.income.find(function(row) { return String(row && row.name || '') === 'Spillover previous Month'; })
+        : null;
+    }
+
+    function carryForwardIncomeAmountForMonth(month) {
+      const row = linkedRolloverIncomeRow(month);
+      if (!row) return 0;
+      const actual = Number(rowActual(row) || 0);
+      if (Math.abs(actual) > 0.0049) return actual;
+      const planned = Number(row.planned || 0);
+      return Number.isFinite(planned) ? planned : 0;
+    }
+
+    function linkedCashRolloverAmountForMonth(month) {
+      if (!month || !isClosedMonth(month)) return null;
+      const rolloverTarget = linkedRolloverTargetForMonth(month);
+      const storedRolloverRow = rolloverTarget && Array.isArray(rolloverTarget.income)
+        ? rolloverTarget.income.find(function(row) { return String(row && row.name || '') === 'Spillover previous Month'; })
+        : null;
+      if (!storedRolloverRow) return null;
+      const storedRollover = Number(rowActual(storedRolloverRow) || storedRolloverRow.planned || 0);
+      return Number.isFinite(storedRollover) ? Number(storedRollover.toFixed(2)) : null;
+    }
+
+    function closedMonthCashResult(month, head) {
+      const model = head || headerMetrics(month);
+      const rawCash = Number(model && model.rawBankAccount || 0);
+      return Number.isFinite(rawCash) ? Number(rawCash.toFixed(2)) : 0;
+    }
+
+    function outgoingRolloverAmountForMonth(month, head) {
+      if (!month || !isClosedMonth(month)) return 0;
+      return Math.max(0, closedMonthCashResult(month, head));
+    }
+
     function headerMetrics(month) {
       syncDerivedRows(month);
       const subscriptionImpact = derivedSubscriptionImpactForMonth(month);
@@ -5765,11 +5812,11 @@
       const committedSavings = month.savings.reduce((sum, item) => sum + rowActual(item), 0);
       const bankAccountBase = liquidIncomeTotalForMonth(month, state);
       const rawBankAccount = bankAccountBase - committedExpenses - committedSavings;
-      const edenredBudget = specialFundingBudgetForMonth(month, state);
+      const nonCashBenefitsBudget = specialFundingBudgetForMonth(month, state);
       const cashRolledForward = linkedCashRolloverActiveForMonth(month);
       const totalRemaining = cashRolledForward ? 0 : rawTotalRemaining;
       const bankAccount = cashRolledForward ? 0 : rawBankAccount;
-      const availableBudget = bankAccount + edenredBudget;
+      const availableBudget = bankAccount + nonCashBenefitsBudget;
       const unpaidFixedExpenses = month.expenses.reduce((sum, row) => {
         if (!row.fixed || row.fixedPaid || isSpecialFundingExpenseRowName(row.name, state, month)) return sum;
         const actualTowardsFixed = (row.transactions || []).reduce((txSum, tx) => txSum + Number(tx.amount || 0), 0);
@@ -5791,7 +5838,9 @@
         finalRemainingAfterRollover: totalRemaining,
         bankAccount,
         rawBankAccount,
-        edenredBudget,
+        closingCashResult: isClosedMonth(month) ? Number(rawBankAccount.toFixed(2)) : rawBankAccount,
+        outgoingRolloverAmount: isClosedMonth(month) ? Math.max(0, Number(rawBankAccount.toFixed(2))) : 0,
+        nonCashBenefitsBudget,
         specialFundingStatus: specialFundingStatusForMonth(month, state),
         availableBudget,
         unpaidFixedExpenses,
@@ -5807,10 +5856,12 @@
       const base = hasNormalizedAvailableFunds ? baseModel : monthBudgetBase(month);
       const head = (baseModel && baseModel.head) || base.head || headerMetrics(month);
       const availableFunds = Math.max(0, Number(base.availableFunds != null ? base.availableFunds : (head.allocation && head.allocation.availableFunds) || 0));
-      const closingBeforeRollover = Number(head.finalRemainingBeforeRollover || head.rawTotalRemaining || 0);
-      const closingAfterRollover = Number(head.finalRemainingAfterRollover || head.totalRemaining || 0);
-      const hasRolloverImpact = !!head.cashRolledForward && Math.abs(closingBeforeRollover - closingAfterRollover) > 0.0049;
-      const forecastEvaluationClosing = hasRolloverImpact ? closingBeforeRollover : closingAfterRollover;
+      const closingBeforeRollover = isClosedMonth(month)
+        ? closedMonthCashResult(month, head)
+        : Number(head.finalRemainingBeforeRollover || head.rawTotalRemaining || 0);
+      const closingAfterRollover = isClosedMonth(month) ? 0 : Number(head.finalRemainingAfterRollover || head.totalRemaining || 0);
+      const hasRolloverImpact = isClosedMonth(month) && Math.abs(closingBeforeRollover) > 0.0049;
+      const forecastEvaluationClosing = closingBeforeRollover;
       const forecastEvaluationUsedPct = availableFunds > 0
         ? ((availableFunds - forecastEvaluationClosing) / availableFunds) * 100
         : 0;
@@ -5933,6 +5984,114 @@
         oneoffShare: oneoffShare,
         modeledRows: modeledRows,
         reason: reason
+      };
+    }
+
+
+    function forecastConfidenceModel(month, forecast, baseModel) {
+      const base = baseModel || monthBudgetBase(month);
+      const ctx = monthDateContext(month && month.name);
+      const currentDay = Math.max(1, Number((forecast && forecast.currentDay) || (ctx && ctx.dayIndex) || 1));
+      const daysInMonth = Math.max(currentDay, Number((forecast && forecast.daysInMonth) || (ctx && ctx.daysInMonth) || 30));
+      const progressRatio = Math.max(0, Math.min(1, currentDay / Math.max(1, daysInMonth)));
+
+      let fixedPlanned = 0;
+      let fixedProcessed = 0;
+      (month.expenses || []).forEach(function(row) {
+        if (!row || !row.fixed) return;
+        const planned = Math.max(0, Number(row.planned || 0));
+        const actual = Math.max(0, Number(rowActual(row) || 0));
+        fixedPlanned += planned;
+        if (row.fixedPaid || actual > 0) fixedProcessed += Math.max(planned, actual);
+      });
+      const subscriptionPlanned = Math.max(0, Number(forecast && forecast.subscriptionPlannedTotal || 0));
+      const subscriptionProcessed = Math.max(0, Number(forecast && forecast.subscriptionPaidSoFar || 0));
+      const recurringTotal = fixedPlanned + subscriptionPlanned;
+      const recurringProcessed = Math.min(recurringTotal || 0, fixedProcessed + subscriptionProcessed);
+      const recurringRatio = recurringTotal > 0 ? Math.max(0, Math.min(1, recurringProcessed / recurringTotal)) : progressRatio;
+
+      let savingsPlanned = 0;
+      let savingsDone = 0;
+      (month.savings || []).forEach(function(row) {
+        const planned = Math.max(0, Number(row && row.planned || 0));
+        const actual = Math.max(0, Number(rowActual(row) || 0));
+        savingsPlanned += planned;
+        savingsDone += actual;
+      });
+      const savingsRatio = savingsPlanned > 0 ? Math.max(0, Math.min(1, savingsDone / savingsPlanned)) : 1;
+
+      let previousClosedCount = 0;
+      try {
+        const idx = (state.months || []).findIndex(function(m) { return m && m.name === month.name; });
+        if (idx > 0) {
+          previousClosedCount = (state.months || []).slice(0, idx).filter(function(m) { return m && isClosedMonth(m); }).length;
+        }
+      } catch (e) {}
+      const historyRatio = Math.max(0, Math.min(1, previousClosedCount / 3));
+
+      const variableRows = (month.expenses || []).filter(function(row) { return row && !row.fixed; }).length;
+      const behaviorSignals = Math.max(0,
+        Number(forecast && forecast.cadenceGuidedRows || 0) +
+        Number(forecast && forecast.dictionaryInfluencedRows || 0) +
+        Number(forecast && forecast.builtInInfluencedRows || 0)
+      );
+      const behaviorRatio = variableRows > 0 ? Math.max(0, Math.min(1, behaviorSignals / variableRows)) : 0.5;
+
+      const score = (progressRatio * 0.35) + (recurringRatio * 0.25) + (savingsRatio * 0.15) + (historyRatio * 0.15) + (behaviorRatio * 0.10);
+      const pct = Math.round(Math.max(20, Math.min(96, 20 + score * 76)));
+      const level = pct >= 75 ? 'High' : (pct >= 50 ? 'Medium' : 'Low');
+      const tone = level === 'High' ? 'good' : (level === 'Medium' ? 'warn' : 'bad');
+
+      let support = '';
+      if (progressRatio < 0.18) {
+        support = 'Early-month read; confidence will improve as more transactions are logged.';
+      } else if (recurringRatio < 0.65) {
+        support = 'Some fixed or recurring expenses are still pending.';
+      } else if (savingsRatio < 0.65) {
+        support = 'Savings allocation is not fully confirmed yet.';
+      } else if (historyRatio < 0.7) {
+        support = 'Good live data, with limited closed-month history.';
+      } else {
+        support = 'Most recurring, savings, and live-spending signals are available.';
+      }
+
+      const componentSummary = Math.round(progressRatio * 100) + '% month complete · ' + Math.round(recurringRatio * 100) + '% recurring processed';
+      const factorSummary = 'Savings ' + Math.round(savingsRatio * 100) + '% · History ' + Math.round(historyRatio * 100) + '%';
+      return {
+        pct: pct,
+        level: level,
+        label: level + ' confidence',
+        tone: tone,
+        support: support,
+        componentSummary: componentSummary,
+        factorSummary: factorSummary,
+        progressRatio: progressRatio,
+        recurringRatio: recurringRatio,
+        savingsRatio: savingsRatio,
+        historyRatio: historyRatio,
+        behaviorRatio: behaviorRatio
+      };
+    }
+
+    function forecastAccuracyModel(month, lockedForecast, finalAmount, baseModel) {
+      if (!lockedForecast) return null;
+      const base = baseModel || monthBudgetBase(month);
+      const lockedAmount = Number(lockedForecast.projectedAvailableEnd || 0);
+      const actualAmount = Number(finalAmount || 0);
+      const error = Math.abs(actualAmount - lockedAmount);
+      const denominator = Math.max(1, Math.abs(Number(base && base.availableFunds || 0)), Math.abs(lockedAmount), Math.abs(actualAmount));
+      const pct = Math.round(Math.max(0, Math.min(100, 100 - (error / denominator) * 100)));
+      const label = pct >= 90 ? 'Very accurate' : (pct >= 75 ? 'Good accuracy' : (pct >= 55 ? 'Wide miss' : 'Poor accuracy'));
+      const variance = actualAmount - lockedAmount;
+      return {
+        pct: pct,
+        error: error,
+        lockedAmount: lockedAmount,
+        actualAmount: actualAmount,
+        variance: variance,
+        label: label,
+        tone: pct >= 75 ? 'good' : (pct >= 55 ? 'warn' : 'bad'),
+        support: label + ' · error ' + currency(error) + ' against locked expectation'
       };
     }
 
@@ -6184,31 +6343,37 @@
         ? String(model.mainDriver.label || '').replace(/ variable/i, '').replace(/ left/i, '')
         : '';
       if (driverCategory) candidateCategories.push(driverCategory);
+      const contextSignal = categorySpendSignal(month);
       candidateCategories.forEach(function(category) {
         const key = cleanGroupName(category);
         if (!key || seen[key]) return;
         seen[key] = true;
-        const series = historySeriesForCategory(month, key).slice(-3);
-        if (!series.length) return;
-        const current = categoryExpenseRows(month, key).reduce(function(sum, row) { return sum + rowActual(row); }, 0);
-        const avg = averageValue(series);
-        if (avg <= 0 && current <= 0) return;
-        const deltaPct = avg > 0 ? ((current - avg) / avg) * 100 : 0;
-        const aboveCount = series.filter(function(value) { return avg > 0 && value > avg * 1.1; }).length;
-        const belowCount = series.filter(function(value) { return avg > 0 && value < avg * 0.9; }).length;
-        if (deltaPct >= 15) {
+        const sig = contextSignal[key];
+        if (!sig || (sig.variableBudget <= 0 && sig.expected <= 0)) return;
+        // Explain the forecast in its own terms: what each driver is *projected*
+        // to do against the budget (using the shared signal), not how partial
+        // month-to-date spend compares to a full-month average — which early in a
+        // month always reads as far "below norm" and misleads.
+        const budget = Number(sig.variableBudget || 0);
+        const expected = Number(sig.expected || 0);
+        const deltaPct = budget > 0 ? ((expected - budget) / budget) * 100 : (expected > 0 ? 100 : 0);
+        if (expected > budget && (deltaPct >= 8 || sig.overMonths >= 3)) {
           patternEntries.push({
             tone: 'bad',
             category: key,
-            message: `${key} is running ${deltaPct.toFixed(0)}% above its recent 3-month norm.`,
-            reinforcement: aboveCount >= 2 ? `Recurring pressure in ${key.toLowerCase()} showed up in ${aboveCount} of the last ${series.length} months.` : `${key} is above its usual run-rate this month.`
+            message: `${key} is projected ${deltaPct.toFixed(0)}% above its budget.`,
+            reinforcement: sig.overMonths >= 2
+              ? `It ran over budget in ${sig.overMonths} of the last ${sig.months} months — a repeating pattern, not a one-off.`
+              : `${key} is trending above the budget you set.`
           });
-        } else if (deltaPct <= -15) {
+        } else if (expected < budget && (deltaPct <= -8 || sig.underMonths >= FORECAST_DOWNWARD_GATE_MONTHS)) {
           patternEntries.push({
             tone: 'good',
             category: key,
-            message: `${key} is tracking ${Math.abs(deltaPct).toFixed(0)}% below its recent norm.`,
-            reinforcement: belowCount >= 2 ? `${key} has been consistently lighter than usual, which supports keeping more room elsewhere.` : `${key} is lighter than usual this month.`
+            message: `${key} is projected ${Math.abs(deltaPct).toFixed(0)}% below its budget.`,
+            reinforcement: sig.underMonths >= 2
+              ? `Consistently lighter than budget (${sig.underMonths} of ${sig.months} months), so there is room to reallocate.`
+              : `${key} is tracking under the budget you set.`
           });
         }
       });
@@ -6323,6 +6488,8 @@
       return normalizedStateMeta('healthy');
     }
 
+    const FORECAST_LOGIC_VERSION = 4;
+
     function buildLockedForecastSnapshot(month, liveForecast) {
       const ctx = monthDateContext(month.name);
       const head = headerMetrics(month);
@@ -6332,6 +6499,7 @@
         : 0;
       const state = forecastStateMetaForValues(forecast.projectedAvailableEnd, forecastEndPct, head.availableBudget);
       return {
+        forecastLogicVersion: FORECAST_LOGIC_VERSION,
         lockDay: Number(month.forecastLockDay || 5),
         lockedOn: new Date().toISOString(),
         basedOnDay: Number(forecast.currentDay || (ctx ? ctx.dayIndex : 1) || 1),
@@ -6373,24 +6541,257 @@
       };
     }
 
+    function normalizeLockedForecastSnapshot(month, snapshot, options) {
+      if (!month || !snapshot || typeof snapshot !== 'object') return null;
+      const projectedAvailableEnd = Number(
+        snapshot.projectedAvailableEnd != null ? snapshot.projectedAvailableEnd
+          : snapshot.projectedEnd != null ? snapshot.projectedEnd
+          : snapshot.lockedProjection != null ? snapshot.lockedProjection
+          : snapshot.forecastAmount != null ? snapshot.forecastAmount
+          : snapshot.amount
+      );
+      if (!Number.isFinite(projectedAvailableEnd)) return null;
+      const ctx = monthDateContext(month.name);
+      const lockDay = Number(month.forecastLockDay || snapshot.lockDay || 5);
+      const lockedOnRaw = snapshot.lockedOn || snapshot.createdAt || snapshot.capturedAt || snapshot.date || snapshot.savedAt || '';
+      const source = String(snapshot.source || (options && options.source) || 'legacy-lock');
+      const normalized = Object.assign({}, snapshot, {
+        forecastLogicVersion: Number(snapshot.forecastLogicVersion || 0) || 0,
+        lockDay: lockDay,
+        lockedOn: lockedOnRaw || '',
+        projectedAvailableEnd: projectedAvailableEnd,
+        projectedCashEnd: Number.isFinite(Number(snapshot.projectedCashEnd)) ? Number(snapshot.projectedCashEnd) : projectedAvailableEnd,
+        projectedSavingsReserveRemaining: Number(snapshot.projectedSavingsReserveRemaining || 0),
+        projectedExpensesNet: Number(snapshot.projectedExpensesNet || 0),
+        projectedSavings: Number(snapshot.projectedSavings || 0),
+        projectedRepeatable: Number(snapshot.projectedRepeatable || 0),
+        projectedOpen: Number(snapshot.projectedOpen || 0),
+        projectedOneoff: Number(snapshot.projectedOneoff || 0),
+        remainingDays: Number(snapshot.remainingDays || 0),
+        forecastConfidence: Number(snapshot.forecastConfidence || 0),
+        forecastEndPct: Number(snapshot.forecastEndPct || 0),
+        source: source
+      });
+      const lockedOn = lockedOnRaw ? new Date(lockedOnRaw) : null;
+      const lockedInsideMonth = !!(lockedOn && !isNaN(lockedOn.getTime()) && ctx && ctx.start && ctx.end && lockedOn >= ctx.start && lockedOn <= ctx.end);
+      const versionMatches = Number(snapshot.forecastLogicVersion || 0) === FORECAST_LOGIC_VERSION;
+      const realDayLock = source === 'day-5-lock' && (lockedInsideMonth || (ctx && ctx.sameMonth));
+      normalized.trustLevel = versionMatches && realDayLock ? 'trusted' : 'legacy';
+      normalized.isTrustedLock = normalized.trustLevel === 'trusted';
+      normalized.isLegacyLock = normalized.trustLevel === 'legacy';
+      return normalized;
+    }
+
+    function findStoredLockedForecastSnapshot(month) {
+      if (!month || typeof month !== 'object') return null;
+      const candidateKeys = [
+        'lockedForecast',
+        'forecastLocked',
+        'forecastLock',
+        'forecastSnapshot',
+        'forecastReference',
+        'lockedForecastSnapshot',
+        'day5Forecast',
+        'day5Lock',
+        'referenceForecast'
+      ];
+      for (let i = 0; i < candidateKeys.length; i += 1) {
+        const key = candidateKeys[i];
+        const value = month[key];
+        if (!value) continue;
+        if (typeof value === 'object') {
+          const normalized = normalizeLockedForecastSnapshot(month, value, { source: key === 'lockedForecast' ? value.source : key });
+          if (normalized) return normalized;
+        } else if (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) {
+          const numeric = Number(value);
+          if (Number.isFinite(numeric)) {
+            const normalized = normalizeLockedForecastSnapshot(month, { projectedAvailableEnd: numeric, source: key }, { source: key });
+            if (normalized) return normalized;
+          }
+        }
+      }
+      return null;
+    }
+
+    function forecastLockedSnapshotIsTrusted(month, snapshot) {
+      const normalized = normalizeLockedForecastSnapshot(month, snapshot);
+      return !!(normalized && normalized.isTrustedLock);
+    }
+
     function ensureLockedForecastSnapshot(month, liveForecast) {
       const ctx = monthDateContext(month.name);
       const lockDay = Number(month.forecastLockDay || 5);
-      const hasLocked = Boolean(month.lockedForecast && typeof month.lockedForecast === 'object' && Number(month.lockedForecast.projectedAvailableEnd || 0) === Number(month.lockedForecast.projectedAvailableEnd || 0));
+      let storedLocked = findStoredLockedForecastSnapshot(month);
       const currentDay = Number((liveForecast || {}).currentDay || (ctx ? ctx.dayIndex : 1) || 1);
-      const shouldAutoLock = currentDay >= lockDay;
-      if (!hasLocked && shouldAutoLock) {
+      const shouldAutoLock = ctx && ctx.sameMonth && currentDay >= lockDay;
+      if ((!storedLocked || !storedLocked.isTrustedLock) && shouldAutoLock) {
         month.lockedForecast = buildLockedForecastSnapshot(month, liveForecast);
+        storedLocked = normalizeLockedForecastSnapshot(month, month.lockedForecast);
         try {
           if (typeof saveState === 'function' && state && Array.isArray(state.months)) saveState(state);
         } catch (e) {}
       }
-      return month.lockedForecast || null;
+      return storedLocked || null;
+    }
+
+
+    function forecastRowMatchKey(row) {
+      return [cleanGroupName(row && row.group || ''), cleanGroupName(row && row.name || '')].join('|').toLowerCase();
+    }
+
+    function historicalExpenseActualsForRow(month, row) {
+      const months = state && Array.isArray(state.months) ? state.months : [];
+      const activeIndex = months.indexOf(month);
+      const currentKey = forecastRowMatchKey(row);
+      const values = [];
+      const maxIndex = activeIndex >= 0 ? activeIndex : months.length;
+      for (let i = 0; i < maxIndex; i += 1) {
+        const previous = months[i];
+        if (!previous || !Array.isArray(previous.expenses)) continue;
+        const match = previous.expenses.find(function(candidate) {
+          return candidate && !candidate.fixed && forecastRowMatchKey(candidate) === currentKey;
+        });
+        if (!match) continue;
+        const value = Math.max(0, Number(rowActual(match) || 0));
+        if (value > 0.005) values.push(value);
+      }
+      return values.slice(-6);
+    }
+
+    function forecastMedian(values) {
+      const clean = (values || []).map(Number).filter(function(value) { return Number.isFinite(value); }).sort(function(a, b) { return a - b; });
+      if (!clean.length) return 0;
+      const mid = Math.floor(clean.length / 2);
+      return clean.length % 2 ? clean[mid] : (clean[mid - 1] + clean[mid]) / 2;
+    }
+
+    function historicalExpectedTotalForRow(month, row) {
+      const values = historicalExpenseActualsForRow(month, row);
+      if (!values.length) return 0;
+      const avg = values.reduce(function(sum, value) { return sum + value; }, 0) / values.length;
+      const median = forecastMedian(values);
+      return Math.max(0, (avg * 0.4) + (median * 0.6));
+    }
+
+    function historicalRemainingForRow(month, row, actual) {
+      const expected = historicalExpectedTotalForRow(month, row);
+      return Math.max(0, expected - Math.max(0, Number(actual || 0)));
+    }
+
+    // ----- Budget-aware category spend signal --------------------------------
+    // Per variable category, blend the user's budget with their typical actual
+    // spend, weighted by how much the history can be trusted (sample size x
+    // consistency). Overspend is trusted readily; underspend only pulls the
+    // projection below budget after a confirmation gate of consistent months
+    // (budget stays a floor before then). Median + MAD make it outlier-resistant
+    // so one anomalous month can't dominate. This is shared shape intended for
+    // both the forecast and the Adjustment Advisor.
+    // See veyra_budget_aware_forecast_spec.
+    const FORECAST_HISTORY_WINDOW = 6;
+    const FORECAST_DOWNWARD_GATE_MONTHS = 4;
+    const FORECAST_UPWARD_BUDGET_CAP = 2;
+
+    // Per past month, the total variable (non-fixed) spend in `group`.
+    function categoryVariableHistory(month, group) {
+      const months = (state && Array.isArray(state.months)) ? state.months : [];
+      const activeIndex = months.indexOf(month);
+      const maxIndex = activeIndex >= 0 ? activeIndex : months.length;
+      const values = [];
+      for (let i = 0; i < maxIndex; i += 1) {
+        const prev = months[i];
+        if (!prev || !Array.isArray(prev.expenses)) continue;
+        let present = false;
+        let sum = 0;
+        prev.expenses.forEach(function(row) {
+          if (!row || row.fixed) return;
+          if (cleanGroupName(row.group) !== group) return;
+          present = true;
+          sum += Math.max(0, Number(rowActual(row) || 0));
+        });
+        if (present) values.push(sum);
+      }
+      return values.slice(-FORECAST_HISTORY_WINDOW);
+    }
+
+    // Recency-weighted, outlier-resistant central estimate of past spend.
+    function forecastTypicalSpend(values) {
+      if (!values.length) return 0;
+      const median = forecastMedian(values);
+      let weightedSum = 0;
+      let weightTotal = 0;
+      values.forEach(function(value, index) {
+        const weight = index + 1; // chronological array: most recent weighs most
+        weightedSum += value * weight;
+        weightTotal += weight;
+      });
+      const recencyMean = weightTotal > 0 ? weightedSum / weightTotal : 0;
+      return Math.max(0, (median * 0.6) + (recencyMean * 0.4));
+    }
+
+    // 0..1 — high when months agree, low when erratic. MAD-based for outlier
+    // resistance (a single spike inflates variance but not the median deviation).
+    function forecastConsistency(values) {
+      if (values.length < 2) return values.length === 1 ? 0.5 : 0;
+      const median = forecastMedian(values);
+      if (median <= 0) return 0;
+      const deviations = values.map(function(value) { return Math.abs(value - median); });
+      const mad = forecastMedian(deviations);
+      return Math.min(1, Math.max(0, 1 - (mad / median)));
+    }
+
+    // group -> { variableBudget, typicalActual, confidence, weight, expected }.
+    function categorySpendSignal(month, head) {
+      const allocation = (head && head.allocation) ? head.allocation : allocationRows(month);
+      const subscriptionImpact = derivedSubscriptionImpactForMonth(month);
+      const plannedByGroup = subscriptionImpact.plannedByGroup || {};
+      const signal = {};
+      (allocation.rows || []).forEach(function(allocRow) {
+        if (!allocRow || allocRow.key === 'savings') return;
+        const group = cleanGroupName(allocRow.label);
+        const groupRows = (month.expenses || []).filter(function(row) { return cleanGroupName(row.group) === group; });
+        if (!groupRows.length) return;
+        // All-fixed categories project through fixedRemaining, not here.
+        if (groupRows.every(function(row) { return row.fixed; })) return;
+        // The variable share of the budget = allocation minus fixed/subscription
+        // commitments (those are counted separately in the forecast).
+        const fixedPlanned = groupRows.reduce(function(sum, row) {
+          return sum + (row.fixed ? Math.max(0, Number(row.planned || 0)) : 0);
+        }, 0) + Math.max(0, Number(plannedByGroup[group] || 0));
+        const variableBudget = Math.max(0, Number(allocRow.allocation || 0) - fixedPlanned);
+        const history = categoryVariableHistory(month, group);
+        const typical = forecastTypicalSpend(history);
+        const sizeFactor = Math.min(1, history.length / FORECAST_DOWNWARD_GATE_MONTHS);
+        const confidence = sizeFactor * forecastConsistency(history);
+        const underMonths = history.filter(function(value) { return value < variableBudget; }).length;
+        const overMonths = history.filter(function(value) { return value > variableBudget; }).length;
+        let weight;
+        if (typical >= variableBudget) {
+          weight = confidence;                                  // overspend: trusted readily
+        } else {
+          weight = (underMonths >= FORECAST_DOWNWARD_GATE_MONTHS) ? confidence : 0; // underspend: gated
+        }
+        let expected = variableBudget + ((typical - variableBudget) * weight);
+        if (variableBudget > 0) expected = Math.min(expected, variableBudget * FORECAST_UPWARD_BUDGET_CAP);
+        expected = Math.max(0, expected);
+        signal[group] = {
+          group: group,
+          variableBudget: variableBudget,
+          typicalActual: typical,
+          confidence: confidence,
+          months: history.length,
+          overMonths: overMonths,
+          underMonths: underMonths,
+          weight: weight,
+          expected: expected
+        };
+      });
+      return signal;
     }
 
     function monthForecast(month) {
       const ctx = monthDateContext(month.name);
       const head = headerMetrics(month);
+      const spendSignal = categorySpendSignal(month, head);
       const subscriptionImpact = derivedSubscriptionImpactForMonth(month);
 
       const daysInMonth = ctx ? ctx.daysInMonth : 30;
@@ -6415,6 +6816,60 @@
       let dictionaryInfluencedRows = 0;
       let builtInInfluencedRows = 0;
 
+      const forecastLockDay = Math.max(1, Number(month.forecastLockDay || 5));
+      const earlyMonthPreview = currentDay < forecastLockDay;
+      function budgetBoundedRemaining(row, fallbackProjection) {
+        const planned = Math.max(0, Number(row && row.planned || 0));
+        const actual = Math.max(0, Number(rowActual(row) || 0));
+        const remainingPlanned = Math.max(planned - actual, 0);
+        const projected = Math.max(0, Number(fallbackProjection || 0));
+        if (planned > 0) {
+          if (actual <= 0 || earlyMonthPreview) return remainingPlanned;
+          return Math.min(projected, remainingPlanned);
+        }
+        return projected;
+      }
+
+      // Strip one-off lumps from a row's spend so a single large early charge
+      // (rent, an annual fee, a big one-time purchase) is not mistaken for a
+      // daily habit and extrapolated across the rest of the month.
+      function lumpAdjustedDailyRate(row, actual) {
+        const total = Math.max(0, Number(actual || 0));
+        if (total <= 0) return 0;
+        const txs = (Array.isArray(row && row.transactions) ? row.transactions.map(normalizeExpenseTransaction) : [])
+          .map(function(tx) { return Math.max(0, Number(tx && tx.amount || 0)); })
+          .filter(function(amt) { return amt > 0; })
+          .sort(function(a, b) { return b - a; });
+        // A single recorded charge cannot establish a recurring daily rate, so
+        // it stays counted once (in spentSoFar) and is never projected forward.
+        if (txs.length <= 1) return 0;
+        const largest = txs[0];
+        const restMedian = forecastMedian(txs.slice(1));
+        const dominatesTotal = largest > total * 0.6;
+        const dwarfsTypical = restMedian > 0 && largest > restMedian * 2.5;
+        const recurringSpend = (dominatesTotal || dwarfsTypical) ? Math.max(0, total - largest) : total;
+        return recurringSpend / Math.max(1, currentDay);
+      }
+
+      // Blend a stable anchor (history, else remaining plan) with the observed
+      // daily pace, weighting the pace by how much of the month has elapsed.
+      // Early on the observed rate is noisy, so the anchor dominates; later the
+      // observed pace dominates. Combined with lump removal above, this stops a
+      // frontloaded entry from inflating the month-end projection.
+      function smoothedPaceRemaining(row, actual, historicalRemaining, remainingPlanned) {
+        const paceRemaining = lumpAdjustedDailyRate(row, actual) * remainingDays;
+        const anchor = historicalRemaining > 0
+          ? historicalRemaining
+          : Math.max(0, Number(remainingPlanned || 0));
+        const paceWeight = Math.min(1, Math.max(0, currentDay / Math.max(1, daysInMonth)));
+        const blended = anchor > 0
+          ? (anchor * (1 - paceWeight)) + (paceRemaining * paceWeight)
+          : paceRemaining * paceWeight;
+        return Math.max(0, blended);
+      }
+
+      const rawRowProjections = [];
+      const categoryVariableSpent = {};
       (month.expenses || []).forEach(function(row) {
         const actual = rowActual(row);
         const planned = Number(row.planned || 0);
@@ -6427,6 +6882,8 @@
         }
 
         variableSpent += actual;
+        const group = cleanGroupName(row.group);
+        categoryVariableSpent[group] = (categoryVariableSpent[group] || 0) + Math.max(0, actual);
         const behavior = forecastBehaviorForRow(row);
         if (behavior.source === 'cadence' || behavior.source === 'cadence-mixed') cadenceGuidedRows += 1;
         else if (behavior.source === 'dictionary') dictionaryInfluencedRows += 1;
@@ -6435,27 +6892,67 @@
         const cadenceProjection = cadenceForecastProjectionForRow(row, behavior, currentDay, daysInMonth, remainingDays);
         if (cadenceProjection.cadenceProjected) cadenceProjectedRows += 1;
 
+        // Raw per-row projection sets the *shape*; the category signal below sets
+        // the *magnitude*. Lump-damping and time-weighting still run here.
+        let bucket;
+        let raw;
         if (behavior.kind === 'recurring') {
           repeatableActual += actual;
-          if (cadenceProjection.cadenceProjected) {
-            projectedRepeatable += cadenceProjection.repeatable;
-          } else {
-            projectedRepeatable += (actual / currentDay) * remainingDays;
-            if (remainingPlanned > 0 && actual <= 0) {
-              projectedRepeatable += remainingPlanned;
-            }
-          }
-          return;
-        }
-
-        if (behavior.kind === 'oneoff' || behavior.kind === 'likely-oneoff') {
+          const historicalRemaining = historicalRemainingForRow(month, row, actual);
+          const paceProjection = cadenceProjection.cadenceProjected
+            ? Number(cadenceProjection.repeatable || 0)
+            : smoothedPaceRemaining(row, actual, historicalRemaining, remainingPlanned);
+          bucket = 'repeatable';
+          raw = budgetBoundedRemaining(row, paceProjection || remainingPlanned || historicalRemaining);
+        } else if (behavior.kind === 'oneoff' || behavior.kind === 'likely-oneoff') {
           oneoffActual += actual;
-          projectedOneoff += cadenceProjection.oneoff || remainingPlanned;
-          return;
+          bucket = 'oneoff';
+          raw = budgetBoundedRemaining(row, cadenceProjection.oneoff || remainingPlanned);
+        } else {
+          openActual += actual;
+          const historicalRemaining = historicalRemainingForRow(month, row, actual);
+          bucket = 'open';
+          raw = budgetBoundedRemaining(row, smoothedPaceRemaining(row, actual, historicalRemaining, remainingPlanned));
         }
+        rawRowProjections.push({ group: group, bucket: bucket, raw: Math.max(0, Number(raw || 0)) });
+      });
 
-        openActual += actual;
-        projectedOpen += (actual / currentDay) * remainingDays;
+      // Bound each category's projected future spend by its budget-aware expected
+      // total. Raw row projections provide the within-category distribution; the
+      // signal's `expected` provides the ceiling/target. A category with no signal
+      // entry (no budget and no history) keeps its raw projection unchanged.
+      const categoryRawTotals = {};
+      rawRowProjections.forEach(function(item) {
+        categoryRawTotals[item.group] = (categoryRawTotals[item.group] || 0) + item.raw;
+      });
+      const categoryScale = {};
+      const categoryResidual = {};
+      // A closed month has no remaining days, so nothing can be projected forward;
+      // its actuals are already in spentSoFar. Without this gate, projecting
+      // (expected − spent) would invent phantom spend for a finished month.
+      const monthClosedForProjection = (typeof isClosedMonth === 'function') && isClosedMonth(month);
+      Object.keys(categoryRawTotals).forEach(function(group) {
+        const sig = spendSignal[group];
+        if (monthClosedForProjection) { categoryScale[group] = 0; return; }
+        if (!sig) { categoryScale[group] = 1; return; }
+        const target = Math.max(0, sig.expected - (categoryVariableSpent[group] || 0));
+        const rawTotal = categoryRawTotals[group];
+        if (rawTotal > 0.0001) {
+          categoryScale[group] = target / rawTotal;        // rescale row shape to the target
+        } else {
+          categoryScale[group] = 0;
+          categoryResidual[group] = target;                // no row shape; place as open
+        }
+      });
+      rawRowProjections.forEach(function(item) {
+        const scale = categoryScale[item.group];
+        const value = item.raw * (scale === undefined ? 1 : scale);
+        if (item.bucket === 'repeatable') projectedRepeatable += value;
+        else if (item.bucket === 'oneoff') projectedOneoff += value;
+        else projectedOpen += value;
+      });
+      Object.keys(categoryResidual).forEach(function(group) {
+        projectedOpen += Math.max(0, categoryResidual[group]);
       });
 
       if (month.splitwise) {
@@ -6473,22 +6970,46 @@
       const projectedExpensesNet = projectedExpensesGross - splitwiseImpact;
 
       let savedSoFar = 0;
-      let plannedSavingsRemaining = 0;
+      let plannedSavingsRowRemaining = 0;
       (month.savings || []).forEach(function(row) {
         const actual = rowActual(row);
         const planned = Number(row.planned || 0);
         savedSoFar += actual;
-        plannedSavingsRemaining += Math.max(planned - actual, 0);
+        plannedSavingsRowRemaining += Math.max(planned - actual, 0);
       });
 
+      // Reserve the savings *target* from the Budget Allocation, not just what has
+      // been moved so far. head.uncommittedSavings is the still-to-fund portion of
+      // the allocation target (target − committed, floored at 0), the same reserve
+      // the spendable target pool uses elsewhere. Effect on the forecast:
+      //   • committing savings up to the target is neutral — the target was never
+      //     "available", so moving it changes nothing;
+      //   • overcommitting beyond the target lowers available (uncommitted reaches 0
+      //     and the extra has already left via availableBudget);
+      //   • a month that closes under-funded surfaces through actual closing cash on
+      //     the month-closed path, not this projection.
+      // Fall back to the savings-row plan only when no allocation target exists.
+      const allocationSavingsRemaining = Math.max(0, Number(head.uncommittedSavings || 0));
+      const plannedSavingsRemaining = allocationSavingsRemaining > 0
+        ? allocationSavingsRemaining
+        : plannedSavingsRowRemaining;
+
       const projectedSavings = savedSoFar + plannedSavingsRemaining;
-      const projectedCashEnd = head.availableBudget - ((projectedExpensesGross - spentSoFar) + plannedSavingsRemaining);
-      const projectedSavingsReserveRemaining = Math.max(Number(head.uncommittedSavings || 0), 0);
-      const projectedAvailableEnd = projectedCashEnd - projectedSavingsReserveRemaining;
-      const forecastConfidenceBase = variableSpent > 0
-        ? (cadenceGuidedRows * 1.4 + cadenceProjectedRows * 0.35 + dictionaryInfluencedRows * 1.2 + builtInInfluencedRows * 0.7) / Math.max(1, (month.expenses || []).filter(function(row) { return row && !row.fixed; }).length)
-        : 0;
-      const forecastConfidence = Math.max(0, Math.min(1, 0.28 + forecastConfidenceBase));
+      const projectedFutureExpensesGross = projectedVariable + fixedRemaining;
+      const projectedCashEnd = head.availableBudget - projectedFutureExpensesGross - plannedSavingsRemaining;
+      const projectedSavingsReserveRemaining = plannedSavingsRemaining;
+      const projectedAvailableEnd = projectedCashEnd;
+      const forecastConfidenceMeta = forecastConfidenceModel(month, {
+        subscriptionPlannedTotal: Number(subscriptionImpact.plannedTotal || 0),
+        subscriptionPaidSoFar: Number(subscriptionImpact.actualTotal || 0),
+        cadenceGuidedRows,
+        cadenceProjectedRows,
+        dictionaryInfluencedRows,
+        builtInInfluencedRows,
+        currentDay,
+        daysInMonth
+      }, { head, availableFunds: Number(head.availableBudget || 0) });
+      const forecastConfidence = Math.max(0, Math.min(1, Number(forecastConfidenceMeta.pct || 0) / 100));
 
       return {
         spentSoFar,
@@ -6506,6 +7027,7 @@
         openActual,
         oneoffActual,
         projectedExpensesGross,
+        projectedFutureExpensesGross,
         projectedExpensesNet,
         projectedSavings,
         projectedCashEnd,
@@ -6518,84 +7040,13 @@
         cadenceProjectedRows,
         dictionaryInfluencedRows,
         builtInInfluencedRows,
+        forecastLogicVersion: FORECAST_LOGIC_VERSION,
+        earlyMonthPreview,
         forecastConfidence,
+        forecastConfidenceMeta,
         currentDay,
         daysInMonth,
         remainingDays
-      };
-    }
-
-    // ── Shared category pace projection ────────────────────────────────────
-    // Used by both Q7 (Decision Simulator) and the Smart Budget Guidance tile.
-    // Returns a structured data object; rendering is handled separately per context.
-    function computeCategoryPaceData(month, groupKey) {
-      const ctx = monthDateContext(month.name);
-      const daysInMonth = ctx ? ctx.daysInMonth : 30;
-      const currentDay = Math.max(1, ctx ? ctx.dayIndex : 1);
-      const remainingDays = Math.max(0, daysInMonth - currentDay);
-      const cleanKey = cleanGroupName(String(groupKey || '').replace('expense-group|', ''));
-      const groupRows = (month.expenses || []).filter(function(r) {
-        return cleanGroupName(r.group || '') === cleanKey;
-      });
-
-      let spentSoFar = 0;
-      let projectedExtra = 0;
-      let oneoffActual = 0;
-      let projectedOneoff = 0;
-      let groupFixed = 0;
-
-      groupRows.forEach(function(row) {
-        const actual = rowActual(row);
-        const planned = Number(row.planned || 0);
-        const remainingPlanned = Math.max(planned - actual, 0);
-        if (row.fixed) {
-          groupFixed += actual;
-          spentSoFar += actual;
-          return;
-        }
-        spentSoFar += actual;
-        const behavior = forecastBehaviorForRow(row);
-        const cadenceProjection = cadenceForecastProjectionForRow(row, behavior, currentDay, daysInMonth, remainingDays);
-        if (behavior.kind === 'oneoff' || behavior.kind === 'likely-oneoff') {
-          oneoffActual += actual;
-          projectedOneoff += cadenceProjection.oneoff || remainingPlanned;
-          return;
-        }
-        if (behavior.kind === 'recurring') {
-          if (cadenceProjection.cadenceProjected) {
-            projectedExtra += cadenceProjection.repeatable;
-          } else {
-            projectedExtra += (actual / currentDay) * remainingDays;
-            if (remainingPlanned > 0 && actual <= 0) projectedExtra += remainingPlanned;
-          }
-          return;
-        }
-        projectedExtra += (actual / currentDay) * remainingDays;
-      });
-
-      const projectedTotal = spentSoFar + projectedExtra + projectedOneoff;
-      const allocation = dsAllocationForGroup(month, groupKey);
-      const allocationBase = (allocation != null && allocation > 0) ? allocation : spentSoFar;
-      const projectedVsAllocation = projectedTotal - allocationBase;
-      const pctThrough = daysInMonth > 0 ? Math.round((currentDay / daysInMonth) * 100) : 0;
-
-      return {
-        groupKey: groupKey,
-        spentSoFar: spentSoFar,
-        projectedTotal: projectedTotal,
-        projectedExtra: projectedExtra,
-        projectedOneoff: projectedOneoff,
-        oneoffActual: oneoffActual,
-        groupFixed: groupFixed,
-        allocationBase: allocationBase,
-        hasAllocation: allocation != null && allocation > 0,
-        projectedVsAllocation: projectedVsAllocation,
-        isOver: projectedVsAllocation > 5,
-        isUnder: projectedVsAllocation < -5,
-        pctThrough: pctThrough,
-        currentDay: currentDay,
-        daysInMonth: daysInMonth,
-        remainingDays: remainingDays
       };
     }
 
@@ -6666,7 +7117,9 @@
     function controllableCategoryCapacity(month, group) {
       return controllableCategoryRows(month, group).reduce(function(sum, row) {
         const planned = Number(row.planned || 0);
-        const actual = rowActual(row);
+        // Floor actual at 0: a reimbursement (negative actual) must not read as
+        // extra room beyond the planned budget.
+        const actual = Math.max(0, rowActual(row));
         const remainingPlanned = Math.max(planned - actual, 0);
         const room = remainingPlanned > 0 ? remainingPlanned : Math.max(actual * 0.4, 0);
         return sum + room;
@@ -6730,11 +7183,22 @@
       const base = monthBudgetBase(month);
       const head = base.head;
       const forecast = monthForecast(month);
-      const spentPct = base.availableFunds > 0 ? ((base.availableFunds - Number(head.totalRemaining || 0)) / base.availableFunds) * 100 : 0;
+      // Spending pace is expenses-only, with one exception: saving *more* than the
+      // budgeted/expected amount locks money away from expenses, so the over-budget
+      // savings shrinks the effective expense budget and pushes the pace up. Saving up
+      // to (or under) the budgeted amount has no effect.
+      const allocRows = (head.allocation && head.allocation.rows) || [];
+      const expenseRows = allocRows.filter(function(r) { return r.key !== 'savings'; });
+      const savingsRow = allocRows.find(function(r) { return r.key === 'savings'; });
+      const expenseBudgetRaw = expenseRows.reduce(function(s, r) { return s + Number(r.allocation || 0); }, 0);
+      const expenseSpent = expenseRows.reduce(function(s, r) { return s + Number(r.actual || 0); }, 0);
+      const savingsOverage = savingsRow ? Math.max(Number(savingsRow.actual || 0) - Number(savingsRow.allocation || 0), 0) : 0;
+      const expenseBudget = Math.max(expenseBudgetRaw - savingsOverage, 0);
+      const spentPct = expenseBudget > 0 ? (expenseSpent / expenseBudget) * 100 : (expenseSpent > 0 ? 100 : 0);
       const timePct = base.ctx ? (Number(base.currentDay || 1) / Math.max(1, Number(base.daysInMonth || 30))) * 100 : 0;
       const forecastEndPct = base.availableFunds > 0 ? ((Number(forecast.projectedExpensesNet || 0) + Number(forecast.projectedSavings || 0)) / base.availableFunds) * 100 : 0;
       const delta = spentPct - timePct;
-      return { spentPct, timePct, forecastEndPct, delta };
+      return { spentPct, timePct, forecastEndPct, delta, expenseSpent, expenseBudget };
     }
 
     function splitwiseDirectionalModel(month) {
@@ -6777,10 +7241,12 @@
       const burn = burnRate(month);
       const subscriptionBurden = subscriptionBurdenModel(month, base, forecast);
       const specialFunding = specialFundingInsightModel(month);
-      const daysLeft = Math.max(1, Number(forecast.remainingDays || 0));
-      const currentPace = Number(forecast.projectedVariable || 0) / daysLeft;
-      const targetDaily = Number(base.targetBudgetPool || 0) / daysLeft;
-      const planGap = Number(forecast.projectedAvailableEnd || 0);
+      const monthClosed = !!base.monthClosed;
+      const daysLeft = monthClosed ? 1 : Math.max(1, Number(forecast.remainingDays || 0));
+      const monthEndOutcome = monthClosed ? monthEndOutcomeModel(month, base) : null;
+      const currentPace = monthClosed ? 0 : Number(forecast.projectedVariable || 0) / daysLeft;
+      const targetDaily = monthClosed ? 0 : Number(base.targetBudgetPool || 0) / daysLeft;
+      const planGap = monthClosed ? Number((monthEndOutcome && monthEndOutcome.closingAfterRollover) || 0) : Number(forecast.projectedAvailableEnd || 0);
       const paceGap = currentPace - targetDaily;
       const paceGapPct = targetDaily > 0 ? (paceGap / targetDaily) * 100 : 0;
       const availableFunds = Number(base.availableFunds || 0);
@@ -6799,7 +7265,11 @@
         tone: 'good',
         icon: '✓'
       };
-      if (planGap < 0 || burn.forecastEndPct > 100) {
+      if (monthClosed) {
+        risk = planGap < -0.0049
+          ? { label: 'Closed overspent', tone: 'bad', icon: '⚠️' }
+          : { label: 'Month closed', tone: 'good', icon: '✓' };
+      } else if (planGap < 0 || burn.forecastEndPct > 100) {
         risk = { label: 'Projected overspend', tone: 'bad', icon: '⚠️' };
       } else if (marginPct <= 5 || burn.forecastEndPct >= 95) {
         risk = { label: 'Tight margin', tone: 'warn', icon: '⚠️' };
@@ -6820,7 +7290,11 @@
       const mainDriver = driverRows.find(function(row) { return row.amount > 0; }) || driverRows[0];
 
       let action = '';
-      if (currentPace > targetDaily && targetDaily > 0) {
+      if (monthClosed) {
+        action = (monthEndOutcome && monthEndOutcome.hasRolloverImpact)
+          ? `Month is closed. ${currency(monthEndOutcome.closingBeforeRollover)} was rolled into the next month, so daily pacing is inactive.`
+          : 'Month is closed, so daily pacing and forecast recovery actions are inactive.';
+      } else if (currentPace > targetDaily && targetDaily > 0) {
         action = `Trim variable pace by ${currency(currentPace - targetDaily)}/day to land near plan.`;
       } else if (planGap < 0) {
         action = `Recover about ${currency(Math.abs(planGap) / daysLeft)}/day to avoid finishing negative.`;
@@ -6835,8 +7309,9 @@
         action = 'No pressure signal yet — keep spending close to your target pace.';
       }
 
-      const forecastConfidencePct = Math.round(Math.max(0, Math.min(1, Number(forecast.forecastConfidence || 0))) * 100);
-      const confidenceLabel = forecastConfidencePct >= 75 ? 'High confidence' : (forecastConfidencePct >= 50 ? 'Medium confidence' : 'Low confidence');
+      const confidenceMeta = (forecast && forecast.forecastConfidenceMeta) || forecastConfidenceModel(month, forecast, base);
+      const forecastConfidencePct = Math.round(Number(confidenceMeta.pct || (Math.max(0, Math.min(1, Number(forecast.forecastConfidence || 0))) * 100)) || 0);
+      const confidenceLabel = confidenceMeta.label || (forecastConfidencePct >= 75 ? 'High confidence' : (forecastConfidencePct >= 50 ? 'Medium confidence' : 'Low confidence'));
       const signalMeta = forecastSignalMeta(forecast);
       const methodLabel = signalMeta.methodLabel;
       const subscriptionForecastNote = subscriptionPendingAmount > 0
@@ -6864,6 +7339,7 @@
         action,
         forecastConfidencePct,
         confidenceLabel,
+        confidenceMeta,
         methodLabel
       };
     }
@@ -6890,7 +7366,9 @@ function renderExpensesTable(rows) {
         const group = pair[0];
         const groupRows = pair[1];
         const actual = expenseTabCategoryTotalForGroup(activeMonth, group, groupRows);
-        const spent = Math.abs(actual);
+        // Signed: a net reimbursement (negative total) should reduce the overall
+        // "Total spent", not inflate it via its absolute value.
+        const spent = actual;
         const planned = Math.max(0, Number(allocationAmountForExpenseGroup(activeMonth, group) || 0));
         const entries = expenseTabCategoryEntryCountForGroup(activeMonth, group, groupRows);
         const usage = planned > 0 ? (spent / Math.max(planned, 1)) * 100 : null;
@@ -7226,11 +7704,11 @@ function summarizeBehaviorHero(month, items, state, monthClosed) {
 function rewriteBehaviorInsightMessage(message, mode) {
       const text = compactGuidanceMessage(message);
 
-      let match = text.match(/^(.+?) is the main live issue: already (.+?) above target, with (.+?) more at risk if pace holds\./i);
+      let match = text.match(/^(.+?) is the main live issue: (.+?) used so far, with (.+?) more at risk if the pace holds\./i);
       if (match) {
         return mode === 'hero'
-          ? `${match[1]} is over target by ${match[2]}, with ${match[3]} still at risk.`
-          : `${match[1]} is over target by ${match[2]}. ${match[3]} is still at risk.`;
+          ? `${match[1]}: ${match[2]} used so far, ${match[3]} still at risk.`
+          : `${match[1]}: ${match[2]} used so far. ${match[3]} more is at risk if the pace holds.`;
       }
 
       match = text.match(/^(.+?) is the best current lever, with about (.+?) still realistically controllable\./i);
@@ -7286,16 +7764,20 @@ function renderBehaviorInsightsCard(month, behaviorItems, behaviorIntelInsights)
         ? 'Three signals from the closed month. Use them to shape the next reset.'
         : 'Three signals that help you see what needs attention now and what matters next month.';
       const state = behaviorStateMeta(behaviorItems, monthClosed);
-      const labels = monthClosed ? ['Review', 'Carry forward', 'Next month'] : ['Do now', 'Watch', 'Next month'];
-      const rawItems = labels.map(function(label, idx) {
-        const item = behaviorItems[idx] || { tone: 'warn', message: 'No strong signal yet.' };
+      const fallbackLabels = monthClosed ? ['Review', 'Carry forward', 'Next month'] : ['Do now', 'Watch', 'Next month'];
+      const sourceItems = (behaviorItems || []).filter(function(it) { return it && (it.copy || it.message); }).slice(0, 3);
+      const rawItems = sourceItems.map(function(item, idx) {
+        const hasCopy = !!item.copy;
         return {
-          label: label,
+          label: item.tag || fallbackLabels[idx] || 'Signal',
           tone: item.tone || 'warn',
-          fullCopy: rewriteBehaviorInsightMessage(item.message, 'hero'),
-          copy: rewriteBehaviorInsightMessage(item.message, 'tile')
+          fullCopy: hasCopy ? (item.fullCopy || item.copy) : rewriteBehaviorInsightMessage(item.message, 'hero'),
+          copy: hasCopy ? item.copy : rewriteBehaviorInsightMessage(item.message, 'tile')
         };
       });
+      if (!rawItems.length) {
+        rawItems.push({ label: monthClosed ? 'Review' : 'Steady', tone: 'good', fullCopy: 'Nothing notable stood out this month.', copy: 'Nothing notable stood out this month.' });
+      }
       const heroText = summarizeBehaviorHero(month, rawItems, state, monthClosed);
       const heroSub = monthClosed
         ? 'Closing observations.'
@@ -8536,53 +9018,23 @@ function usedVsOwnedRatio(usageItems) {
     }
 
     function smartInsightsGuidanceMicroCopy(text, type) {
-      const raw = String(text || '').replace(/\s+/g, ' ').trim();
-      if (!raw) return '';
-      const moneyMatches = raw.match(/€\s?-?\d[\d,.]*/g) || [];
-      const percentMatches = raw.match(/-?\d+(?:\.\d+)?%/g) || [];
-      const firstSentence = (raw.split(/(?<=[.!?])\s+/)[0] || raw).replace(/[.!?]+$/, '');
-      const topicMatch = raw.match(/([A-Z][A-Za-z &-]{2,28}) is /);
-      const topic = topicMatch ? topicMatch[1].trim() : '';
-
+      let copy = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!copy) return '';
+      // Strip redundant lead-ins. The tiles have room for a complete line, so we
+      // never truncate or compress into cryptic "€X used · €Y pressure" fragments.
+      copy = copy
+        .replace(/^This matters because\s+/i, '')
+        .replace(/^Why it matters:?\s*/i, '')
+        .replace(/^Best move now:?\s*/i, '')
+        .replace(/^Live signal:?\s*/i, '');
       if (type === 'signal') {
-        const firstMoney = moneyMatches[0] || '';
-        const secondMoney = moneyMatches[1] || '';
-        const pct = percentMatches[0] || '';
-        const parts = [];
-        if (topic) parts.push(topic);
-        if (firstMoney) parts.push(firstMoney + ' used');
-        if (secondMoney) parts.push(secondMoney + ' pressure');
-        if (pct) parts.push(pct);
-        if (parts.length >= 2) return parts.join(' · ');
-        return firstSentence.length > 86 ? firstSentence.slice(0, 83).trim() + '…' : firstSentence;
+        // The live-signal tile carries the spent / at-risk read plus the
+        // projection — the first two sentences of the driver — shown in full.
+        const sentences = copy.split(/(?<=[.!?])\s+/).filter(Boolean);
+        return sentences.slice(0, 2).join(' ');
       }
-
-      if (type === 'why') {
-        let copy = firstSentence
-          .replace(/^This matters because\s+/i, '')
-          .replace(/^Why it matters:?\s*/i, '')
-          .replace(/\bmostly already committed or one-off\b/i, 'mostly committed/one-off')
-          .replace(/\bpreventing additional damage through the remaining flexible categories\b/i, 'protect flexible categories');
-        if (copy.length > 92) {
-          const clauses = copy.split(/[,;:–—]/).map(function(s){ return s.trim(); }).filter(Boolean);
-          copy = clauses.slice(0, 2).join(' · ') || copy;
-        }
-        return copy.length > 92 ? copy.slice(0, 89).trim() + '…' : copy;
-      }
-
-      if (type === 'action') {
-        let copy = firstSentence
-          .replace(/^Best move now:?\s*/i, '')
-          .replace(/^Avoid adding further spend around\s+/i, 'Pause spend in ')
-          .replace(/\band keep the rest of the month near\b/i, ' · keep daily spend near');
-        if (copy.length > 92) {
-          const clauses = copy.split(/[,;:–—]/).map(function(s){ return s.trim(); }).filter(Boolean);
-          copy = clauses.slice(0, 2).join(' · ') || copy;
-        }
-        return copy.length > 92 ? copy.slice(0, 89).trim() + '…' : copy;
-      }
-
-      return firstSentence.length > 92 ? firstSentence.slice(0, 89).trim() + '…' : firstSentence;
+      // why / action tiles are short, self-contained directions: show complete.
+      return copy;
     }
 
 function renderInsights(month) {
@@ -8595,7 +9047,6 @@ function renderInsights(month) {
       const forecast = insightCardModels.forecast || model.forecast || {};
       const burn = insightCardModels.burn || model.burn || {};
       const guidance = (insightCardModels.guidance && typeof insightCardModels.guidance === 'object') ? insightCardModels.guidance : topGuidance(month);
-      const guidancePace = insightCardModels.guidancePace || { data: null, mode: 'guidance' };
       const mix = insightCardModels.mix || budgetMixTrackerModel(month);
       const behaviorItems = Array.isArray(insightCardModels.behaviorInsights) ? insightCardModels.behaviorInsights : [];
       const behaviorIntelInsights = Array.isArray(insightCardModels.behaviorIntelligence) ? insightCardModels.behaviorIntelligence : [];
@@ -8612,6 +9063,7 @@ function renderInsights(month) {
       const forecastLockDateText = forecastCard.forecastLockDateText || forecastLockDateLabel(month, forecastLockDay);
       const lockedForecast = forecastCard.lockedForecast || ensureLockedForecastSnapshot(month, forecast);
       const forecastLocked = typeof forecastCard.forecastLocked === 'boolean' ? forecastCard.forecastLocked : Boolean(lockedForecast);
+      const forecastLockIsLegacy = forecastLocked && String((lockedForecast && lockedForecast.trustLevel) || '') === 'legacy';
       const forecastReference = forecastCard.forecastReference || (forecastLocked ? lockedForecast : forecast);
       const forecastStateMeta = forecastCard.forecastStateMeta || resolvedDashboardStateMeta(
         forecastLocked
@@ -8630,7 +9082,7 @@ function renderInsights(month) {
       const forecastSummaryCopy = forecastCard.summaryCopy || (forecastLocked ? 'Live projection is available against the locked reference.' : `Locks on ${forecastLockDateText}.`);
       const forecastDrivers = Array.isArray(forecastCard.driverRows) ? forecastCard.driverRows : (forecastLocked ? ((lockedForecast && lockedForecast.driverRows) || []) : (model.driverRows || []));
 
-      const forecastTooltipHtml = '<ul class="info-tooltip-list"><li>Locks on day 5 and becomes a stable benchmark. Before that it\'s a preview — use the tiles for pressure signals.</li><li>After locking, compare the live projection against the locked reference rather than reacting to day-to-day movement.</li><li>Start with the End-of-Month number, then scan the tiles for status, drift, buffer, and structural load.</li></ul>';
+      const forecastTooltipHtml = '<ul class="info-tooltip-list"><li>Locks on day 5 and becomes a stable benchmark. Legacy locks are restored only when a stored forecast value exists; they are clearly marked because older versions did not save all lock metadata.</li><li> Before that it\'s a preview — use the tiles for pressure signals.</li><li>After locking, compare the live projection against the locked reference rather than reacting to day-to-day movement.</li><li>Start with the End-of-Month number, then scan the tiles for status, drift, buffer, and structural load.</li></ul>';
       const forecastHeaderHtml = renderUnifiedCardHeader({ title: 'Monthly Forecast', tooltipId: 'monthlyForecastTooltip', tooltipHtml: forecastTooltipHtml });
       const renderForecastMetricTile = function(metric) {
         metric = metric || {};
@@ -8644,11 +9096,11 @@ function renderInsights(month) {
       wrap.innerHTML = `
         <section class="insight-card ui-3d-panel ui-3d-insight forecast-card ${forecastStateMeta.tone || ''}" draggable="true" data-insight-key="forecast" data-insight-span="2">
             ${forecastHeaderHtml}
-            <div class="logic-kicker">${forecastLocked ? 'Locked forecast' : 'Forecast preview'}</div>
-            <div class="insight-main ${Number(forecastHeadlineAmount || 0) < 0 ? "value-negative" : "income-positive"}">${monthClosed ? 'Locked forecast' : 'End-of-Month spendable'} ${currency(Number(forecastHeadlineAmount || 0))}</div>
-            <div class="forecast-risk ${forecastStateMeta.tone || ''}">${forecastLocked ? '🔒' : '⏳'} ${monthClosed ? `Closed Month · locked on ${forecastLockDateText}` : (forecastLocked ? `${forecastStateMeta.label || 'Locked'} · locked on ${forecastLockDateText}` : `Preview · locks on ${forecastLockDateText}`)}</div>
+            <div class="logic-kicker">${monthClosed ? 'Retrospective result' : (forecastLocked ? 'Locked forecast' : 'Forecast preview')}</div>
+            <div class="insight-main ${Number(forecastHeadlineAmount || 0) < 0 ? "value-negative" : "income-positive"}">${monthClosed ? 'Final result' : 'End-of-Month spendable'} ${currency(Number(forecastHeadlineAmount || 0))}</div>
+            <div class="forecast-risk ${forecastStateMeta.tone || ''}">${monthClosed ? '✓' : (forecastLocked ? '🔒' : '⏳')} ${monthClosed ? (forecastLocked ? (forecastLockIsLegacy ? 'Closed Month · legacy lock restored' : `Closed Month · locked on ${forecastLockDateText}`) : 'Closed Month · final result') : (forecastLocked ? `${forecastStateMeta.label || 'Locked'} · locked on ${forecastLockDateText}` : `Preview · locks on ${forecastLockDateText}`)}</div>
             <div class="micro-bar"><div class="micro-fill ${forecastUsedPctForEvaluation > 100 ? 'bad' : forecastUsedPctForEvaluation >= 80 ? 'warn' : ''}" style="width:${Math.min(Math.max(forecastUsedPctForEvaluation,0),100)}%;"></div></div>
-            <div class="insight-detail"><span>${monthClosed ? (monthEndOutcome.hasRolloverImpact ? `Rolled ${currency(monthEndOutcome.closingBeforeRollover)} forward` : `Closed with ${currency(closedForecastFinalAmount)} remaining`) : (forecastLocked ? `Locked ${forecastLockDateText}` : `Preview · locks ${forecastLockDateText}`)}${!monthClosed && Number((forecastReference && forecastReference.projectedSavingsReserveRemaining) || 0) > 0 ? ` · ${currency(Number(forecastReference.projectedSavingsReserveRemaining || 0))} reserved` : ''}</span><span>${forecastUsedPctForEvaluation.toFixed(1)}% used</span></div>
+            <div class="insight-detail"><span>${monthClosed ? (monthEndOutcome.hasRolloverImpact ? `Rolled ${currency(monthEndOutcome.closingBeforeRollover)} forward` : `Closed with ${currency(closedForecastFinalAmount)} remaining`) : (forecastLocked ? (forecastLockIsLegacy ? 'Legacy lock restored' : `Locked ${forecastLockDateText}`) : `Preview · locks ${forecastLockDateText}`)}${!monthClosed && Number((forecastReference && forecastReference.projectedSavingsReserveRemaining) || 0) > 0 ? ` · ${currency(Number(forecastReference.projectedSavingsReserveRemaining || 0))} reserved` : ''}</span><span>${forecastUsedPctForEvaluation.toFixed(1)}% used</span></div>
             <div class="forecast-primary-grid">${primaryForecastMetrics.map(renderForecastMetricTile).join('')}</div>
             <div class="forecast-driver-box">
               <div class="logic-kicker">Why</div>
@@ -8688,7 +9140,7 @@ function renderInsights(month) {
                     <div class="tile-copy">${smartInsightsGuidanceMicroCopy(guidance.action, "action")}</div>
                   </div>
                 </div>
-                ${renderCategoryPaceTile(guidancePace && guidancePace.data ? guidancePace.data : null, guidancePace && guidancePace.mode ? guidancePace.mode : 'guidance')}
+                ${renderCategoryBudgetBars(guidance && guidance.budgetBars ? guidance.budgetBars : null)}
                 <div class="guidance-urgency"><strong>${guidance.urgencyLabel}:</strong> ${guidance.urgency}</div>
               </div>
               <aside class="guidance-track-card">
@@ -8791,6 +9243,8 @@ function categoryTrendRows(month) {
       (allocation.rows || []).forEach(function(row) {
         allocationMap[cleanGroupName(row.label)] = Number(row.allocation || 0);
       });
+      const trendSignal = categorySpendSignal(month, { allocation: allocation });
+      const trendMonthClosed = (typeof isClosedMonth === 'function') && isClosedMonth(month);
 
       const ctx = monthDateContext(month.name);
       const daysInMonth = ctx ? ctx.daysInMonth : 30;
@@ -8825,9 +9279,23 @@ function categoryTrendRows(month) {
               return sum + Math.max(planned - rowActual(row), 0);
             }, 0)
           : 0;
-        const projected = isCommittedCategory
-          ? curr + remainingPlanned
-          : (currentDay > 0 ? (curr / currentDay) * daysInMonth : curr);
+        let projected;
+        if (isCommittedCategory) {
+          projected = curr + remainingPlanned;
+        } else if (trendMonthClosed) {
+          projected = curr;                                  // closed month: nothing left to project
+        } else {
+          // Budget-aware projection from the shared signal — consistent with the
+          // forecast and the Advisor — rather than a naive linear pace that a
+          // single early charge would blow out of proportion.
+          const trendSig = trendSignal[cleanGroupName(key)];
+          if (trendSig) {
+            const fixedCommitment = Math.max(0, target - Number(trendSig.variableBudget || 0));
+            projected = Math.max(curr, Number(trendSig.expected || 0) + fixedCommitment);
+          } else {
+            projected = currentDay > 0 ? (curr / currentDay) * daysInMonth : curr;
+          }
+        }
         const actualDelta = curr - target;
         const projectedDelta = projected - target;
         const absChange = Math.abs(curr - prev);
@@ -9375,19 +9843,6 @@ function controllabilityProfile(month, group) {
       };
     }
 
-function controllabilityExplanation(profile) {
-      if (!profile) return "mixed note pattern";
-      if (profile.type === "repeatable") {
-        return profile.repeatedTokens.length
-          ? `repeatable note pattern (${profile.repeatedTokens.join(" / ")})`
-          : "repeatable note pattern";
-      }
-      if (profile.type === "mostly-oneoff") {
-        return "mostly one-off note pattern";
-      }
-      return "mixed note pattern";
-    }
-
 function guidanceActionPlan(month, causeGroup, amountNeeded) {
       const need = Math.max(0, Number(amountNeeded || 0));
       const causeProfile = causeGroup ? controllabilityProfile(month, causeGroup) : null;
@@ -9732,14 +10187,14 @@ function setLinkedRollover(month, sourceMonth) {
 
 function applyLinkedRollover(month, sourceMonth) {
       ensureRowStructure(month, 'income');
-      let row = (month.income || []).find(r => r.name === "Spillover previous Month");
+      let row = linkedRolloverIncomeRow(month);
       if (!row) {
         row = starterIncomeRow('income-rollover-linked', 'Adjustments', 'Spillover previous Month');
         month.income = Array.isArray(month.income) ? month.income : [];
         month.income.push(row);
       }
       const sourceMetrics = headerMetrics(sourceMonth);
-      const rolloverAmount = Number(Number(sourceMetrics.rawTotalRemaining || sourceMetrics.totalRemaining || 0).toFixed(2));
+      const rolloverAmount = Number(outgoingRolloverAmountForMonth(sourceMonth, sourceMetrics).toFixed(2));
       row.transactions = [];
       row.fixedPaid = false;
       row.planned = rolloverAmount;
@@ -9748,7 +10203,8 @@ function applyLinkedRollover(month, sourceMonth) {
           amount: rolloverAmount,
           note: `Linked rollover from ${sourceMonth.name}`,
           date: todayStamp(),
-          linked: true
+          linked: true,
+          rolloverAuto: true
         });
       }
 
@@ -9886,10 +10342,12 @@ function reconcileMonthChain() {
     }
 
 function propagateLinkedRollovers() {
-      // Strict state mode: do not silently mutate saved/imported months during render.
-      // Rollover rows are preserved exactly as stored unless the user explicitly creates
-      // or refreshes a rollover through the UI.
-      return;
+      if (!state || !Array.isArray(state.months)) return;
+      state.months.forEach(function(month) {
+        const sourceMonth = linkedRolloverSourceForMonth(month);
+        if (!sourceMonth) return;
+        applyLinkedRollover(month, sourceMonth);
+      });
     }
 
     window.reconcileMonthChain = reconcileMonthChain;
@@ -9900,8 +10358,8 @@ function rolloverPreview(month) {
         ? Object.keys(month.splitwise).reduce((sum, key) => sum + splitwiseBudgetPendingForKey(month, key), 0)
         : 0;
       return {
-        carryCash: Number(metrics.totalRemaining || 0),
-        carryRemaining: Number(metrics.totalRemaining || 0),
+        carryCash: Number(metrics.outgoingRolloverAmount || 0),
+        carryRemaining: Number(metrics.rawTotalRemaining || metrics.totalRemaining || 0),
         carrySplitwise: Number(pendingSplitwise || 0)
       };
     }
@@ -10298,6 +10756,12 @@ function partnerBalance(month) {
     }
 
 function syncDerivedRows(month, monthListOverride) {
+      const rolloverSource = linkedRolloverSourceForMonth(month, monthListOverride);
+      if (rolloverSource && rolloverSource !== month && !month._syncingLinkedRollover) {
+        month._syncingLinkedRollover = true;
+        try { applyLinkedRollover(month, rolloverSource); }
+        finally { month._syncingLinkedRollover = false; }
+      }
       const splitRow = ensureSharedExpensesIncomePreset(month);
       if (splitRow) {
         splitRow.toggleBased = false;
@@ -10808,8 +11272,8 @@ function renderExpenseModal(row) {
       const planned = Number(row.planned || 0);
       const entryCount = (row.transactions || []).length;
       const hasToggle = Boolean(row.fixed || row.toggleBased);
-      const overAmount = planned > 0 ? Math.max(Math.abs(actual) - planned, 0) : 0;
-      const plannedRemaining = planned > 0 ? Math.max(planned - Math.abs(actual), 0) : 0;
+      const overAmount = planned > 0 ? Math.max(actual - planned, 0) : 0;
+      const plannedRemaining = planned > 0 ? Math.max(planned - actual, 0) : 0;
       const cadenceSelect = renderExpenseCadenceSelect(row.id, EXPENSE_CADENCE_HINT_DEFAULT);
       const linkedFeature = specialFundingLinkedExpenseMeta(row, state, getActiveMonth());
       const linkedCoverageText = linkedFeature
@@ -10842,10 +11306,10 @@ function renderExpenseModal(row) {
               <div class="expense-progress">
                 <div class="expense-progress-row">
                   <span>${planned > 0 ? `Budget <strong>${currency(planned)}</strong>` : `No planned budget set`}</span>
-                  <span>${planned > 0 ? `${Math.round((Math.abs(actual) / Math.max(planned, 1)) * 100)}% used` : linkedCoverageText || `${entryCount} logged`}</span>
+                  <span>${planned > 0 ? `${Math.round((Math.max(0, actual) / Math.max(planned, 1)) * 100)}% used` : linkedCoverageText || `${entryCount} logged`}</span>
                 </div>
                 <div class="expense-progress-bar">
-                  <span class="expense-progress-fill ${overAmount > 0.0049 ? "is-over" : ""}" style="width:${planned > 0 ? Math.min((Math.abs(actual) / Math.max(planned, 1)) * 100, 100) : Math.min(entryCount * 12, 100)}%"></span>
+                  <span class="expense-progress-fill ${overAmount > 0.0049 ? "is-over" : ""}" style="width:${planned > 0 ? Math.min((Math.max(0, actual) / Math.max(planned, 1)) * 100, 100) : Math.min(entryCount * 12, 100)}%"></span>
                 </div>
               </div>
               <div class="expense-modal-hero-stats">
@@ -10927,9 +11391,15 @@ function renderExpenseGroupTile(group, groupRows) {
       const activeMonth = getActiveMonth();
       const totalActual = expenseTabCategoryTotalForGroup(activeMonth, group, groupRows);
       const totalPlanned = allocationAmountForExpenseGroup(activeMonth, group);
-      const spent = Math.abs(totalActual);
-      const pct = totalPlanned > 0 ? Math.min((spent / Math.max(totalPlanned, 1)) * 100, 100) : 0;
-      const rawPct = totalPlanned > 0 ? Math.round((spent / Math.max(totalPlanned, 1)) * 100) : 0;
+      // Signed total: a category can net negative when reimbursements (entered as
+      // negative transactions, or settled shared expenses) exceed its spend. Show
+      // that real figure rather than its absolute value; only the progress-bar
+      // visuals are floored at zero so they never render negative.
+      const spent = totalActual;
+      const spentForBar = Math.max(0, spent);
+      const hasSpend = Math.abs(spent) > 0.0049;
+      const pct = totalPlanned > 0 ? Math.min((spentForBar / Math.max(totalPlanned, 1)) * 100, 100) : 0;
+      const rawPct = totalPlanned > 0 ? Math.round((spentForBar / Math.max(totalPlanned, 1)) * 100) : 0;
       const overAmount = totalPlanned > 0 ? Math.max(spent - totalPlanned, 0) : 0;
       const remainingAmount = totalPlanned > 0 ? Math.max(totalPlanned - spent, 0) : 0;
       const categoryColor = expenseCategoryPickerColor(group, state);
@@ -10945,7 +11415,7 @@ function renderExpenseGroupTile(group, groupRows) {
         '--expense-cat-soft:' + hexToRgba(categoryColor, 0.10),
         '--expense-cat-cta:' + categoryColor
       ].join(';');
-      const toneClass = overAmount > 0.0049 ? 'is-alert' : spent > 0 ? 'is-live' : '';
+      const toneClass = overAmount > 0.0049 ? 'is-alert' : hasSpend ? 'is-live' : '';
       const progressCopy = totalPlanned > 0
         ? `${rawPct}% of budget used`
         : 'Set a budget to activate progress tracking';
@@ -10961,13 +11431,13 @@ function renderExpenseGroupTile(group, groupRows) {
                 <div class="phase4-expense-name">${escapeHtml(group)}</div>
               </div>
             </div>
-            <span class="phase4-expense-status ${overAmount > 0.0049 ? 'is-over' : spent > 0 ? 'is-active' : ''}">${overAmount > 0.0049 ? 'Over plan' : spent > 0 ? 'Tracking' : 'Ready'}</span>
+            <span class="phase4-expense-status ${overAmount > 0.0049 ? 'is-over' : hasSpend ? 'is-active' : ''}">${overAmount > 0.0049 ? 'Over plan' : hasSpend ? 'Tracking' : 'Ready'}</span>
           </div>
 
           <div class="phase4-expense-row-main">
             <div class="phase4-expense-total-block">
               <span class="phase4-expense-total-label">Spent this month</span>
-              <strong class="phase4-expense-main ${spent > 0 ? 'is-live' : ''}">${currency(spent)}</strong>
+              <strong class="phase4-expense-main ${hasSpend ? 'is-live' : ''}">${currency(spent)}</strong>
             </div>
             <div class="phase4-expense-meta phase4-expense-meta-clean">
               <div class="phase4-expense-stat">
@@ -11011,8 +11481,8 @@ function renderExpenseGroupModalSection(row, isActive) {
       const planned = Number(row.planned || 0);
       const entryCount = (row.transactions || []).length;
       const hasToggle = Boolean(row.fixed || row.toggleBased);
-      const overAmount = planned > 0 ? Math.max(Math.abs(actual) - planned, 0) : 0;
-      const plannedRemaining = planned > 0 ? Math.max(planned - Math.abs(actual), 0) : 0;
+      const overAmount = planned > 0 ? Math.max(actual - planned, 0) : 0;
+      const plannedRemaining = planned > 0 ? Math.max(planned - actual, 0) : 0;
       const linkedFeature = specialFundingLinkedExpenseMeta(row, state, getActiveMonth());
       const linkedCoverageText = linkedFeature
         ? `${currency(linkedFeature.covered)} / ${currency(linkedFeature.available)} covered`
@@ -11036,7 +11506,7 @@ function renderExpenseGroupModalSection(row, isActive) {
           </div>
           <div class="expense-progress expense-subcat-progress">
             <div class="expense-progress-bar">
-              <span class="expense-progress-fill ${overAmount > 0.0049 ? "is-over" : ""}" style="width:${planned > 0 ? Math.min((Math.abs(actual) / Math.max(planned, 1)) * 100, 100) : Math.min(entryCount * 12, 100)}%"></span>
+              <span class="expense-progress-fill ${overAmount > 0.0049 ? "is-over" : ""}" style="width:${planned > 0 ? Math.min((Math.max(0, actual) / Math.max(planned, 1)) * 100, 100) : Math.min(entryCount * 12, 100)}%"></span>
             </div>
           </div>
           <div class="expense-subcat-foot">
@@ -11059,14 +11529,14 @@ function renderExpenseGroupModal(group, groupRows) {
       const totalActual = expenseTabCategoryTotalForGroup(activeMonth, group, groupRows);
       const totalPlanned = allocationAmountForExpenseGroup(activeMonth, group);
       const totalEntries = expenseTabCategoryEntryCountForGroup(activeMonth, group, groupRows);
-      const overAmount = totalPlanned > 0 ? Math.max(Math.abs(totalActual) - totalPlanned, 0) : 0;
+      const overAmount = totalPlanned > 0 ? Math.max(totalActual - totalPlanned, 0) : 0;
       const activeRow = groupRows.find(row => row.id === openExpenseModalRowId) || groupRows[0];
       const selectedRow = activeRow || null;
       const selectedActual = selectedRow ? rowActual(selectedRow) : 0;
       const selectedPlanned = selectedRow ? Number(selectedRow.planned || 0) : 0;
       const selectedEntryCount = selectedRow ? (selectedRow.transactions || []).length : 0;
-      const selectedOver = selectedPlanned > 0 ? Math.max(Math.abs(selectedActual) - selectedPlanned, 0) : 0;
-      const selectedRemaining = selectedPlanned > 0 ? Math.max(selectedPlanned - Math.abs(selectedActual), 0) : 0;
+      const selectedOver = selectedPlanned > 0 ? Math.max(selectedActual - selectedPlanned, 0) : 0;
+      const selectedRemaining = selectedPlanned > 0 ? Math.max(selectedPlanned - selectedActual, 0) : 0;
       const linkedFeature = selectedRow ? specialFundingLinkedExpenseMeta(selectedRow, state, getActiveMonth()) : null;
       const linkedCoverageText = linkedFeature
         ? `${currency(linkedFeature.covered)} / ${currency(linkedFeature.available)} covered`
@@ -11128,10 +11598,10 @@ function renderExpenseGroupModal(group, groupRows) {
                   <div class="expense-progress">
                     <div class="expense-progress-row">
                       <span>${selectedPlanned > 0 ? `Budget <strong>${currency(selectedPlanned)}</strong>` : `No planned budget set`}</span>
-                      <span>${selectedPlanned > 0 ? `${Math.round((Math.abs(selectedActual) / Math.max(selectedPlanned, 1)) * 100)}% used` : linkedCoverageText || `${selectedEntryCount} logged`}</span>
+                      <span>${selectedPlanned > 0 ? `${Math.round((Math.max(0, selectedActual) / Math.max(selectedPlanned, 1)) * 100)}% used` : linkedCoverageText || `${selectedEntryCount} logged`}</span>
                     </div>
                     <div class="expense-progress-bar">
-                      <span class="expense-progress-fill ${selectedOver > 0.0049 ? "is-over" : ""}" style="width:${selectedPlanned > 0 ? Math.min((Math.abs(selectedActual) / Math.max(selectedPlanned, 1)) * 100, 100) : Math.min(selectedEntryCount * 12, 100)}%"></span>
+                      <span class="expense-progress-fill ${selectedOver > 0.0049 ? "is-over" : ""}" style="width:${selectedPlanned > 0 ? Math.min((Math.max(0, selectedActual) / Math.max(selectedPlanned, 1)) * 100, 100) : Math.min(selectedEntryCount * 12, 100)}%"></span>
                     </div>
                   </div>
                   <div class="expense-selected-kpis">
@@ -11230,9 +11700,9 @@ function cashflowKindMeta(kind) {
         return sum + (actualValue > 0.0049 || plannedValue > 0.0049 || txCount > 0 ? 1 : 0);
       }, 0);
       const progressPct = planned > 0
-        ? Math.max(0, Math.min((Math.abs(actual) / Math.max(planned, 1)) * 100, 100))
+        ? Math.max(0, Math.min((Math.max(0, actual) / Math.max(planned, 1)) * 100, 100))
         : (rowCount > 0 ? Math.max(8, Math.min((activeRowCount / rowCount) * 100, 100)) : 0);
-      const remainder = planned > 0 ? planned - Math.abs(actual) : 0;
+      const remainder = planned > 0 ? planned - actual : 0;
       return { actual, planned, rowCount, entryCount, activeRowCount, progressPct, remainder };
     }
 
@@ -11796,22 +12266,10 @@ function renderRows(targetId, rows, kind) {
       let totalRemaining = totalPlanned - totalSpent;
       const closed = isClosedMonth(month);
 
-      // For closed months that already have a linked next-month rollover, display the
-      // stored linked rollover amount as the source of truth. Do not recalculate it from
-      // current allocation math, because schema/default changes can otherwise make old
-      // months appear to gain or lose money without any new bank data.
       if (closed) {
-        const rolloverTarget = linkedRolloverTargetForMonth(month);
-        const storedRolloverRow = rolloverTarget && Array.isArray(rolloverTarget.income)
-          ? rolloverTarget.income.find(function(row) { return String(row && row.name || '') === 'Spillover previous Month'; })
-          : null;
-        if (storedRolloverRow) {
-          const storedRollover = Number(rowActual(storedRolloverRow) || storedRolloverRow.planned || 0);
-          if (Number.isFinite(storedRollover)) {
-            totalRemaining = storedRollover;
-            totalSpent = totalPlanned - totalRemaining;
-          }
-        }
+        const head = headerMetrics(month);
+        totalRemaining = closedMonthCashResult(month, head);
+        totalSpent = totalPlanned - totalRemaining;
       }
       const remainingPct = totalPlanned > 0 ? (totalRemaining / totalPlanned) * 100 : 0;
 
@@ -11835,8 +12293,9 @@ function renderRows(targetId, rows, kind) {
           message = 'Month ended exactly on budget';
           supportingNumber = 'Perfect landing \u2014 nothing left over';
         } else if (closed) {
-          message = 'Month ended near the limit';
-          supportingNumber = currency(Math.max(totalRemaining, 0)) + ' remained at close';
+          state = 'on-track';
+          message = 'Month ended with money left over';
+          supportingNumber = currency(Math.max(totalRemaining, 0)) + ' moved forward';
         } else {
           message = "You're close to your limit";
           supportingNumber = 'Only ' + currency(Math.max(totalRemaining, 0)) + ' remaining';
@@ -11850,8 +12309,8 @@ function renderRows(targetId, rows, kind) {
             message = 'Month ended exactly on budget';
             supportingNumber = 'Perfect landing \u2014 nothing left over';
           } else {
-            message = 'Month ended on track';
-            supportingNumber = currency(Math.max(totalRemaining, 0)) + ' left over';
+            message = 'Month ended with money left over';
+            supportingNumber = currency(Math.max(totalRemaining, 0)) + ' moved forward';
           }
         } else {
           message = "You're on track";
@@ -11868,23 +12327,73 @@ function renderRows(targetId, rows, kind) {
       const hasActivity = monthHasTrackedEntries(month);
       if (!hasActivity) { el.innerHTML = ''; return; }
 
-      const { state, message, supportingNumber } = getFinancialState(month);
-      const closed = isClosedMonth(month);
-      const icons = {
-        'on-track':    closed ? '✓' : '✓',
-        'warning':     closed ? '!' : '⚠',
-        'overspending': closed ? '↓' : '↑'
-      };
-      const cssClass = { 'on-track': 'state-on-track', 'warning': 'state-warning', 'overspending': 'state-overspending' };
+      const fs = getFinancialState(month);
+      const head = headerMetrics(month);
+      // Budget-used / spent / pace all come from the (expenses-only) Burn Rate model, so the
+      // ring, the spent figure and the burn tile agree and savings never moves any of them.
+      const burn = burnRate(month);
+      const usedPctClamped = Math.max(0, Math.min(100, Number(burn.spentPct || 0)));
+      const paceDelta = Number(burn.delta || 0);
+      const ringSpent = Math.max(Number(burn.expenseSpent || 0), 0);
+      const ringBudget = Math.max(Number(burn.expenseBudget || 0), 0);
+      const ringC = 339.3;                                  // 2π·54
+      const ringOff = (ringC * (1 - usedPctClamped / 100)).toFixed(1);
+
+      const incomeActual = (month.income || []).reduce(function(s, r) { return s + Number(rowActual(r, month) || 0); }, 0);
+      const savingsActual = (month.savings || []).reduce(function(s, r) { return s + Math.abs(Number(rowActual(r, month) || 0)); }, 0);
+      const dayStats = monthDayStats(month.name);
+      const daysLeft = Number(dayStats.daysLeft || 0);
+      const safeToSpend = Math.max(Number(fs.totalRemaining || 0), 0);
+
+      // Forecast (condensed from the former Smart Insight card)
+      const monthClosed = isClosedMonth(month);
+      const fmodel = forecastWidgetModel(month);
+      const forecast = (fmodel && fmodel.forecast) || monthForecast(month);
+      const monthEndOutcome = monthClosed ? monthEndOutcomeModel(month, { head: head }) : null;
+      const liveProjection = monthClosed
+        ? Number((monthEndOutcome && monthEndOutcome.forecastEvaluationClosing) || 0)
+        : Number((forecast && forecast.projectedAvailableEnd) || 0);
+      const lockedForecast = ensureLockedForecastSnapshot(month, forecast);
+      const hasLock = !monthClosed && lockedForecast && Number.isFinite(Number(lockedForecast.projectedAvailableEnd));
+      const projDelta = hasLock ? (liveProjection - Number(lockedForecast.projectedAvailableEnd || 0)) : 0;
+      const forecastNote = monthClosed
+        ? 'Final result'
+        : (hasLock ? `${currency(Math.abs(projDelta))} ${projDelta >= 0 ? 'above' : 'below'} lock` : 'Open preview');
+
+      // Burn pace (condensed): how far ahead/behind month progress we are
+      const absPace = Math.abs(paceDelta);
+      const burnVal = absPace < 0.05 ? 'On pace' : `${absPace.toFixed(1)}% ${paceDelta > 0 ? 'ahead' : 'behind'}`;
+      const burnClass = paceDelta > 0.05 ? 'down' : (paceDelta < -0.05 ? 'up' : '');
+      const fcProjClass = liveProjection >= 0 ? 'up' : 'down';
+      const fcLockClass = projDelta >= 0 ? 'up' : 'down';
+
+      const stateClass = { 'on-track': 'ov-on-track', 'warning': 'ov-warning', 'overspending': 'ov-over' }[fs.state] || 'ov-on-track';
+      const stateIcon = { 'on-track': '✓', 'warning': '⚠', 'overspending': '↑' }[fs.state] || '✓';
 
       el.innerHTML = `
-        <div class="status-banner ${cssClass[state]}">
-          <div class="status-banner-icon">${icons[state]}</div>
-          <div class="status-banner-body">
-            <div class="status-banner-title">${message}</div>
-            <div class="status-banner-sub">${supportingNumber}</div>
+        <section class="ov-hero ${stateClass}">
+          <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="ovRingGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#10b981"/></linearGradient></defs></svg>
+          <div class="ov-ring">
+            <svg viewBox="0 0 128 128" aria-hidden="true"><circle class="ov-ring-track" cx="64" cy="64" r="54"/><circle class="ov-ring-prog" cx="64" cy="64" r="54" style="stroke-dasharray:${ringC};stroke-dashoffset:${ringOff}"/></svg>
+            <div class="ov-ring-core"><b>${Math.round(usedPctClamped)}%</b><span>BUDGET USED</span></div>
           </div>
-        </div>`;
+          <div class="ov-headline">
+            <span class="ov-label">Safe to spend</span>
+            <span class="ov-big">${currency(safeToSpend)}</span>
+            <span class="ov-ctx">${currency(ringSpent)} spent of ${currency(ringBudget)}${daysLeft > 0 ? ` · ${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : ''}</span>
+            <span class="ov-pill">${stateIcon} ${fs.message}</span>
+          </div>
+          <div class="ov-cluster" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="ov-mini"><div class="ov-mini-l">This month</div><div class="ov-mrow"><span>Income</span><span class="v up">${currency(incomeActual)}</span></div><div class="ov-mrow"><span>Spent</span><span class="v down">${currency(ringSpent)}</span></div></div>
+            <div class="ov-mini"><div class="ov-mini-l">Forecast</div><div class="ov-mrow"><span>Projected</span><span class="v ${fcProjClass}">${currency(liveProjection)}</span></div>${hasLock ? `<div class="ov-mrow"><span>vs lock</span><span class="v ${fcLockClass}">${signedCurrency(projDelta)}</span></div>` : `<div class="ov-mrow"><span>Status</span><span class="v">${forecastNote}</span></div>`}</div>
+            <div class="ov-mini"><div class="ov-mini-l">Saved</div><div class="ov-mrow"><span>This month</span><span class="v up">${currency(savingsActual)}</span></div></div>
+            <div class="ov-mini"><div class="ov-mini-l">Burn rate</div><div class="ov-mrow" style="gap:10px"><span>Pace</span><span class="v ${burnClass}">${burnVal}</span></div></div>
+          </div>
+          <div class="ov-pace">
+            <div class="ov-pace-top"><span>Budget pace</span><span>${fs.supportingNumber}</span></div>
+            <div class="ov-pace-bar"><span style="width:${usedPctClamped.toFixed(1)}%"></span></div>
+          </div>
+        </section>`;
     }
 
 
@@ -11933,17 +12442,18 @@ function renderRows(targetId, rows, kind) {
       const summaryEl = document.getElementById("summaryCards");
       if (!summaryEl) return;
       const head = headerMetrics(month);
-      const { allocation, totalRemaining, bankAccount, edenredBudget, availableBudget, unpaidFixedExpenses, uncommittedSavings, reservedForTargetBudget, targetBudgetPool } = head;
+      const { allocation, totalRemaining, bankAccount, nonCashBenefitsBudget, availableBudget, unpaidFixedExpenses, uncommittedSavings, reservedForTargetBudget, targetBudgetPool } = head;
       const { daysInMonth, daysLeft, dayOfMonth } = monthDayStats(month.name);
-      const realDailyBudget = daysLeft > 0 ? (availableBudget / daysLeft) : availableBudget;
-      const targetDailyBudget = daysLeft > 0 ? (targetBudgetPool / daysLeft) : targetBudgetPool;
+      const monthClosed = isClosedMonth(month);
+      const realDailyBudget = monthClosed ? 0 : (daysLeft > 0 ? (availableBudget / daysLeft) : availableBudget);
+      const targetDailyBudget = monthClosed ? 0 : (daysLeft > 0 ? (targetBudgetPool / daysLeft) : targetBudgetPool);
       const budgetUsedPct = allocation.availableFunds > 0 ? ((allocation.availableFunds - totalRemaining) / allocation.availableFunds) * 100 : 0;
       const hasTrackedEntries = monthHasTrackedEntries(month);
       const zeroStateFoot = "Add income, savings, or expenses to begin.";
       const targetFoot = !hasTrackedEntries
         ? zeroStateFoot
-        : daysLeft === 0
-          ? `Reserved ${currency(reservedForTargetBudget)} at month close`
+        : monthClosed
+          ? 'Closed month — no daily target remains'
           : `${currency(unpaidFixedExpenses)} fixed · ${currency(uncommittedSavings)} savings reserved`;
 
       const shiftCard = hasTrackedEntries ? biggestCategoryShiftKpi(month) : {
@@ -11956,9 +12466,9 @@ function renderRows(targetId, rows, kind) {
       };
       const cards = [
         { label: "Bank Account", value: currency(bankAccount), raw: bankAccount, semantic: "good", foot: hasTrackedEntries ? "Cash after expenses & savings" : zeroStateFoot, className: "" },
-        { label: specialFundingSourceLabel(state, month) + " Balance", value: currency(edenredBudget), raw: edenredBudget, semantic: "good", foot: hasTrackedEntries ? specialFundingSummaryFoot(month, state) : zeroStateFoot, className: "" },
-        { label: "Daily Budget", value: currency(realDailyBudget), raw: realDailyBudget, semantic: "good", foot: hasTrackedEntries ? (daysLeft === 0 ? "Month ended" : `${currency(Math.max(totalRemaining, 0))} remaining · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`) : zeroStateFoot, className: realDailyBudget < 0 ? "negative-budget" : budgetUsedPct >= 100 ? "warn-100" : budgetUsedPct >= 80 ? "warn-80" : "" },
-        { label: "Target Daily", value: currency(targetDailyBudget), raw: targetDailyBudget, semantic: "good", foot: targetFoot, className: targetDailyBudget < 0 ? "negative-budget" : reservedForTargetBudget > 0 && budgetUsedPct >= 100 ? "warn-100" : reservedForTargetBudget > 0 && budgetUsedPct >= 80 ? "warn-80" : "" },
+        { label: specialFundingSourceLabel(state, month) + " Balance", value: currency(nonCashBenefitsBudget), raw: nonCashBenefitsBudget, semantic: "good", foot: hasTrackedEntries ? specialFundingSummaryFoot(month, state) : zeroStateFoot, className: "" },
+        { label: "Daily Budget", value: monthClosed ? 'Closed' : currency(realDailyBudget), raw: realDailyBudget, semantic: "good", foot: hasTrackedEntries ? (monthClosed ? "Month ended — daily budget no longer applies" : `${currency(Math.max(totalRemaining, 0))} remaining · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`) : zeroStateFoot, className: !monthClosed && realDailyBudget < 0 ? "negative-budget" : !monthClosed && budgetUsedPct >= 100 ? "warn-100" : !monthClosed && budgetUsedPct >= 80 ? "warn-80" : "" },
+        { label: "Target Daily", value: monthClosed ? 'Closed' : currency(targetDailyBudget), raw: targetDailyBudget, semantic: "good", foot: targetFoot, className: !monthClosed && targetDailyBudget < 0 ? "negative-budget" : !monthClosed && reservedForTargetBudget > 0 && budgetUsedPct >= 100 ? "warn-100" : !monthClosed && reservedForTargetBudget > 0 && budgetUsedPct >= 80 ? "warn-80" : "" },
         shiftCard
       ];
       const KPI_KEYS = ['kpi_bank', 'kpi_noncash', 'kpi_real', 'kpi_target', 'kpi_shift'];
@@ -11979,8 +12489,11 @@ function renderRows(targetId, rows, kind) {
         const labelClass = isHero ? 'hero-kpi-eyebrow' : 'kpi-card-label';
         const valueClassName = isHero ? 'hero-kpi-value' : 'kpi-card-value';
         const footClass = isHero ? 'hero-kpi-foot' : 'kpi-card-foot';
+        const kpiIcons = { kpi_bank: '🏦', kpi_noncash: '✦', kpi_real: '📅', kpi_target: '🎯', kpi_shift: '📊' };
+        const kpiIcon = kpiIcons[cardKey] || '•';
         return `
         <article class="${outerClass} ${card.className || ""}" draggable="true" data-kpi-key="${cardKey}">
+          <span class="kpi-icon" aria-hidden="true">${kpiIcon}</span>
           <div class="${labelClass} kpi-label">${card.label}</div>
           <div class="${valueClassName} kpi-value ${valueClass}">${card.value}</div>
           <div class="${footClass} kpi-foot">${card.foot}</div>
@@ -12149,66 +12662,9 @@ function renderRows(targetId, rows, kind) {
     function renderInlineOverviewInsights(month) {
       const el = document.getElementById('overviewInlineInsights');
       if (!el) return;
-      const model = forecastWidgetModel(month);
-      const forecast = model.forecast || monthForecast(month);
-      const lockedForecast = ensureLockedForecastSnapshot(month, forecast);
-      const burn = model.burn || burnRate(month);
-
-      const liveProjection = Number(forecast && forecast.projectedAvailableEnd || 0);
-      const hasLockedForecast = Boolean(lockedForecast && Number.isFinite(Number(lockedForecast.projectedAvailableEnd)));
-      const lockedProjection = hasLockedForecast ? Number(lockedForecast.projectedAvailableEnd || 0) : null;
-      const projectionDelta = hasLockedForecast ? liveProjection - lockedProjection : 0;
-      const absProjectionDelta = Math.abs(projectionDelta);
-      const forecastTone = !hasLockedForecast
-        ? (liveProjection < 0 ? 'bad' : 'ok')
-        : (projectionDelta >= 0 ? 'ok' : (absProjectionDelta <= 50 ? 'warn' : 'bad'));
-      const forecastStatus = !hasLockedForecast
-        ? 'Open preview'
-        : (projectionDelta >= 0 ? `${currency(absProjectionDelta)} above lock` : `${currency(absProjectionDelta)} below lock`);
-      const forecastDetail = hasLockedForecast
-        ? `Live projection vs locked start forecast of <strong>${currency(lockedProjection)}</strong>`
-        : `Live projection before the month forecast locks`;
-
-      const spentPct = Number(burn.spentPct || 0);
-      const timePct = Number(burn.timePct || 0);
-      const paceDelta = spentPct - timePct;
-      const absPaceDelta = Math.abs(paceDelta);
-      const burnTone = paceDelta > 7.5 ? 'bad' : (paceDelta > 2.5 ? 'warn' : 'ok');
-      const burnStatus = paceDelta > 7.5 ? 'Ahead of month' : (paceDelta > 2.5 ? 'Slightly ahead' : (paceDelta < -2.5 ? 'Behind month' : 'On pace'));
-      const paceText = absPaceDelta < 0.05
-        ? 'matched with month progress'
-        : `${absPaceDelta.toFixed(1)} percentage points ${paceDelta > 0 ? 'ahead of' : 'behind'} month progress`;
-      const spentWidth = Math.min(Math.max(spentPct, 0), 100).toFixed(1);
-      const timeWidth = Math.min(Math.max(timePct, 0), 100).toFixed(1);
-
-      el.innerHTML = `
-        <div class="inline-analytics-section-head">
-          <span class="inline-analytics-section-title">Smart Insights</span>
-        </div>
-        <div class="inline-analytics">
-          <article class="insight-card inline-insight-card forecast-inline-card">
-            <div class="insight-card-head">
-              <span class="insight-card-label">Forecast Status</span>
-              <span class="insight-card-status ${forecastTone}">${forecastStatus}</span>
-            </div>
-            <div class="insight-card-value">${currency(liveProjection)}</div>
-            <div class="insight-card-detail">${forecastDetail}</div>
-          </article>
-          <article class="insight-card inline-insight-card burn-inline-card">
-            <div class="insight-card-head">
-              <span class="insight-card-label">Burn Rate</span>
-              <span class="insight-card-status ${burnTone}">${burnStatus}</span>
-            </div>
-            <div class="insight-card-value">${spentPct.toFixed(1)}% <span class="insight-card-value-sub">spent</span></div>
-            <div class="burn-pace-compare" style="--spent-width:${spentWidth}%; --time-width:${timeWidth}%">
-              <div class="burn-pace-row"><span>Budget used</span><strong>${spentPct.toFixed(1)}%</strong></div>
-              <div class="burn-pace-track"><span class="burn-pace-fill spent"></span></div>
-              <div class="burn-pace-row"><span>Month progress</span><strong>${timePct.toFixed(1)}%</strong></div>
-              <div class="burn-pace-track"><span class="burn-pace-fill time"></span></div>
-            </div>
-            <div class="insight-card-detail">You are <strong>${paceText}</strong>.</div>
-          </article>
-        </div>`;
+      // Smart Insights (Forecast + Burn) now live in the Overview hero band.
+      // This section is kept cleared so nothing renders beneath the hero.
+      el.innerHTML = '';
     }
 
     function renderOverview(month) {
@@ -12271,7 +12727,7 @@ function renderRows(targetId, rows, kind) {
       const allocationHiddenCount = Math.max(0, allocationOrderedRows.length - allocationDisplayRows.length);
       // === UI v2: card-based budget allocation layout ===
       // Logic, math, and data sources are unchanged. Only the rendered structure differs.
-      const carryForwardAmount = Number(incomeActualByName(month, 'Spillover previous Month') || 0);
+      const carryForwardAmount = Number(carryForwardIncomeAmountForMonth(month) || 0);
       const sharedExpensesNet = Number((outstandingSharedExpenses && outstandingSharedExpenses.net) || 0);
       const usedAmount = allocation.availableFunds - totalRemaining;
       const usedPctClamped = Math.max(0, Math.min(100, usedPct));
@@ -14019,2168 +14475,6 @@ function renderRows(targetId, rows, kind) {
       }).join('') + '</div>';
     }
 
-    // ── Decision Simulator v3 — signal-driven question pipeline ─────────
-    //
-    // Reads from 5 insight card models to generate smart questions.
-    // Each question has: id, label, framing, buckets (1–2 sliders), tier
-    // Tier 1 = issue-triggered (overspend, pace, subscriptions)
-    // Tier 2 = opportunity-driven (savings, income, trajectory)
-    // Questions are ranked: tier 1 first, then tier 2; max 5 shown.
-    // ─────────────────────────────────────────────────────────────────────
-
-    function dsSliderRange(current, histAvg, bucketType) {
-      // Dynamic range anchored on current value.
-      // Min: 0 always (user can go to zero; it's extreme but valid).
-      // Max: larger of 2× current, 1.6× histAvg, or a sensible floor.
-      const safeCurrent = Math.max(0, Number(current || 0));
-      const safeAvg = histAvg != null ? Math.max(0, Number(histAvg)) : null;
-      const dynamicMax = safeAvg
-        ? Math.max(safeCurrent * 2, safeAvg * 1.6, 50)
-        : Math.max(safeCurrent * 2.2, 50);
-      // Step: coarser for larger amounts
-      const step = safeCurrent > 500 ? 25 : safeCurrent > 200 ? 10 : safeCurrent > 50 ? 5 : 1;
-      return { min: 0, max: Math.ceil(dynamicMax / step) * step, step };
-    }
-
-    function dsHistAvgForKey(key, historyMonths) {
-      if (!historyMonths.length) return null;
-      const vals = historyMonths.map(function(hm) {
-        return planningBucketOptions(hm).reduce(function(s, o) {
-          return o.key === key ? s + (o.current || 0) : s;
-        }, 0);
-      }).filter(function(v) { return v > 0; });
-      if (!vals.length) return null;
-      return vals.reduce(function(a, b) { return a + b; }, 0) / vals.length;
-    }
-
-    function dsSavedAmount(month, slotId) {
-      const sc = month.scenario;
-      if (!sc || !Array.isArray(sc.adjustments)) return null;
-      const entry = sc.adjustments.find(function(a) { return a.id === slotId; });
-      return entry != null ? Number(entry.amount) : null;
-    }
-
-    function dsBucketFromOption(opt, slotId, month, historyMonths) {
-      const histAvg = dsHistAvgForKey(opt.key, historyMonths);
-      const range = dsSliderRange(opt.current, histAvg, opt.bucketType);
-      const saved = dsSavedAmount(month, slotId);
-      return {
-        id: slotId,
-        key: opt.key,
-        bucketType: opt.bucketType,
-        label: opt.label
-          .replace('Expenses / ', '')
-          .replace('Savings / ', '')
-          .replace('Income / ', '')
-          .replace(' · Savings', '')
-          .replace(' · Investment', ''),
-        current: opt.current,
-        histAvg: histAvg,
-        min: range.min,
-        max: range.max,
-        step: range.step,
-        value: saved != null ? Math.min(Math.max(saved, range.min), range.max) : opt.current
-      };
-    }
-
-    function dsComputeOutcomes(buckets, forecast, totalIncome, historyMonths) {
-      const baseEnd = Number(forecast.projectedAvailableEnd || 0);
-      const remainingDays = Math.max(1, Number(forecast.remainingDays || 1));
-
-      let totalDelta = 0;
-      buckets.forEach(function(b) {
-        // Use currentDisplay as baseline when set (allocation target), not actual mid-month spend
-        const baseline = b.currentDisplay != null ? b.currentDisplay : b.current;
-        const diff = b.value - baseline;
-        totalDelta += b.bucketType === 'income' ? diff : -diff;
-      });
-
-      const adjustedEnd = baseEnd + totalDelta;
-      const baseDaily = baseEnd / remainingDays;
-      const adjustedDaily = adjustedEnd / remainingDays;
-      const dailyDelta = adjustedDaily - baseDaily;
-
-      // Savings headroom: frees up / costs from non-savings buckets
-      const nonSavingsDelta = buckets
-        .filter(function(b) { return b.bucketType !== 'savings'; })
-        .reduce(function(s, b) {
-          const baseline = b.currentDisplay != null ? b.currentDisplay : b.current;
-          const diff = b.value - baseline;
-          return s + (b.bucketType === 'income' ? diff : -diff);
-        }, 0);
-
-      // Income coverage shift
-      const expenseBucketsCurrent = buckets
-        .filter(function(b) { return b.bucketType === 'expense'; })
-        .reduce(function(s, b) { return s + (b.currentDisplay != null ? b.currentDisplay : b.current); }, 0);
-      const expenseBucketsAdj = buckets
-        .filter(function(b) { return b.bucketType === 'expense'; })
-        .reduce(function(s, b) { return s + b.value; }, 0);
-
-      const incomeCurrent = buckets.find(function(b) { return b.bucketType === 'income'; });
-      const incomeAdj = incomeCurrent
-        ? totalIncome - incomeCurrent.current + incomeCurrent.value
-        : totalIncome;
-
-      const expCoverageCurrent = incomeAdj > 0 ? (expenseBucketsCurrent / totalIncome) * 100 : null;
-      const expCoverageAdj = incomeAdj > 0 ? (expenseBucketsAdj / incomeAdj) * 100 : null;
-
-      return {
-        baseEnd, adjustedEnd, totalDelta,
-        baseDaily, adjustedDaily, dailyDelta,
-        remainingDays,
-        nonSavingsDelta,
-        expCoverageCurrent, expCoverageAdj,
-        incomeAdj, totalIncome
-      };
-    }
-
-    // Allocation helpers — module-level so both dsGenerateQuestions and renderDecisionSimulator can use them
-    function dsAllocationForGroup(month, groupKey) {
-      if (!groupKey || typeof groupKey !== 'string') return null;
-      const groupName = groupKey.replace('expense-group|', '');
-      try {
-        const rows = allocationRows(month);
-        const row = rows.rows.find(function(r) {
-          return (r.label || '').trim().toLowerCase() === groupName.trim().toLowerCase();
-        });
-        return row ? Math.round(Number(row.allocation || 0)) : null;
-      } catch(e) { return null; }
-    }
-
-    function dsSavingsAllocation(month) {
-      try {
-        const rows = allocationRows(month);
-        const savRow = rows.rows.find(function(r) { return r.key === 'savings'; });
-        return savRow ? Math.round(Number(savRow.allocation || 0)) : null;
-      } catch(e) { return null; }
-    }
-
-    function dsExpenseLabel(opt, fallbackKey) {
-      let raw = '';
-      if (opt && typeof opt.label === 'string' && opt.label.trim()) {
-        raw = opt.label;
-      } else if (typeof fallbackKey === 'string' && fallbackKey) {
-        raw = fallbackKey;
-      }
-      return String(raw || '')
-        .replace('Expenses / ', '')
-        .replace('Expenses/', '')
-        .trim();
-    }
-
-    function dsGenerateQuestions(month, historyMonths) {
-      const options = planningBucketOptions(month);
-      const forecast = monthForecast(month);
-      const base = monthBudgetBase(month);
-      const totalIncome = (month.income || []).reduce(function(s, r) { return s + rowActual(r); }, 0);
-
-      // Pull signals from insight models — wrapped in try/catch so a partial
-      // data month doesn't break the simulator
-      let fwm, decision, advisor, burden, mix;
-      try { fwm = forecastWidgetModel(month); } catch(e) { fwm = null; }
-      try { decision = insightDecisionEngine(month); } catch(e) { decision = null; }
-      try { advisor = budgetAdjustmentAdvisor(month); } catch(e) { advisor = null; }
-      try { burden = subscriptionBurdenModel(month, base, forecast); } catch(e) { burden = null; }
-      try { mix = budgetMixTrackerModel(month); } catch(e) { mix = null; }
-
-      const questions = [];
-
-      // Helper: find bucket option by type / key
-      function optByKey(key) { return options.find(function(o) { return o.key === key; }) || null; }
-
-      // All expense groups — includes fixed-only groups (for display)
-      function expenseGroups() {
-        return options
-          .filter(function(o) { return o.bucketType === 'expense' && o.key.indexOf('expense-group|') === 0; })
-          .sort(function(a, b) { return (b.current || 0) - (a.current || 0); });
-      }
-
-      // Only groups that have at least one variable row — eligible for simulation adjustment
-      function simulationVariableExpenseGroups() {
-        return expenseGroups().filter(function(g) {
-          const groupName = g.key.replace('expense-group|', '');
-          const groupExpRows = (month.expenses || []).filter(function(r) {
-            return (r.group || '').trim() === groupName;
-          });
-          // Exclude if ALL rows are fixed (or no rows exist — derived fixed-only via subscriptions)
-          if (groupExpRows.length === 0) return false;
-          return groupExpRows.some(function(r) { return !r.fixed; });
-        });
-      }
-
-      function primaryIncomeOpt() {
-        return options.find(function(o) { return o.bucketType === 'income'; }) || null;
-      }
-      function primarySavingsOpt() {
-        return options.find(function(o) { return o.bucketType === 'savings'; }) || null;
-      }
-
-      // ── Smart offset basket: top-3 ranked variable expense categories ──────
-      // Returns array of up to 3 { opt, reason, label, score, allocTarget, allocDelta } sorted best-first
-      // allocDelta = this candidate's proportional share of neededGap (weighted by score)
-      function dsOffsetBasket(excludeKey, neededGap) {
-        const groups = simulationVariableExpenseGroups();
-        const decisionRows = decision ? decision.rows : [];
-        let candidates = [];
-        groups.forEach(function(g) {
-          if (excludeKey && g.key === excludeKey) return;
-          const allocTarget = dsAllocationForGroup(month, g.key);
-          const base = (allocTarget != null && allocTarget > 0) ? allocTarget : g.current;
-          // Include if has allocation OR meaningful actual spend
-          if (base < 10) return;
-          const histAvg = dsHistAvgForKey(g.key, historyMonths);
-          const aboveAvg = histAvg && histAvg > 0 ? Math.max(0, g.current - histAvg) : 0;
-          const decRow = decisionRows.find(function(r) { return 'expense-group|' + r.key === g.key; });
-          const lev = decRow ? Number(decRow.leverScore || 0) : 0;
-          // Score on base (allocation or actual), not just actual spend
-          const score = aboveAvg * 2.5 + lev * 1.2 + base * 0.4;
-          const label = dsExpenseLabel(g, g && g.key);
-          let reason = '';
-          if (aboveAvg > 5 && histAvg) {
-            reason = currency(Math.round(aboveAvg)) + ' above your 3-month average';
-          } else if (decRow && decRow.profile && decRow.profile.type === 'repeatable') {
-            reason = 'most controllable recurring category';
-          } else if (decRow && decRow.capacity > 10) {
-            reason = currency(Math.round(decRow.capacity)) + ' of identified capacity';
-          } else {
-            reason = 'largest flexible category';
-          }
-          candidates.push({ opt: g, reason: reason, label: label, score: score, allocTarget: allocTarget, base: base, allocDelta: null });
-        });
-        candidates.sort(function(a, b) { return b.score - a.score; });
-        const top3 = candidates.slice(0, 3);
-
-        // Distribute neededGap across top-3 proportionally by score
-        if (neededGap && neededGap > 0 && top3.length > 0) {
-          const totalScore = top3.reduce(function(s, c) { return s + c.score; }, 0) || 1;
-          let remaining = neededGap;
-          top3.forEach(function(c, i) {
-            if (i === top3.length - 1) {
-              // Last candidate gets the remainder to avoid rounding drift
-              c.allocDelta = Math.min(remaining, c.base);
-            } else {
-              const share = Math.round(neededGap * c.score / totalScore);
-              c.allocDelta = Math.min(share, c.base);
-              remaining -= c.allocDelta;
-            }
-            c.allocDelta = Math.max(0, c.allocDelta);
-          });
-        }
-        return top3;
-      }
-
-      // Q1 — Overspend recovery
-      if (decision && decision.liveIssue) {
-        const issue = decision.liveIssue;
-        const over = Math.max(Number(issue.actualOver || 0), 0);
-        const futureRisk = Math.max(Number(issue.futureRisk || 0), 0);
-        const groupKey = 'expense-group|' + issue.key;
-        const opt = optByKey(groupKey);
-        if (opt) {
-          const histAvg = dsHistAvgForKey(groupKey, historyMonths);
-          const allocAmt = dsAllocationForGroup(month, groupKey);
-          // Reference: allocation target (what was budgeted), then histAvg, then current
-          const refAmt = (allocAmt != null && allocAmt > 0) ? allocAmt : (histAvg || opt.current);
-          const overAmt = refAmt > 0 ? Math.max(0, opt.current - refAmt) : over;
-          const recoverAmt = overAmt > 0 ? overAmt : Math.round(futureRisk * 0.7);
-          // Use confirmed quick-input if present, else seed at reference (allocation or histAvg)
-          const savedQVal = month.scenario && month.scenario.questionKey === 'q-overspend' && month.scenario.quickInputVal != null
-            ? month.scenario.quickInputVal : null;
-          const targetAmt = savedQVal != null ? savedQVal : Math.round(refAmt);
-          const bucket = dsBucketFromOption(opt, 'b-overspend-main', month, historyMonths);
-          bucket.currentDisplay = refAmt > 0 ? refAmt : undefined;
-          bucket.value = targetAmt;
-          bucket.snapValue = Math.round(refAmt);
-          bucket.snapLabel = allocAmt != null ? '→ allocation' : '→ avg';
-          const overPct = refAmt > 0 ? Math.round((opt.current / refAmt - 1) * 100) : 0;
-          questions.push({
-            id: 'q-overspend',
-            tier: 1,
-            badge: { label: 'Urgent', tone: 'urgent' },
-            label: issue.key + ' is running over — how much can you recover by cutting it?',
-            currentNote: overPct > 0 ? overPct + '% above ' + (allocAmt != null ? 'allocation' : 'average') : (recoverAmt > 0 ? 'Recovery potential: ' + currency(recoverAmt) : ''),
-            framing: 'Target mode — set the amount you want to reach. ' + (recoverAmt > 0 ? 'Bringing it back recovers ' + currency(recoverAmt) + ' by month-end.' : 'Slide to see the recovery.'),
-            quickInput: {
-              type: 'eur',
-              seed: Math.round(refAmt),
-              primaryBucket: 'b-overspend-main',
-              placeholder: 'target €'
-            },
-            buckets: [bucket]
-          });
-        }
-      }
-
-      // Q2 — Pace-to-plan alignment
-      if (fwm) {
-        const planGap = Number(fwm.planGap || 0);
-        const paceGapPct = Number(fwm.paceGapPct || 0);
-        if (planGap < -20 || paceGapPct > 12) {
-          const lever = decision && decision.adjustmentLever;
-          const leverKey = lever ? 'expense-group|' + lever.key : null;
-          const groups = expenseGroups();
-          const primaryOpt = (leverKey ? optByKey(leverKey) : null) || groups[0] || null;
-          if (primaryOpt) {
-            const shortage = Math.abs(Math.min(planGap, 0));
-            const primaryAllocAmt = dsAllocationForGroup(month, primaryOpt.key);
-            const primaryBase = (primaryAllocAmt != null && primaryAllocAmt > 0) ? primaryAllocAmt : primaryOpt.current;
-            // Use confirmed quick-input if present
-            const savedQVal = month.scenario && month.scenario.questionKey === 'q-pace' && month.scenario.quickInputVal != null
-              ? month.scenario.quickInputVal : null;
-            const primaryTargetAmt = savedQVal != null ? savedQVal : Math.max(0, primaryBase - (shortage > 0 ? shortage : Math.round(primaryBase * 0.15)));
-            const primaryBucket = dsBucketFromOption(primaryOpt, 'b-pace-main', month, historyMonths);
-            primaryBucket.currentDisplay = primaryBase > 0 ? primaryBase : undefined;
-            primaryBucket.value = primaryTargetAmt;
-            primaryBucket.snapValue = primaryTargetAmt;
-            primaryBucket.snapLabel = shortage > 0 ? '−' + currency(shortage) : '−15%';
-            const buckets = [primaryBucket];
-
-            // Secondary: basket of top-3 excluding primary, gap distributed proportionally
-            const basket = dsOffsetBasket(primaryOpt.key, shortage);
-            const savedOffsetKey = month.scenario && month.scenario.bucketOverrides && month.scenario.bucketOverrides['b-pace-sec'];
-            const activeBasketKey = savedOffsetKey || (basket[0] && basket[0].opt.key);
-            const activeBasketOpt = activeBasketKey ? optByKey(activeBasketKey) : null;
-            if (activeBasketOpt) {
-              const secAllocTarget = dsAllocationForGroup(month, activeBasketOpt.key);
-              const secBase = (secAllocTarget != null && secAllocTarget > 0) ? secAllocTarget : activeBasketOpt.current;
-              if (secBase >= 10) {
-                const secBucket = dsBucketFromOption(activeBasketOpt, 'b-pace-sec', month, historyMonths);
-                const activeItem = basket.find(function(c) { return c.opt.key === activeBasketOpt.key; });
-                const secCut = (activeItem && activeItem.allocDelta > 0) ? activeItem.allocDelta : 0;
-                const secTarget = Math.max(0, secBase - secCut);
-                secBucket.value = secTarget;
-                secBucket.currentDisplay = secBase;
-                secBucket.snapValue = secTarget;
-                secBucket.snapLabel = secCut > 0 ? '−' + currency(secCut) : '→ target';
-                if (activeItem) {
-                  if (!activeItem.allocTarget) activeItem.allocTarget = secBase;
-                }
-                secBucket.reasonNote = activeItem ? (activeItem.label + ' — ' + activeItem.reason) : '';
-                secBucket.basket = basket;
-                secBucket.basketBucketId = 'b-pace-sec';
-                buckets.push(secBucket);
-              }
-            }
-
-            questions.push({
-              id: 'q-pace',
-              tier: 1,
-              badge: { label: planGap < 0 ? 'Urgent' : 'Warning', tone: planGap < 0 ? 'urgent' : 'warn' },
-              label: planGap < 0
-                ? 'Month-end is projected short — which cuts close the gap?'
-                : 'Spending is above target pace — what brings it back in line?',
-              currentNote: planGap < 0
-                ? 'Shortfall: ' + currency(Math.abs(planGap))
-                : 'Pace ' + Math.round(paceGapPct) + '% above target',
-              framing: 'Target mode — set the amount you want to reach for the lever below. ' +
-                (planGap < 0 ? 'Gap to close: ' + currency(Math.abs(planGap)) + '.' : 'Basket shows further cuts to reinforce.'),
-              quickInput: {
-                type: 'eur',
-                seed: primaryTargetAmt,
-                primaryBucket: 'b-pace-main',
-                placeholder: 'target €'
-              },
-              buckets: buckets
-            });
-          }
-        }
-      }
-
-      // Q3 — Subscription affordability simulator
-      // Always fires when subscriptions exist (this is a planning question, not a reactive alert).
-      // The user wants to know: "Can I add a new subscription?" or "What happens if my recurring
-      // burden grows?" Cadences: monthly / quarterly / yearly — all normalised to a monthly cost.
-      // Analysis: variable expense headroom, savings impact, past-months averages.
-      {
-        const allSubs = ensureSubscriptionsState(state).filter(function(s) { return s.active !== false; });
-        if (allSubs.length > 0 || (burden && burden.activeCount > 0)) {
-
-          // ── Cadence and amount from saved scenario state ─────────────────
-          const savedSubsCadence = month.scenario && month.scenario.subsSimCadence;
-          const cadence = (savedSubsCadence === 'quarterly' || savedSubsCadence === 'yearly')
-            ? savedSubsCadence : 'monthly';
-          const cadenceMultiplier = cadence === 'yearly' ? 1/12 : cadence === 'quarterly' ? 1/3 : 1;
-          const cadenceLabel = cadence === 'yearly' ? '/yr' : cadence === 'quarterly' ? '/qtr' : '/mo';
-
-          // Saved EUR amount (the per-cycle cost the user entered)
-          const savedSubsAmt = month.scenario && month.scenario.questionKey === 'q-subs' && month.scenario.quickInputVal != null
-            ? Number(month.scenario.quickInputVal) : null;
-          const defaultSubsAmt = cadence === 'yearly' ? 100 : cadence === 'quarterly' ? 30 : 10;
-          const inputAmt = savedSubsAmt != null ? savedSubsAmt : defaultSubsAmt;
-          const monthlyNewCost = Math.max(0, inputAmt * cadenceMultiplier);
-
-          // ── Current subscription baseline ────────────────────────────────
-          const existingMonthly = allSubs.reduce(function(sum, s) {
-            const c = String(s.cadence || '').toLowerCase();
-            const amt = Number(s.amount || s.defaultAmount || 0);
-            if (c === 'yearly') return sum + amt / 12;
-            if (c === 'quarterly') return sum + amt / 3;
-            return sum + amt; // monthly default
-          }, 0);
-
-          // ── Variable expense headroom ────────────────────────────────────
-          // Sum of (allocation − actual) across variable expense groups where we have room
-          const varGroups = simulationVariableExpenseGroups();
-          let totalVarAlloc = 0, totalVarActual = 0;
-          varGroups.forEach(function(g) {
-            const alloc = dsAllocationForGroup(month, g.key);
-            const base = (alloc != null && alloc > 0) ? alloc : g.current;
-            totalVarAlloc += base;
-            totalVarActual += g.current;
-          });
-          const varHeadroom = Math.max(0, totalVarAlloc - totalVarActual);
-
-          // ── Savings headroom ─────────────────────────────────────────────
-          const savingsAlloc = dsSavingsAllocation(month) || 0;
-          const savOpt3 = primarySavingsOpt();
-          const savingsActual = savOpt3 ? (savOpt3.current || 0) : 0;
-          const savingsHeadroom = Math.max(0, savingsActual - 0); // savings we could dip into
-          const savingsDipNeeded = monthlyNewCost > varHeadroom
-            ? Math.max(0, monthlyNewCost - varHeadroom)
-            : 0;
-
-          // ── Historical average check ─────────────────────────────────────
-          // Do past months show consistent variable budget surplus?
-          let histVarSurplusAvg = null;
-          if (historyMonths.length > 0) {
-            const surpluses = historyMonths.map(function(hm) {
-              const hmVarGroups = planningBucketOptions(hm).filter(function(o) {
-                return o.bucketType === 'expense' && o.key.indexOf('expense-group|') === 0;
-              });
-              let hmAlloc = 0, hmActual = 0;
-              hmVarGroups.forEach(function(g) {
-                const alloc = dsAllocationForGroup(hm, g.key);
-                hmAlloc += (alloc != null && alloc > 0) ? alloc : g.current;
-                hmActual += g.current;
-              });
-              return hmAlloc - hmActual;
-            }).filter(function(v) { return Number.isFinite(v); });
-            if (surpluses.length) {
-              histVarSurplusAvg = surpluses.reduce(function(a, b) { return a + b; }, 0) / surpluses.length;
-            }
-          }
-
-          // ── Badge tone: good if affordable, warn if tight, urgent if dipping savings ──
-          const subsAffordable = monthlyNewCost <= varHeadroom;
-          const subsTight = !subsAffordable && savingsDipNeeded > 0 && savingsDipNeeded <= savingsAlloc * 0.15;
-          const subsBadTone = !subsAffordable && !subsTight;
-          const tone = subsAffordable ? 'opportunity' : subsTight ? 'warn' : 'warn';
-          const badgeLabel = subsAffordable ? 'Planning' : 'Warning';
-
-          // ── Verdict note shown in the picker ─────────────────────────────
-          const annualCost = Math.round(monthlyNewCost * 12);
-          const currentNote = currency(Math.round(monthlyNewCost)) + '/mo · ' + currency(annualCost) + '/yr run rate';
-
-          questions.push({
-            id: 'q-subs',
-            tier: 2,
-            badge: { label: badgeLabel, tone: tone },
-            label: 'Can I take on a new subscription — or what if my recurring burden grows?',
-            currentNote: currentNote,
-            framing: 'Enter the cost per billing cycle and pick its cadence. The simulator checks whether your variable budget has room, or whether savings would need to absorb it.',
-            // Quick-input = the per-cycle amount (EUR only)
-            quickInput: {
-              type: 'eur',
-              seed: inputAmt,
-              primaryBucket: 'b-subs-qi',
-              placeholder: 'cost' + cadenceLabel,
-              disabled: false
-            },
-            // No sliders — output is purely analytical (adding a fixed cost is not about cutting something)
-            buckets: [],
-            // Carry computed values for outcome/narration rendering
-            subsData: {
-              cadence: cadence,
-              cadenceLabel: cadenceLabel,
-              inputAmt: inputAmt,
-              monthlyNewCost: monthlyNewCost,
-              annualCost: annualCost,
-              existingMonthly: existingMonthly,
-              varHeadroom: varHeadroom,
-              totalVarAlloc: totalVarAlloc,
-              totalVarActual: totalVarActual,
-              savingsAlloc: savingsAlloc,
-              savingsDipNeeded: savingsDipNeeded,
-              histVarSurplusAvg: histVarSurplusAvg,
-              histMonthCount: historyMonths.length,
-              affordable: subsAffordable,
-              tight: subsTight
-            }
-          });
-        }
-      }
-
-      // Q4 — Savings stretch
-      const savOpt = primarySavingsOpt();
-      if (savOpt) {
-        const savingsRow = mix && mix.rows.find(function(r) { return r.label === 'Savings'; });
-        const savPct = savingsRow ? Math.round(savingsRow.percentOfAvailable) : 0;
-        const incOpt2 = primaryIncomeOpt();
-        const incomeBase = incOpt2 ? totalIncome : 1;
-
-        // Current savings allocation = the baseline
-        const currentSavAlloc = dsSavingsAllocation(month) || 0;
-
-        // Quick-input = the INCREASE amount (EUR or %). Default seed = +5% of income.
-        const defaultIncreasePct = 5;
-        const defaultIncreaseEur = Math.round(incomeBase * defaultIncreasePct / 100);
-
-        const savedQMode = month.scenario && month.scenario.quickInputMode;
-        const qiMode = (savedQMode === 'eur' || savedQMode === 'pct') ? savedQMode : 'pct';
-
-        const savedQVal = month.scenario && month.scenario.questionKey === 'q-savings' && month.scenario.quickInputVal != null
-          ? month.scenario.quickInputVal : null;
-
-        // Convert input to EUR increase
-        let increaseEur;
-        if (savedQVal != null) {
-          increaseEur = qiMode === 'pct'
-            ? Math.round(savedQVal / 100 * incomeBase)
-            : Math.round(savedQVal);
-        } else {
-          increaseEur = defaultIncreaseEur;
-        }
-        // Negative increase = reducing savings; positive = adding
-        const targetSavAmt = currentSavAlloc + increaseEur;
-        const targetSavPct = Math.round(targetSavAmt / (incomeBase || 1) * 100);
-
-        const savBucket = dsBucketFromOption(savOpt, 'b-sav-main', month, historyMonths);
-        savBucket.value = Math.max(0, targetSavAmt);
-        savBucket.snapValue = currentSavAlloc + defaultIncreaseEur;
-        savBucket.snapLabel = '+' + defaultIncreasePct + '%';
-        savBucket.currentDisplay = currentSavAlloc > 0 ? currentSavAlloc : undefined;
-
-        const buckets = [savBucket];
-
-        // Gap = the increase itself (positive = need to fund this extra saving)
-        const savGap = Math.max(0, increaseEur);
-        const savedOverrideKey = month.scenario && month.scenario.bucketOverrides && month.scenario.bucketOverrides['b-sav-offset'];
-        const basket = dsOffsetBasket(null, savGap);
-        const activeOffsetKey = savedOverrideKey || (basket[0] && basket[0].opt.key);
-        const activeOffsetOpt = activeOffsetKey ? optByKey(activeOffsetKey) : null;
-
-        if (activeOffsetOpt) {
-          const offsetAllocTarget = dsAllocationForGroup(month, activeOffsetOpt.key);
-          const offsetBase = (offsetAllocTarget != null && offsetAllocTarget > 0) ? offsetAllocTarget : activeOffsetOpt.current;
-          if (offsetBase >= 10) {
-            const offsetBucket = dsBucketFromOption(activeOffsetOpt, 'b-sav-offset', month, historyMonths);
-            const activeItem = basket.find(function(c) { return c.opt.key === activeOffsetOpt.key; });
-            const suggestedCut = (activeItem && activeItem.allocDelta > 0) ? activeItem.allocDelta : 0;
-            const suggestedTarget = Math.max(0, offsetBase - suggestedCut);
-            offsetBucket.value = suggestedTarget;
-            offsetBucket.currentDisplay = offsetBase;
-            offsetBucket.snapValue = suggestedTarget;
-            offsetBucket.snapLabel = suggestedCut > 0 ? '−' + currency(suggestedCut) : '→ target';
-            if (activeItem && !activeItem.allocTarget) activeItem.allocTarget = offsetBase;
-            offsetBucket.reasonNote = activeItem ? (activeItem.label + ' — ' + activeItem.reason) : '';
-            offsetBucket.basket = basket;
-            offsetBucket.basketBucketId = 'b-sav-offset';
-            buckets.push(offsetBucket);
-          }
-        }
-
-        questions.push({
-          id: 'q-savings',
-          tier: 2,
-          badge: { label: 'Opportunity', tone: 'opportunity' },
-          label: 'What would pushing your savings rate higher require in cuts?',
-          currentNote: 'Currently ' + currency(currentSavAlloc) + ' (' + savPct + '% of funds)',
-          framing: 'Enter the increase (EUR or %). The basket shows best categories to absorb the cut.',
-          increaseEur: increaseEur,
-          quickInput: {
-            type: qiMode,
-            toggleable: true,
-            seed: qiMode === 'eur' ? defaultIncreaseEur : defaultIncreasePct,
-            seedEur: defaultIncreaseEur,
-            seedPct: defaultIncreasePct,
-            savingsBase: currentSavAlloc,
-            incomeBase: incomeBase,
-            primaryBucket: 'b-sav-main',
-            placeholder: qiMode === 'eur' ? '€ increase' : '% of income'
-          },
-          buckets: buckets
-        });
-      }
-
-      // Q5 — Income scenario
-      const incOpt = primaryIncomeOpt();
-      if (incOpt) {
-        const incHistAvg = dsHistAvgForKey(incOpt.key, historyMonths);
-        const incVariance = incHistAvg && incHistAvg > 0
-          ? Math.abs((incOpt.current / incHistAvg - 1) * 100)
-          : 0;
-
-        // Quick-input = the INCREASE amount (not the total). Default seed = +10%.
-        const defaultIncreaseEur = Math.round(incOpt.current * 0.10 / 50) * 50 || 100;
-        const defaultIncreasePct = 10;
-
-        // Read saved mode + value (increase, not total)
-        const savedQModeInc = month.scenario && month.scenario.quickInputMode;
-        const qiModeInc = (savedQModeInc === 'eur' || savedQModeInc === 'pct') ? savedQModeInc : 'eur';
-        const savedQValInc = month.scenario && month.scenario.questionKey === 'q-income' && month.scenario.quickInputVal != null
-          ? month.scenario.quickInputVal : null;
-
-        // Convert saved value to absolute income target
-        let increaseEur;
-        if (savedQValInc != null) {
-          increaseEur = qiModeInc === 'pct'
-            ? Math.round(incOpt.current * savedQValInc / 100)
-            : savedQValInc;
-        } else {
-          increaseEur = defaultIncreaseEur;
-        }
-        const targetInc = incOpt.current + increaseEur;
-
-        const incBucket = dsBucketFromOption(incOpt, 'b-inc-main', month, historyMonths);
-        incBucket.value = targetInc;
-        incBucket.snapValue = incOpt.current + defaultIncreaseEur;
-        incBucket.snapLabel = '+' + currency(defaultIncreaseEur);
-
-        const incLabel = incVariance > 8
-          ? 'Income has been variable — what does a stronger month look like for your budget?'
-          : 'What would a salary increase or bonus mean for your daily room?';
-
-        // ── Gain allocation basket: 3 buttons (like Q4's offset basket) ──
-        // Savings ~27%, then top-2 underfunded expense categories split the rest
-        const savOptInc = primarySavingsOpt();
-        const savAllocInc = dsSavingsAllocation(month) || 0;
-        const gainBasket = [];
-
-        if (savOptInc) {
-          const savShare = Math.round(increaseEur * 0.60);
-          gainBasket.push({
-            opt: { key: 'savings', label: 'Savings' },
-            label: 'Savings',
-            reason: '~60% of gain to savings (recommended)',
-            allocTarget: savAllocInc,
-            allocDelta: savShare,
-            score: 300,
-            base: savAllocInc,
-            isGain: true
-          });
-        }
-
-        const underfunded = variableExpenseGroups(month)
-          .map(function(g) {
-            const alloc = dsAllocationForGroup(month, g.key);
-            const room = (alloc != null && alloc > 0) ? Math.max(0, alloc - g.current) : 0;
-            return { g: g, alloc: alloc || g.current, room: room };
-          })
-          .filter(function(x) { return x.room > 10; })
-          .sort(function(a, b) { return b.room - a.room; })
-          .slice(0, 2);
-
-        const expPool = Math.round(increaseEur * 0.40);
-        const expShare = underfunded.length > 0 ? Math.round(expPool / underfunded.length) : 0;
-        underfunded.forEach(function(x) {
-          const share = Math.min(expShare, x.room);
-          gainBasket.push({
-            opt: x.g,
-            label: dsExpenseLabel(x.g, x.g && x.g.key),
-            reason: currency(x.room) + ' below your allocation target',
-            allocTarget: x.alloc,
-            allocDelta: share,
-            score: x.room,
-            base: x.alloc,
-            isGain: true
-          });
-        });
-
-        // Pad to 3 if fewer underfunded categories exist
-        while (gainBasket.length < 3) {
-          gainBasket.push({ opt: { key: '_empty_' + gainBasket.length, label: '—' }, label: '—', reason: '', allocTarget: 0, allocDelta: 0, score: 0, base: 0, isGain: true });
-        }
-
-        // Single allocation basket bucket (renders as 3-button grid + delta line, no slider)
-        const savedGainKey = month.scenario && month.scenario.bucketOverrides && month.scenario.bucketOverrides['b-inc-alloc'];
-        const allocBucket = {
-          id: 'b-inc-alloc',
-          key: 'b-inc-alloc',
-          bucketType: 'income',
-          label: 'Where the gain goes',
-          current: 0,
-          currentDisplay: undefined,
-          histAvg: null,
-          min: 0, max: 0, step: 1,
-          value: 0,
-          basket: gainBasket,
-          basketBucketId: 'b-inc-alloc',
-          isGainAllocationBucket: true,
-          noSlider: true  // flag to suppress slider rendering
-        };
-
-        const gainAllocationBasket = gainBasket;
-        const incBuckets = [incBucket, allocBucket];
-
-        questions.push({
-          id: 'q-income',
-          tier: 2,
-          badge: { label: 'Planning', tone: 'planning' },
-          label: incLabel,
-          currentNote: 'Current income: ' + currency(incOpt.current) + (incHistAvg ? ', avg ' + currency(incHistAvg) : ''),
-          framing: 'Enter the increase (EUR or %). The basket shows where this extra income could go — click to switch allocation target.',
-          quickInput: {
-            type: qiModeInc,
-            toggleable: true,
-            seed: qiModeInc === 'pct' ? defaultIncreasePct : defaultIncreaseEur,
-            seedEur: defaultIncreaseEur,
-            seedPct: defaultIncreasePct,
-            incomeBase: incOpt.current,
-            primaryBucket: 'b-inc-main',
-            placeholder: qiModeInc === 'pct' ? '% increase' : '€ increase'
-          },
-          gainAllocationBasket: gainAllocationBasket,
-          increaseEur: increaseEur,
-          buckets: incBuckets
-        });
-      }
-
-      // Q6 — Trajectory: is this drift structural or temporary?
-      // Triggered: backgroundAnomaly exists, OR a category has risen 2+ months in a row.
-      // Always fires if any expense groups exist — user can switch to any category via selector.
-      // No sliders — purely diagnostic. Shows a mini-timeline, drift cost, and a verdict.
-      {
-        // ── Helper: compute trajData for any group key ─────────────────────
-        function buildTrajDataForGroup(grpKey) {
-          const grpOpt = optByKey(grpKey);
-          if (!grpOpt || grpOpt.current < 0) return null;
-          const timelineVals = historyMonths.map(function(hm) {
-            return planningBucketOptions(hm).reduce(function(s, o) {
-              return o.key === grpKey ? s + (o.current || 0) : s;
-            }, 0);
-          });
-          const histAvg = timelineVals.length
-            ? averageValue(timelineVals) : grpOpt.current;
-          const recent3 = timelineVals.slice(-3);
-          const baseline = recent3.length >= 2 ? averageValue(recent3) : (timelineVals.length ? timelineVals[timelineVals.length - 1] : grpOpt.current);
-          const baselineLabel = recent3.length >= 2 ? 'recent average' : (timelineVals.length ? 'prior month' : 'no history');
-          const driftAmt = grpOpt.current - baseline;
-          const pct = baseline > 0 ? (driftAmt / baseline) * 100 : 0;
-          const isDownshift = pct < -15;
-          const isUptrend = timelineVals.length >= 2 &&
-            timelineVals[timelineVals.length - 1] > timelineVals[timelineVals.length - 2] &&
-            grpOpt.current > timelineVals[timelineVals.length - 1];
-          // Try to get recurrence profile from decision engine rows
-          const decRow = decision && decision.rows
-            ? decision.rows.find(function(r) { return 'expense-group|' + r.key === grpKey; })
-            : null;
-          const profile = decRow && decRow.profile ? decRow.profile : {};
-          const grpName = dsExpenseLabel(grpOpt, grpOpt && grpOpt.key);
-          return {
-            categoryName: grpName,
-            categoryKey: grpKey,
-            current: grpOpt.current,
-            baseline: Math.round(baseline),
-            baselineLabel: baselineLabel,
-            pct: pct,
-            driftAmt: driftAmt,
-            annualDriftCost: Math.round(Math.abs(driftAmt) * 12),
-            recoveryVal: Math.abs(driftAmt),
-            driftDirection: isDownshift ? 'down' : (isUptrend ? 'up-trend' : 'up-spike'),
-            isUptrend: isUptrend,
-            isDownshift: isDownshift,
-            timeline: timelineVals.concat([grpOpt.current]),
-            timelineMonths: historyMonths.map(function(hm) { return hm.name; }).concat(['now']),
-            recurrenceClass: profile.recurrenceClass || 'unknown',
-            monthsObserved: Number(profile.monthsObserved || historyMonths.length),
-            spikeMonths: Number(profile.spikeMonths || 0),
-            histCount: historyMonths.length
-          };
-        }
-
-        const allTrajGroups = expenseGroups();
-        if (allTrajGroups.length > 0) {
-          // ── Determine default category (signal-driven) ───────────────────
-          let defaultTrajKey = null;
-
-          // Path A: anomaly engine
-          if (decision && decision.backgroundAnomaly) {
-            const anom = decision.backgroundAnomaly;
-            const anomKey = 'expense-group|' + anom.key;
-            const anomOpt = optByKey(anomKey);
-            if (anomOpt && anomOpt.current > 20) defaultTrajKey = anomKey;
-          }
-
-          // Path B: multi-month series
-          if (!defaultTrajKey && historyMonths.length >= 2) {
-            for (let gi = 0; gi < Math.min(allTrajGroups.length, 5); gi++) {
-              const grp = allTrajGroups[gi];
-              if (!grp || grp.current < 20) continue;
-              const hv = historyMonths.map(function(hm) {
-                return planningBucketOptions(hm).reduce(function(s, o) {
-                  return o.key === grp.key ? s + (o.current || 0) : s;
-                }, 0);
-              });
-              if (hv.length >= 2 &&
-                  hv[hv.length - 1] > hv[hv.length - 2] &&
-                  grp.current > hv[hv.length - 1]) {
-                defaultTrajKey = grp.key;
-                break;
-              }
-            }
-          }
-
-          // Fallback: highest-spend group
-          if (!defaultTrajKey) defaultTrajKey = allTrajGroups[0].key;
-
-          // ── User override via saved selection ────────────────────────────
-          const savedTrajCat = month.scenario && month.scenario.trajCategory;
-          const activeKey = savedTrajCat && allTrajGroups.find(function(g) { return g.key === savedTrajCat; })
-            ? savedTrajCat : defaultTrajKey;
-
-          const trajData = buildTrajDataForGroup(activeKey);
-          if (trajData) {
-            const pctAbs = Math.abs(Math.round(trajData.pct));
-            const isUp = !trajData.isDownshift;
-            // Badge: Warning for upward drift, Opportunity for downshift, Planning for flat/unknown
-            const tone = Math.abs(trajData.pct) < 10 ? 'planning'
-              : isUp ? 'warn' : 'opportunity';
-            const badgeLabel = Math.abs(trajData.pct) < 10 ? 'Planning'
-              : isUp ? 'Warning' : 'Opportunity';
-            const dirLabel = trajData.isUptrend
-              ? pctAbs + '% uptrend vs ' + trajData.baselineLabel
-              : trajData.isDownshift
-                ? pctAbs + '% below ' + trajData.baselineLabel
-                : pctAbs > 5
-                  ? pctAbs + '% above ' + trajData.baselineLabel
-                  : 'near ' + trajData.baselineLabel;
-            const currentNote = 'Now: ' + currency(Math.round(trajData.current)) +
-              ' · avg: ' + currency(Math.round(trajData.baseline));
-
-            questions.push({
-              id: 'q-trajectory',
-              tier: 2,
-              badge: { label: badgeLabel, tone: tone },
-              label: trajData.categoryName + ' is ' + dirLabel + ' — new normal or recoverable?',
-              currentNote: currentNote,
-              framing: 'Switch category below to analyse any group. This is a diagnostic read — see whether drift is structural or temporary, and what it costs annually if it holds.',
-              quickInput: { disabled: true },
-              buckets: [],
-              trajData: trajData,
-              trajAllGroups: allTrajGroups,
-              trajDefaultKey: defaultTrajKey,
-              trajActiveKey: activeKey
-            });
-          }
-        }
-      }
-
-      // Q7 — Category pace drill-down
-      // Always fires. User picks any expense group via the category selector.
-      // Projects month-end spend for that group using computeCategoryPaceData.
-      {
-        const allGroups = expenseGroups();
-        if (allGroups.length > 0) {
-          const savedPaceCat = month.scenario && month.scenario.paceDrillCategory;
-          const defaultGroup = variableExpenseGroups(month)[0] || allGroups[0];
-          const activeGroupKey = savedPaceCat && allGroups.find(function(g) { return g.key === savedPaceCat; })
-            ? savedPaceCat : defaultGroup.key;
-          const activeGroup = allGroups.find(function(g) { return g.key === activeGroupKey; }) || defaultGroup;
-          const groupName = dsExpenseLabel(activeGroup, activeGroup && activeGroup.key);
-
-          const pd = computeCategoryPaceData(month, activeGroupKey);
-          const groupHistAvg = dsHistAvgForKey(activeGroupKey, historyMonths);
-          const bufferBasket = pd.isOver
-            ? dsOffsetBasket(activeGroupKey, pd.projectedVsAllocation).slice(0, 2)
-            : [];
-
-          questions.push({
-            id: 'q-pace-drill',
-            tier: 2,
-            badge: { label: pd.isOver ? 'Warning' : 'Planning', tone: pd.isOver ? 'warn' : 'opportunity' },
-            label: 'Where is ' + groupName + ' heading by month-end at current pace?',
-            currentNote: currency(Math.round(pd.spentSoFar)) + ' spent · ' + currency(Math.round(pd.projectedTotal)) + ' projected',
-            framing: 'Category-level projection using the same forecast model as your spending pace card — recurring, open, and one-off rows handled separately.',
-            quickInput: { disabled: true },
-            buckets: [],
-            paceDrillData: Object.assign({}, pd, {
-              allGroups: allGroups,
-              groupName: groupName,
-              groupHistAvg: groupHistAvg,
-              bufferBasket: bufferBasket
-            })
-          });
-        }
-      }
-
-      // ── Sort and cap at 6 ───────────────────────────────────────────────
-      questions.sort(function(a, b) {
-        if (a.tier !== b.tier) return a.tier - b.tier;
-        return 0;
-      });
-
-      return questions.slice(0, 6);
-    }
-
-    function renderDecisionSimulator(month, wrap) {
-      const currentIdx = state.months.findIndex(function(m) { return m.name === month.name; });
-      const historyMonths = currentIdx > 0
-        ? state.months.slice(Math.max(0, currentIdx - 3), currentIdx)
-        : [];
-      const forecast = monthForecast(month);
-      const totalIncome = (month.income || []).reduce(function(s, r) { return s + rowActual(r); }, 0);
-
-      const questions = dsGenerateQuestions(month, historyMonths);
-
-      // Determine active question — null = not chosen yet (blank state)
-      const savedQKey = month.scenario && month.scenario.questionKey;
-      const activeQ = savedQKey
-        ? (questions.find(function(q) { return q.id === savedQKey; }) || null)
-        : null;
-
-      // Reset button in card header — visibility depends on activeQ (must be after activeQ)
-      const resetBtnHtml = '<button type="button" class="ds-clear-btn" id="dsClearBtn"' +
-        (!activeQ ? ' style="visibility:hidden"' : '') + '>Reset</button>';
-
-      const headerHtml = renderUnifiedCardHeader({
-        title: 'Decision Simulator',
-        tooltipId: 'scenarioSimulatorTooltip',
-        tooltipHtml: '<ul class="info-tooltip-list"><li><strong>Target mode:</strong> all inputs set the absolute target value you want to reach — not a change from current. Enter the value you want, confirm with Enter or ✓.</li><li>Choose a question — it reads signals from your budget and pre-configures the relevant levers.</li><li>The basket below each offset lever shows the top 3 smart candidates. Click to switch.</li><li>Outcomes update after each confirmation.</li></ul>',
-        rightHtml: resetBtnHtml
-      });
-
-      if (!questions.length) {
-        const sec = document.createElement('section');
-        sec.className = 'planner-card planner-card-scenario ui-3d-decision';
-        sec.setAttribute('data-card-key', 'plan_scenario');
-        sec.setAttribute('data-planner-card', 'plan_scenario');
-        sec.innerHTML = headerHtml + '<div class="ds-empty">Add income, savings, and expenses to generate smart scenarios.</div>';
-        return sec;
-      }
-
-      // Build quick-input field for the question row
-      function buildQuickInputHtml(q) {
-        if (!q || !q.quickInput) {
-          return '<div class="ds-quick-input-wrap is-disabled" aria-hidden="true">' +
-            '<span class="ds-quick-unit" data-toggleable="false">€</span>' +
-            '<input type="number" class="ds-quick-field" disabled placeholder="—">' +
-            '<button type="button" class="ds-quick-confirm" disabled>✓</button>' +
-          '</div>';
-        }
-        const qi = q.quickInput;
-        if (qi.disabled) {
-          return '<div class="ds-quick-input-wrap is-disabled" aria-label="Not applicable for this question" title="Not applicable for this question">' +
-            '<span class="ds-quick-unit" data-toggleable="false">—</span>' +
-            '<input type="number" class="ds-quick-field" disabled placeholder="n/a">' +
-            '<button type="button" class="ds-quick-confirm" disabled>✓</button>' +
-          '</div>';
-        }
-        // Resolve current mode: saved > question default
-        const savedMode = month.scenario && month.scenario.quickInputMode;
-        const mode = qi.toggleable && (savedMode === 'eur' || savedMode === 'pct')
-          ? savedMode : qi.type;
-        // Resolve display value: saved raw val > seed for current mode
-        const savedVal = month.scenario && month.scenario.quickInputVal != null
-          ? month.scenario.quickInputVal : null;
-        const displayVal = savedVal != null ? savedVal
-          : (mode === 'pct' ? qi.seedPct : (qi.seedEur != null ? qi.seedEur : qi.seed));
-        const unit = mode === 'pct' ? '%' : '€';
-        const toggleTitle = qi.toggleable
-          ? (mode === 'pct' ? 'Switch to EUR input' : 'Switch to % input')
-          : '';
-        return '<div class="ds-quick-input-wrap" id="dsQuickWrap">' +
-          '<span class="ds-quick-unit" id="dsQuickUnit"' +
-            ' data-toggleable="' + (qi.toggleable ? 'true' : 'false') + '"' +
-            (toggleTitle ? ' title="' + toggleTitle + '"' : '') + '>' +
-            unit +
-          '</span>' +
-          '<input type="number" class="ds-quick-field" id="dsQuickField"' +
-            ' step="' + (mode === 'pct' ? '0.5' : '1') + '"' +
-            ' value="' + (displayVal != null ? displayVal : '') + '"' +
-            ' placeholder="' + escapeHtml(qi.placeholder || '') + '">' +
-          '<button type="button" class="ds-quick-confirm" id="dsQuickConfirm" title="Confirm (Enter)">✓</button>' +
-        '</div>';
-      }
-
-      // Context strip: Currently (allocation) → Target (input) + delta
-      function buildQuickContextHtml(q) {
-        if (!q || !q.quickInput || q.quickInput.disabled) return '';
-        const qi = q.quickInput;
-        // Only show after the user has confirmed a value for THIS question
-        const savedVal = month.scenario && month.scenario.questionKey === q.id && month.scenario.quickInputVal != null
-          ? month.scenario.quickInputVal : null;
-        if (savedVal == null) return '';
-
-        // Q3 subscription: bypass standard currentBase logic — no primary expense bucket
-        if (q.id === 'q-subs') {
-          const sd = q.subsData || {};
-          const cadenceLabel = sd.cadenceLabel || '/mo';
-          const monthlyCost = Math.max(0, savedVal * (sd.cadence === 'yearly' ? 1/12 : sd.cadence === 'quarterly' ? 1/3 : 1));
-          const annualCost = Math.round(monthlyCost * 12);
-          const affordable = monthlyCost <= (sd.varHeadroom || 0);
-          const cls = affordable ? 'ds-positive' : 'ds-negative';
-          return '<div class="ds-quick-context">' +
-            '<span>' + currency(Math.round(savedVal)) + cadenceLabel + '</span>' +
-            '<span class="ds-quick-context-arrow">→</span>' +
-            '<span class="ds-quick-context-delta ' + cls + '">' + currency(Math.round(monthlyCost)) + '/mo</span>' +
-            '<span class="ds-quick-context-arrow">·</span>' +
-            '<span class="ds-quick-context-delta ' + cls + '">' + currency(annualCost) + '/yr</span>' +
-          '</div>';
-        }
-
-        const primary = q.buckets.find(function(b) { return b.id === qi.primaryBucket; });
-
-        // "Currently" = the allocation baseline for this question
-        let currentBase;
-        if (q.id === 'q-savings') {
-          currentBase = dsSavingsAllocation(month) || 0;
-        } else if (primary && primary.currentDisplay != null) {
-          // currentDisplay was set at build time to the allocation amount
-          currentBase = primary.currentDisplay;
-        } else if (primary) {
-          currentBase = primary.current;
-        } else {
-          return '';
-        }
-
-        // "Target" = confirmed input in EUR
-        const savedMode = month.scenario && month.scenario.quickInputMode;
-        const mode = qi.toggleable && (savedMode === 'eur' || savedMode === 'pct') ? savedMode : (qi.type || 'eur');
-        let targetEur, increaseEur;
-        if (q.id === 'q-savings') {
-          // savedVal = increase amount (EUR or % of income)
-          const incBase = qi.incomeBase || 1;
-          increaseEur = mode === 'pct' ? Math.round(savedVal / 100 * incBase) : savedVal;
-          targetEur = currentBase + increaseEur;
-        } else if (q.id === 'q-income') {
-          const incBase = qi.incomeBase || 0;
-          increaseEur = mode === 'pct' ? Math.round(incBase * savedVal / 100) : savedVal;
-          targetEur = currentBase + increaseEur;
-        } else {
-          targetEur = savedVal;
-          increaseEur = null;
-        }
-
-        const delta = targetEur - currentBase;
-        if (Math.abs(delta) < 0.5) return '';
-        const sign = delta >= 0 ? '+' : '';
-        const isGood = (q.id === 'q-savings' || q.id === 'q-income') ? delta > 0 : delta < 0;
-        const deltaCls = isGood ? 'ds-positive' : 'ds-negative';
-
-        // Q4 and Q5: show "Currently: X → +Y → Total: Z" increase framing
-        if ((q.id === 'q-income' || q.id === 'q-savings') && increaseEur != null) {
-          const incSign = increaseEur >= 0 ? '+' : '';
-          return '<div class="ds-quick-context">' +
-            '<span>Currently: <strong>' + currency(currentBase) + '</strong></span>' +
-            '<span class="ds-quick-context-arrow">→</span>' +
-            '<span class="ds-quick-context-delta ' + deltaCls + '">' + incSign + currency(increaseEur) + '</span>' +
-            '<span class="ds-quick-context-arrow">→</span>' +
-            '<span>Total: <strong>' + currency(targetEur) + '</strong></span>' +
-          '</div>';
-        }
-
-        return '<div class="ds-quick-context">' +
-          '<span>Currently: <strong>' + currency(currentBase) + '</strong></span>' +
-          '<span class="ds-quick-context-arrow">→</span>' +
-          '<span>Target: <strong>' + currency(targetEur) + '</strong></span>' +
-          '<span class="ds-quick-context-delta ' + deltaCls + '">' + sign + currency(delta) + '</span>' +
-        '</div>';
-      }
-
-      // ── Outcome narration ──────────────────────────────────────────────
-      function buildNarration(out, q) {
-        if (!q) return '';
-
-        // Per-question specific summary sentence using real bucket values
-        const primaryB = q.buckets[0];
-        const offsetB = q.buckets.length > 1 ? q.buckets[1] : null;
-
-        function bucketDelta(b) {
-          if (!b) return null;
-          const d = b.value - b.current;
-          return Math.abs(d) < 0.5 ? null : d;
-        }
-
-        function sign(n) { return n >= 0 ? '+' : ''; }
-        function scenarioSignedCurrency(n) { return sign(n) + currency(n); }
-
-        if (q.id === 'q-savings') {
-          const savAllocNow = dsSavingsAllocation(month);
-          const savBase = (savAllocNow != null && savAllocNow > 0) ? savAllocNow : primaryB.current;
-          const confirmedVal = month.scenario && month.scenario.quickInputVal != null ? month.scenario.quickInputVal : null;
-          if (confirmedVal == null) return '';
-          const qi = q.quickInput || {};
-          const incBase = qi.incomeBase || 1;
-          const savedMode = month.scenario && month.scenario.quickInputMode;
-          const mode = qi.toggleable && (savedMode === 'eur' || savedMode === 'pct') ? savedMode : (qi.type || 'pct');
-          // confirmedVal = increase, not absolute
-          const increaseEurN = mode === 'pct' ? Math.round(confirmedVal / 100 * incBase) : confirmedVal;
-          const targetEur = savBase + increaseEurN;
-          if (Math.abs(increaseEurN) < 0.5) return '';
-          const offsetDelta = offsetB ? (offsetB.value - (offsetB.currentDisplay != null ? offsetB.currentDisplay : offsetB.current)) : null;
-          const incSign = increaseEurN >= 0 ? '+' : '';
-          let s = 'Savings ' + incSign + currency(increaseEurN) + ' → ' + currency(targetEur) + ' total';
-          if (offsetB && offsetDelta != null && Math.abs(offsetDelta) > 0.5) {
-            s += ', funded by cutting ' + offsetB.label + ' to ' + currency(offsetB.value) +
-              ' (' + scenarioSignedCurrency(offsetDelta) + ' from allocation).';
-          } else {
-            s += '.';
-          }
-          return s;
-        }
-
-        if (q.id === 'q-overspend' || q.id === 'q-pace') {
-          const allocBase = primaryB.currentDisplay != null ? primaryB.currentDisplay : primaryB.current;
-          const confirmedTarget = month.scenario && month.scenario.quickInputVal != null ? month.scenario.quickInputVal : primaryB.value;
-          const delta = confirmedTarget - allocBase;
-          if (Math.abs(delta) < 0.5) return '';
-          let s = primaryB.label + ' from ' + currency(allocBase) + ' → ' + currency(confirmedTarget) + ' (' + scenarioSignedCurrency(delta) + ' from allocation)';
-          if (offsetB) {
-            const secBase = offsetB.currentDisplay != null ? offsetB.currentDisplay : offsetB.current;
-            const secDelta = offsetB.value - secBase;
-            if (Math.abs(secDelta) > 0.5) {
-              s += ', ' + offsetB.label + ' from ' + currency(secBase) + ' → ' + currency(offsetB.value) + ' (' + scenarioSignedCurrency(secDelta) + ')';
-            }
-          }
-          const recovered = Math.abs(out.totalDelta);
-          if (recovered > 1) s += '. Frees ' + currency(recovered) + ' by month-end.';
-          if (out.adjustedEnd >= 0 && out.baseEnd < 0) s += ' Month-end moves positive.';
-          else if (out.adjustedEnd < 0) s += ' Month-end still negative.';
-          return s;
-        }
-
-        if (q.id === 'q-income') {
-          const qiInc = q.quickInput || {};
-          const savedModeInc = month.scenario && month.scenario.quickInputMode;
-          const incModeN = qiInc.toggleable && (savedModeInc === 'eur' || savedModeInc === 'pct') ? savedModeInc : (qiInc.type || 'eur');
-          const incBaseN = qiInc.incomeBase || primaryB.current;
-          const confirmedInc = month.scenario && month.scenario.quickInputVal != null ? month.scenario.quickInputVal : null;
-          if (confirmedInc == null) return '';
-          const increaseEurN = incModeN === 'pct' ? Math.round(incBaseN * confirmedInc / 100) : confirmedInc;
-          const totalIncN = incBaseN + increaseEurN;
-          let s = 'Income +' + currency(increaseEurN) + ' → ' + currency(totalIncN) + ' total.';
-          // List how the gain is allocated across candidates
-          const basket = q.gainAllocationBasket || [];
-          if (basket.length > 0) {
-            const parts = basket.map(function(c) {
-              const newShare = Math.round((c.share || 0) * (increaseEurN / (qiInc.seedEur || increaseEurN || 1)));
-              return currency(newShare) + ' → ' + c.label;
-            });
-            s += ' Allocated: ' + parts.join(', ') + '.';
-          }
-          return s;
-        }
-
-        if (q.id === 'q-trajectory') {
-          const td = q.trajData;
-          if (!td) return '';
-          const pctAbs = Math.abs(Math.round(td.pct));
-          const driftStr = currency(Math.abs(Math.round(td.driftAmt)));
-
-          // Build timeline string  e.g.  €180 → €195 → €203 → €241 (now)
-          const timelineStr = td.timeline.map(function(v, i) {
-            const label = i === td.timeline.length - 1 ? currency(Math.round(v)) + ' (now)' : currency(Math.round(v));
-            return label;
-          }).join(' → ');
-
-          if (td.isDownshift) {
-            return '<strong>' + td.categoryName + '</strong> is running <strong>' + pctAbs + '% below its ' +
-              td.baselineLabel + '</strong> (' + timelineStr + '). ' +
-              '<strong>' + driftStr + '/mo</strong> may be available to redirect — consider savings as the first destination. ' +
-              'Confirm this is not a timing gap before acting on it.';
-          }
-          if (td.isUptrend) {
-            let s = '<strong>' + td.categoryName + '</strong> shows a <strong>' + td.histCount + '-month uptrend</strong> (' + timelineStr + '). ';
-            s += 'If this holds, you are committing <strong>' + currency(td.annualDriftCost) + '/yr more</strong> than your ' + td.baselineLabel + '. ';
-            if (td.recurrenceClass === 'recurring') {
-              s += 'History suggests this is a <strong>recurring pattern</strong> — consider raising the allocation for ' + td.categoryName + '.';
-            } else if (td.recurrenceClass === 'occasional') {
-              s += 'This type of spike is <strong>occasional</strong> in your history — worth watching but not necessarily permanent.';
-            } else {
-              s += 'Review whether this reflects a <strong>permanent cost increase</strong> or a recoverable spike.';
-            }
-            return s;
-          }
-          // Spike (up but not a trend)
-          return '<strong>' + td.categoryName + '</strong> is <strong>' + pctAbs + '% above its ' + td.baselineLabel + '</strong> (' + timelineStr + '). ' +
-            'This looks like an <strong>outlier month</strong> rather than a trend — the prior months were more stable. ' +
-            (td.annualDriftCost > 0 ? 'If it recurs, the annual cost would be <strong>' + currency(td.annualDriftCost) + '</strong> above average. ' : '') +
-            'No allocation change needed unless the pattern repeats.';
-        }
-
-        if (q.id === 'q-subs') {
-          const sd = q.subsData;
-          if (!sd) return '';
-          const monthlyCost = sd.monthlyNewCost;
-          if (monthlyCost < 0.5) return '';
-          const existingTotal = Math.round(sd.existingMonthly);
-          const newTotal = Math.round(existingTotal + monthlyCost);
-          const annualNew = sd.annualCost;
-          const varRoom = Math.round(sd.varHeadroom);
-          const savDip = Math.round(sd.savingsDipNeeded);
-          const histAvg = sd.histVarSurplusAvg;
-
-          if (sd.affordable) {
-            let s = currency(Math.round(monthlyCost)) + '/mo fits within your variable budget — ' +
-              currency(varRoom) + ' of headroom available.';
-            s += ' Total recurring load would be ' + currency(newTotal) + '/mo (' + currency(annualNew) + '/yr).';
-            if (histAvg != null && histAvg > monthlyCost) {
-              s += ' Past ' + sd.histMonthCount + '-month average shows ' + currency(Math.round(histAvg)) + ' surplus, supporting this.';
-            } else if (histAvg != null && histAvg < monthlyCost) {
-              s += ' However, your ' + sd.histMonthCount + '-month average surplus was only ' + currency(Math.round(histAvg)) + ' — watch the trend.';
-            }
-            return s;
-          } else if (savDip > 0) {
-            let s = currency(Math.round(monthlyCost)) + '/mo exceeds available variable headroom (' + currency(varRoom) + ').';
-            s += ' Absorbing it would require ' + currency(savDip) + '/mo from planned savings.';
-            if (histAvg != null) {
-              s += ' Past ' + sd.histMonthCount + '-month average surplus: ' + currency(Math.round(histAvg)) +
-                (histAvg >= monthlyCost ? ' — history suggests it may be feasible with discipline.' : ' — history does not support this addition.');
-            }
-            return s;
-          } else {
-            return currency(Math.round(monthlyCost)) + '/mo exceeds available variable headroom (' + currency(varRoom) + '). ' +
-              'This would require cutting variable categories or dipping into savings.';
-          }
-        }
-
-        // Fallback for unknown question IDs
-        const daily = out.dailyDelta;
-        const freed = out.nonSavingsDelta;
-        const hasDaily = Math.abs(daily) > 0.5;
-        const hasFreed = Math.abs(freed) > 5 && q.buckets.some(function(b) { return b.bucketType !== 'savings'; });
-        if (hasDaily && hasFreed) {
-          return freed > 0
-            ? 'At this level, you free up ' + currency(freed) + ' — enough to add ' + currency(Math.abs(daily)) + '/day, or redirect to savings.'
-            : 'At this level, you commit ' + currency(Math.abs(freed)) + ' more, reducing room by ' + currency(Math.abs(daily)) + '/day.';
-        }
-        if (hasDaily) return daily > 0 ? 'You gain ' + currency(daily) + '/day in spending room.' : 'You lose ' + currency(Math.abs(daily)) + '/day in spending room.';
-        if (hasFreed) return freed > 0 ? currency(freed) + ' freed for savings.' : currency(Math.abs(freed)) + ' more committed away from savings.';
-        return '';
-      }
-
-      // ── Outcome block HTML ─────────────────────────────────────────────
-      function buildOutcomeHtml(buckets, q, pending) {
-        const out = pending ? null : dsComputeOutcomes(buckets, forecast, totalIncome, historyMonths);
-        const rows = [];
-
-        function placeholder() {
-          return '<div class="ds-outcome-val"><strong>—</strong></div>';
-        }
-
-        function valWithDelta(absVal, delta, absClass) {
-          const dCls = delta > 0.5 ? 'ds-positive' : delta < -0.5 ? 'ds-negative' : '';
-          const dSign = delta >= 0 ? '+' : '';
-          const deltaHtml = Math.abs(delta) > 0.5
-            ? '<span class="ds-outcome-delta ' + dCls + '">' + dSign + currency(delta) + ' vs now</span>'
-            : '';
-          return '<div class="ds-outcome-val">' +
-            '<strong class="' + absClass + '">' + absVal + '</strong>' +
-            deltaHtml +
-          '</div>';
-        }
-
-        // Q5 income: custom outcome block (standard metrics don't apply)
-        if (q && q.id === 'q-income') {
-          const confirmedVal = month.scenario && month.scenario.questionKey === 'q-income' && month.scenario.quickInputVal != null
-            ? month.scenario.quickInputVal : null;
-          const qi = q.quickInput || {};
-          const savedMode = month.scenario && month.scenario.quickInputMode;
-          const incMode = qi.toggleable && (savedMode === 'eur' || savedMode === 'pct') ? savedMode : (qi.type || 'eur');
-          const incBase = qi.incomeBase || 0;
-
-          // Use confirmed value if present; fall back to the value computed at build time (q.increaseEur)
-          // so tiles are never blank when the question is active
-          const effectiveIncrease = confirmedVal != null
-            ? (incMode === 'pct' ? Math.round(incBase * confirmedVal / 100) : confirmedVal)
-            : (q.increaseEur || 0);
-
-          if (!effectiveIncrease || !out) {
-            rows.push('<div class="ds-outcome-row"><span>Monthly income gain</span>' + placeholder() + '</div>');
-            rows.push('<div class="ds-outcome-row"><span>To savings</span>' + placeholder() + '</div>');
-            rows.push('<div class="ds-outcome-row"><span>To spending</span>' + placeholder() + '</div>');
-          } else {
-            const increaseEurOut = effectiveIncrease;
-            const basket = q.gainAllocationBasket || [];
-
-            // Row 1: Income gain
-            rows.push('<div class="ds-outcome-row"><span>Monthly income gain</span>' +
-              '<div class="ds-outcome-val"><strong class="ds-positive">+' + currency(increaseEurOut) + '</strong></div>' +
-            '</div>');
-
-            // Row 2: To savings — always 60% of the effective increase
-            const savShare = Math.round(increaseEurOut * 0.60);
-            const savAllocNow = dsSavingsAllocation(month) || 0;
-            rows.push('<div class="ds-outcome-row"><span>To savings</span>' +
-              '<div class="ds-outcome-val">' +
-                '<strong class="ds-positive">+' + currency(savShare) + '</strong>' +
-                '<span class="ds-outcome-delta ds-positive">' + currency(savAllocNow + savShare) + ' total</span>' +
-              '</div>' +
-            '</div>');
-
-            // Row 3: To spending (remainder after savings share)
-            const toSpending = increaseEurOut - savShare;
-            const dailyExtra = (toSpending / 30).toFixed(2);
-            rows.push('<div class="ds-outcome-row"><span>To spending</span>' +
-              '<div class="ds-outcome-val">' +
-                '<strong class="ds-positive">+' + currency(toSpending) + '</strong>' +
-                '<span class="ds-outcome-delta ds-positive">+€' + dailyExtra + '/day</span>' +
-              '</div>' +
-            '</div>');
-          }
-
-          const narration = out ? buildNarration(out, q) : '';
-          const narrationHtml = narration ? '<div class="ds-narration" data-ds-out="narration">' + narration + '</div>' : '';
-          return '<div class="ds-outcomes" data-ds-outcomes>' + rows.join('') + '</div>' + narrationHtml;
-        }
-
-        // Q4 savings: custom outcome block showing savings increase, expense cut, net
-        if (q && q.id === 'q-savings') {
-          const confirmedVal = month.scenario && month.scenario.questionKey === 'q-savings' && month.scenario.quickInputVal != null
-            ? month.scenario.quickInputVal : null;
-          const qi = q.quickInput || {};
-          const incBase = qi.incomeBase || 1;
-          const savedMode = month.scenario && month.scenario.quickInputMode;
-          const incMode = qi.toggleable && (savedMode === 'eur' || savedMode === 'pct') ? savedMode : (qi.type || 'pct');
-          const effectiveIncrease = confirmedVal != null
-            ? (incMode === 'pct' ? Math.round(incBase * confirmedVal / 100) : confirmedVal)
-            : (q.increaseEur || 0);
-          const savBase = dsSavingsAllocation(month) || 0;
-          const savTarget = savBase + effectiveIncrease;
-          const offsetB = q.buckets.find(function(b) { return b.id === 'b-sav-offset'; });
-          const offsetBase = offsetB ? (offsetB.currentDisplay != null ? offsetB.currentDisplay : offsetB.current) : 0;
-          const offsetTarget = offsetB ? offsetB.value : offsetBase;
-          const offsetCut = offsetBase - offsetTarget;
-
-          // Row 1: Savings increase
-          const incSign = effectiveIncrease >= 0 ? '+' : '';
-          rows.push('<div class="ds-outcome-row"><span>Savings target</span>' +
-            '<div class="ds-outcome-val">' +
-              '<strong class="' + (effectiveIncrease >= 0 ? 'ds-positive' : 'ds-negative') + '">' + incSign + currency(effectiveIncrease) + '</strong>' +
-              '<span class="ds-outcome-delta">' + currency(savTarget) + ' total</span>' +
-            '</div></div>');
-
-          // Row 2: Expense cut required
-          if (offsetB) {
-            rows.push('<div class="ds-outcome-row"><span>Cut in ' + escapeHtml(offsetB.label) + '</span>' +
-              '<div class="ds-outcome-val">' +
-                '<strong class="' + (offsetCut > 0 ? 'ds-positive' : 'ds-negative') + '">' + (offsetCut > 0 ? '−' : '+') + currency(Math.abs(offsetCut)) + '</strong>' +
-                '<span class="ds-outcome-delta">' + currency(offsetTarget) + ' target</span>' +
-              '</div></div>');
-          }
-
-          // Row 3: Net monthly impact (savings increase minus expense freed)
-          const net = effectiveIncrease - offsetCut;
-          const netCls = net <= 0 ? 'ds-positive' : 'ds-negative';
-          rows.push('<div class="ds-outcome-row"><span>Net monthly impact</span>' +
-            '<div class="ds-outcome-val">' +
-              '<strong class="' + netCls + '">' + (net > 0 ? '−' : '+') + currency(Math.abs(net)) + '</strong>' +
-              '<span class="ds-outcome-delta">' + (net > 0 ? 'still needed from other cuts' : 'fully covered') + '</span>' +
-            '</div></div>');
-
-          const narration = out ? buildNarration(out, q) : '';
-          const narrationHtml = narration ? '<div class="ds-narration" data-ds-out="narration">' + narration + '</div>' : '';
-          return '<div class="ds-outcomes" data-ds-outcomes>' + rows.join('') + '</div>' + narrationHtml;
-        }
-
-        // Q3 subscription affordability: custom analytical outcome — no sliders, pure cost analysis
-        if (q && q.id === 'q-subs') {
-          const sd = q.subsData || {};
-          const confirmedAmt = month.scenario && month.scenario.questionKey === 'q-subs' && month.scenario.quickInputVal != null
-            ? Number(month.scenario.quickInputVal) : null;
-          const effectiveInput = confirmedAmt != null ? confirmedAmt : (sd.inputAmt || 0);
-          const effectiveMonthly = effectiveInput * (sd.cadence === 'yearly' ? 1/12 : sd.cadence === 'quarterly' ? 1/3 : 1);
-          const annualCost = Math.round(effectiveMonthly * 12);
-          const existingMonthly = sd.existingMonthly || 0;
-          const varHeadroom = sd.varHeadroom || 0;
-          const savDip = Math.max(0, effectiveMonthly - varHeadroom);
-          const histAvg = sd.histVarSurplusAvg;
-
-          // Row 1: Monthly cost
-          const monthlyCls = effectiveMonthly <= varHeadroom ? 'ds-positive' : 'ds-negative';
-          rows.push('<div class="ds-outcome-row"><span>Monthly cost (normalised)</span>' +
-            '<div class="ds-outcome-val">' +
-              '<strong class="' + monthlyCls + '">' + currency(Math.round(effectiveMonthly)) + '/mo</strong>' +
-              '<span class="ds-outcome-delta">' + currency(annualCost) + '/yr</span>' +
-            '</div></div>');
-
-          // Row 2: Variable budget headroom vs cost
-          const headroomCls = varHeadroom >= effectiveMonthly ? 'ds-positive' : 'ds-negative';
-          const headroomNote = varHeadroom >= effectiveMonthly
-            ? currency(Math.round(varHeadroom - effectiveMonthly)) + ' still free'
-            : currency(Math.round(effectiveMonthly - varHeadroom)) + ' over budget';
-          rows.push('<div class="ds-outcome-row"><span>Variable budget headroom</span>' +
-            '<div class="ds-outcome-val">' +
-              '<strong class="' + headroomCls + '">' + currency(Math.round(varHeadroom)) + '</strong>' +
-              '<span class="ds-outcome-delta ' + headroomCls + '">' + headroomNote + '</span>' +
-            '</div></div>');
-
-          // Row 3: Savings impact (only show when dip needed)
-          if (savDip > 0.5) {
-            const savingsAlloc = sd.savingsAlloc || 0;
-            const savPct = savingsAlloc > 0 ? ((savDip / savingsAlloc) * 100).toFixed(1) : null;
-            const savNote = savPct ? savPct + '% of planned savings' : 'from planned savings';
-            rows.push('<div class="ds-outcome-row"><span>Savings dip required</span>' +
-              '<div class="ds-outcome-val">' +
-                '<strong class="ds-negative">−' + currency(Math.round(savDip)) + '/mo</strong>' +
-                '<span class="ds-outcome-delta ds-negative">' + savNote + '</span>' +
-              '</div></div>');
-          } else {
-            rows.push('<div class="ds-outcome-row"><span>Savings impact</span>' +
-              '<div class="ds-outcome-val"><strong class="ds-positive">None</strong>' +
-              '<span class="ds-outcome-delta">covered by variable budget</span></div></div>');
-          }
-
-          // Row 4: Historical average check
-          if (histAvg != null && sd.histMonthCount > 0) {
-            const histCls = histAvg >= effectiveMonthly ? 'ds-positive' : 'ds-negative';
-            const histVerdict = histAvg >= effectiveMonthly ? 'avg surplus supports this' : 'avg surplus too low';
-            rows.push('<div class="ds-outcome-row"><span>Avg variable surplus (' + sd.histMonthCount + ' mo)</span>' +
-              '<div class="ds-outcome-val">' +
-                '<strong class="' + histCls + '">' + currency(Math.round(histAvg)) + '/mo</strong>' +
-                '<span class="ds-outcome-delta ' + histCls + '">' + histVerdict + '</span>' +
-              '</div></div>');
-          }
-
-          const narration = buildNarration(null, q);
-          const narrationHtml = narration ? '<div class="ds-narration" data-ds-out="narration">' + narration + '</div>' : '';
-          return '<div class="ds-outcomes" data-ds-outcomes>' + rows.join('') + '</div>' + narrationHtml;
-        }
-
-        // Q6 trajectory: diagnostic outcome — drift cost, recovery value, recurrence class
-        if (q && q.id === 'q-trajectory') {
-          const td = q.trajData;
-          if (!td) {
-            rows.push('<div class="ds-outcome-row"><span>Drift vs average</span>' + placeholder() + '</div>');
-            rows.push('<div class="ds-outcome-row"><span>Annual cost of drift</span>' + placeholder() + '</div>');
-            rows.push('<div class="ds-outcome-row"><span>Recovery value</span>' + placeholder() + '</div>');
-          } else {
-            const isUp = !td.isDownshift;
-            // Row 1: Drift vs average
-            const driftCls = isUp ? 'ds-negative' : 'ds-positive';
-            const driftSign = isUp ? '+' : '−';
-            const driftPct = Math.abs(Math.round(td.pct));
-            rows.push('<div class="ds-outcome-row"><span>Drift vs ' + td.baselineLabel + '</span>' +
-              '<div class="ds-outcome-val">' +
-                '<strong class="' + driftCls + '">' + driftSign + currency(Math.abs(Math.round(td.driftAmt))) + '/mo</strong>' +
-                '<span class="ds-outcome-delta ' + driftCls + '">' + driftSign + driftPct + '%</span>' +
-              '</div></div>');
-
-            // Row 2: Annual cost of drift (upward only)
-            if (isUp) {
-              rows.push('<div class="ds-outcome-row"><span>Annual cost if this holds</span>' +
-                '<div class="ds-outcome-val">' +
-                  '<strong class="ds-negative">+' + currency(td.annualDriftCost) + '/yr</strong>' +
-                  '<span class="ds-outcome-delta">above avg run rate</span>' +
-                '</div></div>');
-            } else {
-              rows.push('<div class="ds-outcome-row"><span>Annual saving vs average</span>' +
-                '<div class="ds-outcome-val">' +
-                  '<strong class="ds-positive">−' + currency(td.annualDriftCost) + '/yr</strong>' +
-                  '<span class="ds-outcome-delta">below avg run rate</span>' +
-                '</div></div>');
-            }
-
-            // Row 3: Recurrence class verdict
-            const rcLabel = td.recurrenceClass === 'recurring' ? 'Recurring pattern'
-              : td.recurrenceClass === 'occasional' ? 'Occasional spike'
-              : td.recurrenceClass === 'one-off' ? 'One-off event'
-              : td.histCount >= 2 ? 'Pattern unclear'
-              : 'First data point';
-            const rcCls = td.recurrenceClass === 'recurring' ? 'ds-negative'
-              : td.recurrenceClass === 'one-off' ? 'ds-positive'
-              : '';
-            const rcNote = td.monthsObserved > 0
-              ? td.spikeMonths + ' of ' + td.monthsObserved + ' prior months'
-              : td.histCount + ' months of history';
-            rows.push('<div class="ds-outcome-row"><span>Pattern classification</span>' +
-              '<div class="ds-outcome-val">' +
-                '<strong class="' + rcCls + '">' + rcLabel + '</strong>' +
-                '<span class="ds-outcome-delta">' + rcNote + '</span>' +
-              '</div></div>');
-          }
-          const narration = buildNarration(null, q);
-          const narrationHtml = narration ? '<div class="ds-narration" data-ds-out="narration">' + narration + '</div>' : '';
-          return '<div class="ds-outcomes" data-ds-outcomes>' + rows.join('') + '</div>' + narrationHtml;
-        }
-
-        // Q7 pace drill: delegate entirely to shared renderCategoryPaceTile
-        if (q && q.id === 'q-pace-drill') {
-          return renderCategoryPaceTile(q.paceDrillData || null, 'simulator');
-        }
-
-        // Standard outcome block for all other questions
-        if (out) {
-          const dailyCls = out.dailyDelta > 0.5 ? 'ds-positive' : out.dailyDelta < -0.5 ? 'ds-negative' : '';
-          rows.push('<div class="ds-outcome-row"><span>Spending room per day</span>' +
-            valWithDelta(currency(out.adjustedDaily) + '/day', out.dailyDelta, dailyCls) + '</div>');
-        } else {
-          rows.push('<div class="ds-outcome-row"><span>Spending room per day</span>' + placeholder() + '</div>');
-        }
-
-        const showFreed = out && Math.abs(out.nonSavingsDelta) > 1;
-        if (showFreed) {
-          const freed = out.nonSavingsDelta;
-          const label = freed > 0 ? 'Budget freed for savings' : 'Extra savings commitment';
-          const freeCls = freed > 0 ? 'ds-positive' : 'ds-negative';
-          rows.push('<hr class="ds-outcome-divider"/>' +
-            '<div class="ds-outcome-row"><span>' + label + '</span>' +
-            '<div class="ds-outcome-val"><strong class="' + freeCls + '">' + (freed > 0 ? '+' : '') + currency(freed) + '</strong></div>' +
-            '</div>');
-        }
-
-        if (out && out.expCoverageCurrent !== null && out.expCoverageAdj !== null &&
-            Math.abs(out.expCoverageAdj - out.expCoverageCurrent) > 0.2) {
-          const covDelta = out.expCoverageAdj - out.expCoverageCurrent;
-          const covCls = covDelta < 0 ? 'ds-positive' : covDelta > 0 ? 'ds-negative' : '';
-          rows.push('<div class="ds-outcome-row"><span>Expense share of income</span>' +
-            '<div class="ds-outcome-val">' +
-              '<strong class="' + covCls + '">' + out.expCoverageAdj.toFixed(1) + '%</strong>' +
-              '<span class="ds-outcome-delta ' + covCls + '">' + (covDelta >= 0 ? '+' : '') + covDelta.toFixed(1) + 'pp vs now</span>' +
-            '</div></div>');
-        }
-
-        const narration = out ? buildNarration(out, q) : '';
-        const narrationHtml = narration
-          ? '<div class="ds-narration" data-ds-out="narration">' + narration + '</div>'
-          : '';
-
-        return '<div class="ds-outcomes" data-ds-outcomes>' + rows.join('') + '</div>' + narrationHtml;
-      }
-
-      // ── Bucket / slider HTML ───────────────────────────────────────────
-      function buildBucketHtml(buckets) {
-        // Q3 subscription: no sliders — render cadence toggle only
-        if (activeQ && activeQ.id === 'q-subs') {
-          const sd = activeQ.subsData || {};
-          const currentCadence = sd.cadence || 'monthly';
-          const cadences = [
-            { key: 'monthly',   label: 'Monthly' },
-            { key: 'quarterly', label: 'Quarterly' },
-            { key: 'yearly',    label: 'Yearly' }
-          ];
-          const btns = cadences.map(function(c) {
-            const isActive = c.key === currentCadence;
-            return '<button type="button" class="ds-cadence-btn' + (isActive ? ' is-active' : '') + '"' +
-              ' data-ds-cadence="' + c.key + '">' + c.label + '</button>';
-          }).join('');
-          const existingMonthly = sd.existingMonthly || 0;
-          const existingNote = existingMonthly > 0.5
-            ? 'Current recurring baseline: ' + currency(Math.round(existingMonthly)) + '/mo (' + currency(Math.round(existingMonthly * 12)) + '/yr)'
-            : 'No existing subscriptions yet.';
-          return '<div class="ds-subs-ui">' +
-            '<div class="ds-subs-cadence-row">' +
-              '<span class="ds-subs-cadence-label">Billing cadence</span>' +
-              '<div class="ds-cadence-btns" id="dsCadenceBtns">' + btns + '</div>' +
-            '</div>' +
-            '<div class="ds-subs-existing-note">' + existingNote + '</div>' +
-          '</div>';
-        }
-
-        // Q6 trajectory: category selector + mini timeline display — no sliders
-        if (activeQ && activeQ.id === 'q-trajectory') {
-          const td = activeQ.trajData;
-          const allTrajGroups = activeQ.trajAllGroups || [];
-          const activeKey = activeQ.trajActiveKey || (td && td.categoryKey);
-          const defaultKey = activeQ.trajDefaultKey;
-
-          // Category selector pills
-          const catBtns = allTrajGroups.slice(0, 8).map(function(g) {
-            const isActive = g.key === activeKey;
-            const isSignal = g.key === defaultKey && g.key !== activeKey;
-            const label = dsExpenseLabel(g, g && g.key);
-            return '<button type="button" class="ds-traj-cat-btn' +
-              (isActive ? ' is-active' : '') +
-              (isSignal ? ' is-signal' : '') + '"' +
-              ' data-ds-traj-cat="' + escapeHtml(g.key) + '"' +
-              ' title="' + escapeHtml(label) + (isSignal ? ' (signal-triggered)' : '') + '">' +
-              escapeHtml(label) +
-            '</button>';
-          }).join('');
-
-          // Timeline dots
-          if (!td || !td.timeline.length) {
-            return '<div class="ds-traj-ui">' +
-              '<div class="ds-traj-cat-row"><span class="ds-traj-cat-label">Category</span>' +
-              '<div class="ds-traj-cat-btns">' + catBtns + '</div></div>' +
-            '</div>';
-          }
-          const isUp = !td.isDownshift;
-          const dotHtml = td.timeline.map(function(v, i) {
-            const isNow = i === td.timeline.length - 1;
-            const dotCls = isNow ? (isUp ? 'ds-traj-dot now-up' : 'ds-traj-dot now-down') : 'ds-traj-dot past';
-            const monthLabel = td.timelineMonths && td.timelineMonths[i]
-              ? (isNow ? 'now' : String(td.timelineMonths[i]).slice(0, 3))
-              : (isNow ? 'now' : '');
-            return '<div class="ds-traj-step">' +
-              '<div class="' + dotCls + '"></div>' +
-              '<div class="ds-traj-val">' + currency(Math.round(v)) + '</div>' +
-              '<div class="ds-traj-month">' + escapeHtml(monthLabel) + '</div>' +
-            '</div>';
-          }).join('<div class="ds-traj-arrow">→</div>');
-
-          return '<div class="ds-traj-ui">' +
-            '<div class="ds-traj-cat-row">' +
-              '<span class="ds-traj-cat-label">Category</span>' +
-              '<div class="ds-traj-cat-btns">' + catBtns + '</div>' +
-            '</div>' +
-            '<div class="ds-traj-label">Spending timeline</div>' +
-            '<div class="ds-traj-track">' + dotHtml + '</div>' +
-          '</div>';
-        }
-
-        // Q7 pace drill: category selector
-        if (activeQ && activeQ.id === 'q-pace-drill') {
-          const pd = activeQ.paceDrillData;
-          if (!pd) return '<div class="ds-pace-drill-ui"></div>';
-          const groups = pd.allGroups || [];
-          const btns = groups.slice(0, 8).map(function(g) {
-            const isActive = g.key === pd.activeGroupKey;
-            const label = dsExpenseLabel(g, g && g.key);
-            return '<button type="button" class="ds-drill-cat-btn' + (isActive ? ' is-active' : '') + '"' +
-              ' data-ds-drill-cat="' + escapeHtml(g.key) + '">' +
-              escapeHtml(label) +
-            '</button>';
-          }).join('');
-          return '<div class="ds-pace-drill-ui">' +
-            '<div class="ds-pace-drill-row">' +
-              '<span class="ds-pace-drill-label">Category</span>' +
-              '<div class="ds-drill-cat-btns" id="dsDrillCatBtns">' + btns + '</div>' +
-            '</div>' +
-          '</div>';
-        }
-
-        return buckets.map(function(b) {
-          const clampedVal = Math.min(Math.max(b.value, b.min), b.max);
-          const displayCurrent = b.currentDisplay != null ? b.currentDisplay : b.current;
-          const histNote = b.histAvg !== null ? ' · avg ' + currency(b.histAvg) : '';
-          // Use displayCurrent for % calculation — ensures % is relative to allocation target, not mid-month actual spend
-          const pctBase = displayCurrent > 0 ? displayCurrent : b.current;
-          const pctDisabled = pctBase <= 0;
-          const pctVal = !pctDisabled
-            ? ((clampedVal / pctBase - 1) * 100).toFixed(1)
-            : '';
-
-          // Basket: fixed 3-cell grid — labels only in buttons, delta shown separately below
-          const savedBasketKey = month.scenario && month.scenario.bucketOverrides && month.scenario.bucketOverrides[b.basketBucketId];
-          let basketHtml = '';
-          let basketDeltaHtml = '';
-          if (b.basket && b.basket.length >= 1) {
-            // Build button grid
-            basketHtml = '<div class="ds-basket" data-ds-basket="' + b.basketBucketId + '">' +
-              b.basket.map(function(c) {
-                const isActive = savedBasketKey ? c.opt.key === savedBasketKey : c === b.basket[0];
-                const tooltipText = c.label + ' — ' + c.reason +
-                  (c.allocTarget != null ? ' (allocation: ' + currency(c.allocTarget) + ')' : '');
-                return '<button type="button" class="ds-basket-btn' + (isActive ? ' is-active' : '') + '"' +
-                  ' data-ds-basket-key="' + escapeHtml(c.opt.key) + '"' +
-                  ' data-ds-basket-id="' + escapeHtml(b.basketBucketId) + '"' +
-                  ' title="' + escapeHtml(tooltipText) + '">' +
-                  escapeHtml(c.label) +
-                '</button>';
-              }).join('') +
-            '</div>';
-
-            // Separate anchored delta line — always present, updates on selection
-            const activeCandidate = savedBasketKey
-              ? b.basket.find(function(c) { return c.opt.key === savedBasketKey; }) || b.basket[0]
-              : b.basket[0];
-            if (activeCandidate && activeCandidate.allocDelta != null && activeCandidate.allocDelta > 0) {
-              const isGain = activeCandidate.isGain;
-              const allocBase = activeCandidate.allocTarget != null ? activeCandidate.allocTarget : activeCandidate.base || 0;
-              if (isGain) {
-                // Gain allocation basket: show + framing (where money goes TO)
-                const gainTarget = allocBase + activeCandidate.allocDelta;
-                const totalGain = b.basket.reduce(function(s, c) { return s + (c.allocDelta || 0); }, 0);
-                const gainContext = totalGain > activeCandidate.allocDelta
-                  ? ' — ' + currency(activeCandidate.allocDelta) + ' of ' + currency(totalGain) + ' gain'
-                  : '';
-                basketDeltaHtml = '<div class="ds-basket-delta-line">' +
-                  'Suggested: ' + escapeHtml(activeCandidate.label) +
-                  ' from <strong>' + currency(allocBase) + '</strong>' +
-                  ' → <strong class="ds-positive">' + currency(gainTarget) + '</strong>' +
-                  ' <span class="ds-positive">(+' + currency(Math.round(activeCandidate.allocDelta)) + gainContext + ')</span>' +
-                '</div>';
-              } else {
-                // Cut basket: show − framing (Q4 style)
-                const suggestedTarget = Math.max(0, allocBase - activeCandidate.allocDelta);
-                const totalGap = b.basket.reduce(function(s, c) { return s + (c.allocDelta || 0); }, 0);
-                const gapContext = totalGap > activeCandidate.allocDelta
-                  ? ' — your share of ' + currency(totalGap) + ' total gap'
-                  : '';
-                basketDeltaHtml = '<div class="ds-basket-delta-line">' +
-                  'Suggested: ' + escapeHtml(activeCandidate.label) +
-                  ' from <strong>' + currency(allocBase) + '</strong>' +
-                  ' → <strong class="ds-negative">' + currency(suggestedTarget) + '</strong>' +
-                  ' <span class="ds-negative">(−' + currency(Math.round(activeCandidate.allocDelta)) + gapContext + ')</span>' +
-                '</div>';
-              }
-            } else {
-              basketDeltaHtml = '<div class="ds-basket-delta-line" aria-hidden="true">&nbsp;</div>';
-            }
-          }
-
-          // noSlider buckets (gain allocation display bucket) — render basket + delta only, no slider
-          if (b.noSlider) {
-            const gainTotal = b.basket ? b.basket.reduce(function(s, c) { return s + (c.allocDelta || 0); }, 0) : 0;
-            return '<div class="ds-bucket">' +
-              '<div class="ds-bucket-label">' +
-                escapeHtml(b.label) +
-                (gainTotal > 0 ? '<span class="ds-positive">+' + currency(gainTotal) + ' to allocate</span>' : '<span></span>') +
-              '</div>' +
-              basketHtml +
-              basketDeltaHtml +
-            '</div>';
-          }
-
-          return '<div class="ds-bucket">' +
-            '<div class="ds-bucket-label">' +
-              escapeHtml(b.label) +
-              '<span>' + (b.currentDisplay != null ? 'allocation ' : 'now ') + currency(displayCurrent) + histNote + '</span>' +
-            '</div>' +
-            (b.reasonNote ? '<div class="ds-bucket-reason">↳ ' + escapeHtml(b.reasonNote) + '</div>' : '') +
-            basketHtml +
-            basketDeltaHtml +
-            '<div class="ds-slider-wrap">' +
-              '<input type="range" class="ds-slider" data-ds-id="' + b.id + '"' +
-                ' min="' + b.min + '" max="' + b.max + '" step="' + b.step + '"' +
-                ' value="' + clampedVal + '">' +
-              '<div class="ds-input-wrap">' +
-                '<input type="number" class="ds-amount-input" data-ds-input="' + b.id + '"' +
-                  ' min="' + b.min + '" max="' + b.max + '" step="' + b.step + '"' +
-                  ' value="' + clampedVal.toFixed(0) + '" placeholder="EUR">' +
-                '<button type="button" class="ds-apply-btn" data-ds-apply="' + b.id + '" title="Confirm (Enter)">✓</button>' +
-              '</div>' +
-              '<div class="ds-input-wrap">' +
-                '<input type="number" class="ds-pct-input" data-ds-pct="' + b.id + '"' +
-                  ' step="0.5"' +
-                  (pctDisabled ? ' disabled' : '') +
-                  ' value="' + (pctDisabled ? '' : pctVal) + '" placeholder="%">' +
-                '<span class="ds-pct-suffix">%</span>' +
-                '<button type="button" class="ds-apply-btn" data-ds-apply-pct="' + b.id + '"' +
-                  (pctDisabled ? ' disabled title="% not applicable here"' : ' title="Confirm % (Enter)"') + '>✓</button>' +
-              '</div>' +
-            '</div>' +
-          '</div>';
-        }).join('');
-      }
-
-      // ── Standard question dropdown HTML ────────────────────────────────
-      function buildPickerHtml(questions, activeQ) {
-        const optionRows = questions.map(function(q) {
-          const isActive = activeQ && q.id === activeQ.id;
-          const label = q.badge && q.badge.label
-            ? q.badge.label + ' — ' + q.label
-            : q.label;
-          return '<option value="' + q.id + '"' + (isActive ? ' selected' : '') + '>' +
-            escapeHtml(label) +
-            '</option>';
-        }).join('');
-
-        return '<div class="ds-standard-picker">' +
-          '<select class="ds-question-select" id="dsQuestionSelect" aria-label="Decision Simulator question">' +
-            optionRows +
-          '</select>' +
-        '</div>';
-      }
-
-      const pickerHtml = buildPickerHtml(questions, activeQ);
-      const quickInputHtml = buildQuickInputHtml(activeQ);
-      const quickContextHtml = buildQuickContextHtml(activeQ);
-      const framingHtml = activeQ
-        ? '<div class="ds-question-framing" id="dsFraming">' + escapeHtml(activeQ.framing) + '</div>'
-        : '';
-      const bucketHtml = activeQ ? buildBucketHtml(activeQ.buckets) : '';
-      const outcomeHtml = activeQ
-        ? buildOutcomeHtml(activeQ.buckets, activeQ, false)
-        : '<div class="ds-outcomes" data-ds-outcomes>' +
-            '<div class="ds-outcome-row"><span>Spending room per day</span>' +
-              '<div class="ds-outcome-val"><strong>—</strong></div></div>' +
-            '<div class="ds-outcome-row"><span>Budget freed for savings</span>' +
-              '<div class="ds-outcome-val"><strong>—</strong></div></div>' +
-            '<div class="ds-outcome-row"><span>Expense share of income</span>' +
-              '<div class="ds-outcome-val"><strong>—</strong></div></div>' +
-          '</div>';
-
-      const sec = document.createElement('section');
-      sec.className = 'planner-card planner-card-scenario ui-3d-decision';
-      sec.setAttribute('data-card-key', 'plan_scenario');
-      sec.setAttribute('data-planner-card', 'plan_scenario');
-      sec.innerHTML = headerHtml +
-        '<div class="ds-question-row">' +
-          pickerHtml +
-          quickInputHtml +
-        '</div>' +
-        quickContextHtml +
-        framingHtml +
-        '<div class="ds-body">' +
-          '<div class="ds-buckets-wrap" id="dsBuckets">' + bucketHtml + '</div>' +
-          '<div class="ds-outcome-wrap" id="dsOutcomeWrap">' + outcomeHtml + '</div>' +
-        '</div>';
-
-      // ── Event wiring ────────────────────────────────────────────────────
-
-      // Persist a committed value: snaps slider, refreshes outcomes
-      function persistBucketValue(bucketId, rawVal) {
-        if (!activeQ) return;
-        const val = Math.max(0, Number.isFinite(Number(rawVal)) ? Number(rawVal) : 0);
-        month.scenario = month.scenario || { questionKey: activeQ.id, adjustments: [] };
-        month.scenario.adjustments = month.scenario.adjustments || [];
-        const existing = month.scenario.adjustments.find(function(a) { return a.id === bucketId; });
-        if (existing) { existing.amount = val; } else { month.scenario.adjustments.push({ id: bucketId, amount: val }); }
-        markDirty();
-
-        const sliderEl = sec.querySelector('.ds-slider[data-ds-id="' + bucketId + '"]');
-        if (sliderEl) sliderEl.value = Math.min(Math.max(val, Number(sliderEl.min)), Number(sliderEl.max));
-
-        const eurEl = sec.querySelector('[data-ds-input="' + bucketId + '"]');
-        if (eurEl) eurEl.value = Math.round(val);
-        const bucket = activeQ.buckets.find(function(b) { return b.id === bucketId; });
-        const pctEl = sec.querySelector('[data-ds-pct="' + bucketId + '"]');
-        if (pctEl && !pctEl.disabled && bucket && bucket.current > 0) {
-          pctEl.value = eurToPct(val, bucket.current).toFixed(1);
-        }
-
-        const liveQ = dsGenerateQuestions(month, historyMonths).find(function(q) { return q.id === activeQ.id; }) || activeQ;
-        const outWrap = sec.querySelector('#dsOutcomeWrap');
-        if (outWrap) outWrap.innerHTML = buildOutcomeHtml(liveQ.buckets, liveQ, false);
-      }
-
-      // Helper: EUR ↔ % conversion
-      function pctToEur(pct, current) { return Math.max(0, current * (1 + pct / 100)); }
-      function eurToPct(eur, current) { return current > 0 ? ((eur / current) - 1) * 100 : 0; }
-
-      // ── Quick-input wiring ─────────────────────────────────────────────
-      function getActiveQiMode() {
-        if (!activeQ || !activeQ.quickInput) return 'eur';
-        const qi = activeQ.quickInput;
-        if (!qi.toggleable) return qi.type;
-        const saved = month.scenario && month.scenario.quickInputMode;
-        return (saved === 'eur' || saved === 'pct') ? saved : qi.type;
-      }
-
-      function commitQuickInput(rawVal) {
-        if (!activeQ || !activeQ.quickInput || activeQ.quickInput.disabled) return;
-        const qi = activeQ.quickInput;
-        const mode = getActiveQiMode();
-        const numVal = Number(rawVal) || 0;
-
-        if (activeQ.id === 'q-savings') {
-          const incBase = qi.incomeBase || 1;
-          const savBase = qi.savingsBase || dsSavingsAllocation(month) || 0;
-          // numVal = the INCREASE (EUR or % of income)
-          const increaseEur = mode === 'pct' ? Math.round(numVal / 100 * incBase) : numVal;
-          const eurVal = Math.max(0, savBase + increaseEur);
-          const newGap = Math.max(0, increaseEur);
-          // Auto-set offset bucket proportional share of the increase
-          const offsetB = activeQ.buckets.find(function(b) { return b.id === 'b-sav-offset'; });
-          if (offsetB && newGap > 0) {
-            const offsetAllocBase = offsetB.currentDisplay != null ? offsetB.currentDisplay : offsetB.current;
-            const basket = offsetB.basket || [];
-            const activeC = basket.find(function(c) { return c.opt && c.opt.key === offsetB.key; }) || basket[0];
-            const totalBasketScore = basket.reduce(function(s, c) { return s + (c.score || 0); }, 0) || 1;
-            const candidateScore = activeC ? (activeC.score || 0) : totalBasketScore / 3;
-            const share = Math.min(Math.round(newGap * candidateScore / totalBasketScore), offsetAllocBase);
-            const offsetTarget = Math.max(0, offsetAllocBase - share);
-            month.scenario = month.scenario || { questionKey: activeQ.id, adjustments: [] };
-            month.scenario.adjustments = month.scenario.adjustments || [];
-            const existing = month.scenario.adjustments.find(function(a) { return a.id === 'b-sav-offset'; });
-            if (existing) { existing.amount = offsetTarget; } else { month.scenario.adjustments.push({ id: 'b-sav-offset', amount: offsetTarget }); }
-          }
-          month.scenario = month.scenario || { questionKey: activeQ.id, adjustments: [] };
-          month.scenario.quickInputVal = numVal;
-          const savAdj = month.scenario.adjustments ? month.scenario.adjustments.find(function(a) { return a.id === 'b-sav-main'; }) : null;
-          if (savAdj) { savAdj.amount = eurVal; } else { (month.scenario.adjustments = month.scenario.adjustments || []).push({ id: 'b-sav-main', amount: eurVal }); }
-          pushHistory(); markDirty(); render('planning'); return;
-        }
-
-        if (activeQ.id === 'q-income') {
-          const incBase = qi.incomeBase || 0;
-          const savedMode = month.scenario && month.scenario.quickInputMode;
-          const incMode = qi.toggleable && (savedMode === 'eur' || savedMode === 'pct') ? savedMode : (qi.type || 'eur');
-          // numVal = the INCREASE (EUR or %)
-          const increaseEur = incMode === 'pct' ? Math.round(incBase * numVal / 100) : numVal;
-          const totalIncomeTgt = incBase + increaseEur;
-
-          month.scenario = month.scenario || { questionKey: activeQ.id, adjustments: [] };
-          month.scenario.adjustments = month.scenario.adjustments || [];
-          month.scenario.quickInputVal = numVal;
-
-          // Set income bucket to absolute total
-          const incAdj = month.scenario.adjustments.find(function(a) { return a.id === 'b-inc-main'; });
-          if (incAdj) { incAdj.amount = totalIncomeTgt; } else { month.scenario.adjustments.push({ id: 'b-inc-main', amount: totalIncomeTgt }); }
-
-          // Update all gain allocation buckets proportionally
-          const basket = activeQ.gainAllocationBasket || [];
-          basket.forEach(function(c) {
-            // Recalculate each candidate's share proportionally to the new increaseEur
-            const originalGain = (qi.seedEur || 0);
-            const ratio = originalGain > 0 ? increaseEur / originalGain : 1;
-            const newShare = Math.round((c.share || 0) * ratio);
-            const newTarget = (c.allocTarget || 0) + newShare;
-            const existing = month.scenario.adjustments.find(function(a) { return a.id === c.bucketId; });
-            if (existing) { existing.amount = newTarget; } else { month.scenario.adjustments.push({ id: c.bucketId, amount: newTarget }); }
-          });
-
-          pushHistory(); markDirty(); render('planning'); return;
-        }
-
-        if (activeQ.id === 'q-subs') {
-          // numVal = the per-cycle cost the user entered; cadence is stored separately
-          month.scenario = month.scenario || { questionKey: activeQ.id, adjustments: [] };
-          month.scenario.adjustments = month.scenario.adjustments || [];
-          month.scenario.quickInputVal = Math.max(0, numVal);
-          pushHistory(); markDirty(); render('planning'); return;
-        }
-
-        // Q1 and Q2: input is absolute EUR target for primary bucket → full re-render
-        month.scenario = month.scenario || { questionKey: activeQ.id, adjustments: [] };
-        month.scenario.adjustments = month.scenario.adjustments || [];
-        month.scenario.quickInputVal = numVal;
-        const primId = qi.primaryBucket;
-        const primAdj = month.scenario.adjustments.find(function(a) { return a.id === primId; });
-        if (primAdj) { primAdj.amount = numVal; } else { month.scenario.adjustments.push({ id: primId, amount: numVal }); }
-        pushHistory(); markDirty(); render('planning');
-      }
-
-      const quickField = sec.querySelector('#dsQuickField');
-      const quickConfirm = sec.querySelector('#dsQuickConfirm');
-      const quickUnit = sec.querySelector('#dsQuickUnit');
-
-      // Unit toggle click — flips EUR ↔ % for toggleable questions, converts value
-      if (quickUnit && activeQ && activeQ.quickInput && activeQ.quickInput.toggleable) {
-        quickUnit.addEventListener('click', function() {
-          const qi = activeQ.quickInput;
-          const currentMode = getActiveQiMode();
-          const newMode = currentMode === 'pct' ? 'eur' : 'pct';
-          let newVal = '';
-          const fieldVal = Number(quickField && quickField.value) || 0;
-          if (activeQ.id === 'q-savings') {
-            // Increase mode: pct = % of income, eur = EUR increase
-            const incBase = qi.incomeBase || 1;
-            if (currentMode === 'pct' && newMode === 'eur') {
-              newVal = Math.round(incBase * fieldVal / 100);
-            } else {
-              newVal = incBase > 0 ? (fieldVal / incBase * 100).toFixed(1) : '';
-            }
-          } else if (activeQ.id === 'q-income') {
-            // Increase mode: pct = % increase of current income, eur = EUR increase
-            const incBase = qi.incomeBase || 1;
-            if (currentMode === 'pct' && newMode === 'eur') {
-              newVal = Math.round(incBase * fieldVal / 100);
-            } else {
-              newVal = incBase > 0 ? (fieldVal / incBase * 100).toFixed(1) : '';
-            }
-          }
-          month.scenario = month.scenario || { questionKey: activeQ.id, adjustments: [] };
-          month.scenario.quickInputMode = newMode;
-          month.scenario.quickInputVal = Number(newVal) || null;
-          markDirty();
-          render('planning');
-        });
-      }
-
-      if (quickField) {
-        quickField.addEventListener('input', function() {
-          if (!activeQ || !activeQ.quickInput || activeQ.quickInput.disabled) return;
-          const qi = activeQ.quickInput;
-          const mode = getActiveQiMode();
-          let eurVal;
-          if (activeQ.id === 'q-savings') {
-            // Input = increase; show total (base + increase) on the savings slider
-            const incBase = qi.incomeBase || 1;
-            const savBase = qi.savingsBase || dsSavingsAllocation(month) || 0;
-            const increaseAmt = mode === 'pct'
-              ? Math.round(incBase * (Number(quickField.value) || 0) / 100)
-              : Number(quickField.value) || 0;
-            eurVal = Math.max(0, savBase + increaseAmt);
-          } else if (activeQ.id === 'q-income') {
-            // Input = increase amount; show total on the salary slider
-            const incBase = qi.incomeBase || 0;
-            const increaseAmt = mode === 'pct'
-              ? Math.round(incBase * (Number(quickField.value) || 0) / 100)
-              : Number(quickField.value) || 0;
-            eurVal = incBase + increaseAmt;
-          } else {
-            eurVal = Number(quickField.value) || 0;
-          }
-          const eurEl = sec.querySelector('[data-ds-input="' + qi.primaryBucket + '"]');
-          if (eurEl) eurEl.value = Math.round(eurVal);
-        });
-        quickField.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter') { e.preventDefault(); commitQuickInput(quickField.value); }
-        });
-      }
-      if (quickConfirm) {
-        quickConfirm.addEventListener('click', function() {
-          if (quickField) commitQuickInput(quickField.value);
-        });
-      }
-
-      // Slider drag — syncs display fields only; commits on release
-      sec.querySelectorAll('.ds-slider').forEach(function(slider) {
-        const id = slider.dataset.dsId;
-        slider.addEventListener('input', function() {
-          const val = Number(slider.value);
-          const eurEl = sec.querySelector('[data-ds-input="' + id + '"]');
-          if (eurEl) eurEl.value = Math.round(val);
-          const bucket = activeQ && activeQ.buckets.find(function(b) { return b.id === id; });
-          const pctEl = sec.querySelector('[data-ds-pct="' + id + '"]');
-          if (pctEl && !pctEl.disabled && bucket && bucket.current > 0) {
-            pctEl.value = eurToPct(val, bucket.current).toFixed(1);
-          }
-        });
-        slider.addEventListener('change', function() {
-          pushHistory();
-          persistBucketValue(id, Number(slider.value));
-        });
-      });
-
-      // EUR input — sync % only; no slider, no commit while typing
-      sec.querySelectorAll('.ds-amount-input').forEach(function(input) {
-        const id = input.dataset.dsInput;
-        const bucket = activeQ && activeQ.buckets.find(function(b) { return b.id === id; });
-        input.addEventListener('input', function() {
-          const pctEl = sec.querySelector('[data-ds-pct="' + id + '"]');
-          if (pctEl && !pctEl.disabled && bucket && bucket.current > 0) {
-            pctEl.value = eurToPct(Math.max(0, Number(input.value) || 0), bucket.current).toFixed(1);
-          }
-        });
-        input.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter') { e.preventDefault(); pushHistory(); persistBucketValue(id, Number(input.value) || 0); }
-        });
-      });
-
-      // % input — sync EUR only; no slider, no commit while typing
-      sec.querySelectorAll('.ds-pct-input').forEach(function(input) {
-        const id = input.dataset.dsPct;
-        const bucket = activeQ && activeQ.buckets.find(function(b) { return b.id === id; });
-        input.addEventListener('input', function() {
-          if (input.disabled || !bucket || bucket.current <= 0) return;
-          const eurEl = sec.querySelector('[data-ds-input="' + id + '"]');
-          if (eurEl) eurEl.value = Math.round(pctToEur(Number(input.value) || 0, bucket.current));
-        });
-        input.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter' && !input.disabled) {
-            e.preventDefault();
-            if (!bucket || bucket.current <= 0) return;
-            pushHistory();
-            persistBucketValue(id, pctToEur(Number(input.value) || 0, bucket.current));
-          }
-        });
-      });
-
-      // EUR confirm buttons
-      sec.querySelectorAll('.ds-apply-btn[data-ds-apply]').forEach(function(btn) {
-        const id = btn.dataset.dsApply;
-        btn.addEventListener('click', function() {
-          const inputEl = sec.querySelector('[data-ds-input="' + id + '"]');
-          if (!inputEl) return;
-          pushHistory();
-          persistBucketValue(id, Number(inputEl.value) || 0);
-        });
-      });
-
-      // % confirm buttons
-      sec.querySelectorAll('.ds-apply-btn[data-ds-apply-pct]').forEach(function(btn) {
-        const id = btn.dataset.dsApplyPct;
-        const bucket = activeQ && activeQ.buckets.find(function(b) { return b.id === id; });
-        btn.addEventListener('click', function() {
-          if (btn.disabled || !bucket || bucket.current <= 0) return;
-          const pctEl = sec.querySelector('[data-ds-pct="' + id + '"]');
-          if (!pctEl) return;
-          pushHistory();
-          persistBucketValue(id, pctToEur(Number(pctEl.value) || 0, bucket.current));
-        });
-      });
-
-      // Basket picker — clicking a candidate switches the active offset category
-      sec.querySelectorAll('.ds-basket-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          const basketId = btn.dataset.dsBaskId || btn.dataset.dsBasketId;
-          const newKey = btn.dataset.dsBasketKey;
-          if (!basketId || !newKey) return;
-          month.scenario = month.scenario || { questionKey: activeQ && activeQ.id, adjustments: [] };
-          month.scenario.bucketOverrides = month.scenario.bucketOverrides || {};
-          month.scenario.bucketOverrides[basketId] = newKey;
-          // Clear any saved adjustment for this bucket so it reseeds from the new category
-          month.scenario.adjustments = (month.scenario.adjustments || []).filter(function(a) {
-            return a.id !== basketId;
-          });
-          markDirty();
-          render('planning');
-        });
-      });
-
-      // Cadence toggle for q-subs
-      sec.querySelectorAll('.ds-cadence-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          const newCadence = btn.dataset.dsCadence;
-          if (!newCadence) return;
-          month.scenario = month.scenario || { questionKey: 'q-subs', adjustments: [] };
-          month.scenario.subsSimCadence = newCadence;
-          // Keep the same input amount but clear quickInputVal so it reseeds to the cadence default
-          // only if user hasn't explicitly set a value yet
-          markDirty();
-          render('planning');
-        });
-      });
-
-      // Category selector for q-pace-drill
-      sec.querySelectorAll('.ds-drill-cat-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          const newCat = btn.dataset.dsDrillCat;
-          if (!newCat) return;
-          month.scenario = month.scenario || { questionKey: 'q-pace-drill', adjustments: [] };
-          month.scenario.paceDrillCategory = newCat;
-          markDirty();
-          render('planning');
-        });
-      });
-
-      // Category selector for q-trajectory
-      sec.querySelectorAll('.ds-traj-cat-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          const newCat = btn.dataset.dsTrajCat;
-          if (!newCat) return;
-          month.scenario = month.scenario || { questionKey: 'q-trajectory', adjustments: [] };
-          month.scenario.trajCategory = newCat;
-          markDirty();
-          render('planning');
-        });
-      });
-
-      // ── Standard dropdown: select question ─────────────────────────────
-      function selectQuestion(qid) {
-        const newQ = questions.find(function(q) { return q.id === qid; }) || questions[0];
-        qid = newQ.id;
-        const preservedIds = newQ ? newQ.buckets.map(function(b) { return b.id; }) : [];
-        const existingAdj = month.scenario && Array.isArray(month.scenario.adjustments)
-          ? month.scenario.adjustments.filter(function(a) { return preservedIds.includes(a.id); })
-          : [];
-        const existingOverrides = month.scenario && month.scenario.bucketOverrides
-          ? Object.fromEntries(
-              Object.entries(month.scenario.bucketOverrides).filter(function(kv) {
-                return preservedIds.includes(kv[0]);
-              })
-            )
-          : {};
-        month.scenario = { questionKey: qid, adjustments: existingAdj, bucketOverrides: existingOverrides };
-        markDirty();
-        render('planning');
-      }
-
-      const questionSelect = sec.querySelector('#dsQuestionSelect');
-      if (questionSelect) {
-        questionSelect.addEventListener('change', function() {
-          selectQuestion(questionSelect.value);
-        });
-      }
-
-      // Reset (in card header)
-      const clearBtn = sec.querySelector('#dsClearBtn');
-      if (clearBtn) {
-        clearBtn.addEventListener('click', function() {
-          month.scenario = null;
-          markDirty();
-          render('planning');
-        });
-      }
-
-      return sec;
-    }
-
     function financialGoalPercent(item) {
       return Number(item && item.resolved && (item.resolved.pct != null ? item.resolved.pct : item.resolved.percent) || 0);
     }
@@ -16520,12 +14814,9 @@ function renderRows(targetId, rows, kind) {
     };
 
     function renderPlanningTools(month) {
-      // Decision Simulator has moved to its own modal — planningGrid is no longer used.
-      // If the DS modal is currently open, re-render its content to reflect state changes.
-      const dsOverlay = document.getElementById('dsSimulatorOverlay');
-      if (dsOverlay && dsOverlay.classList.contains('cbm-open') && typeof openDecisionSimulatorModal === 'function') {
-        openDecisionSimulatorModal();
-      }
+      // The Decision Simulator (the only consumer of the planning tools area) has
+      // been removed from the build. Kept as a no-op because several render paths
+      // still call it; safe to delete those calls in a later cleanup pass.
     }
 
     function rowPoolForKind(month, kind) {
@@ -18271,7 +16562,6 @@ function render(hint) {
       }
     });
     window.render = render;
-    window.renderDecisionSimulator = renderDecisionSimulator;
     window.addEventListener("resize", function(){ requestAnimationFrame(alignSmartInsightCards); });
     window.addEventListener("load", function(){
       setTimeout(function(){ requestAnimationFrame(alignSmartInsightCards); }, 0);
@@ -18974,18 +17264,23 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
       return profile.type === 'mostly-oneoff' ? 0.25 : (profile.type === 'mixed' ? 0.65 : 1);
     }
 
-    function recurrenceNarrative(profile) {
-      if (!profile) return '';
-      if (profile.recurrenceClass === 'recurring') {
-        return `This pattern repeated in ${Number(profile.spikeMonths || 0)} of the last ${Number(profile.monthsObserved || 0)} comparable month${Number(profile.monthsObserved || 0) === 1 ? '' : 's'}.`;
+    function recurrenceNarrative(signal) {
+      // Signal-based: describe the over/under-budget pattern the forecast uses,
+      // not spike-detection (which mislabels a chronic over-spender as "isolated").
+      if (!signal || !Number(signal.months || 0)) {
+        return 'More history is needed before this can be treated as a recurring pattern.';
       }
-      if (profile.recurrenceClass === 'occasional') {
-        return `This type of spike showed up in ${Number(profile.spikeMonths || 0)} of the last ${Number(profile.monthsObserved || 0)} comparable months, so treat it as an occasional pattern.`;
+      const months = Number(signal.months || 0);
+      const over = Number(signal.overMonths || 0);
+      const under = Number(signal.underMonths || 0);
+      const monthWord = months === 1 ? 'month' : 'months';
+      if (over >= FORECAST_DOWNWARD_GATE_MONTHS || (over >= 3 && over > under)) {
+        return `It ran over budget in ${over} of the last ${months} ${monthWord} — a repeating pattern, not a one-off.`;
       }
-      if (profile.recurrenceClass === 'one-off') {
-        return `History suggests this looks isolated so far, with only ${Number(profile.spikeMonths || 0)} spike month${Number(profile.spikeMonths || 0) === 1 ? '' : 's'} in ${Number(profile.monthsObserved || 0)} comparable months.`;
+      if (under >= FORECAST_DOWNWARD_GATE_MONTHS || (under >= 3 && under > over)) {
+        return `It stayed under budget in ${under} of the last ${months} ${monthWord} — consistently lighter than planned.`;
       }
-      return 'More history is needed before this can be treated as a recurring pattern.';
+      return `No consistent over- or under-budget pattern yet across ${months} ${monthWord}.`;
     }
 
     function behaviorRecurrenceModel(month) {
@@ -19038,26 +17333,46 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
       return result;
     }
 
+    // Per-category shared-expense (Splitwise) adjustment, shared by the budget-watch
+    // bars, the decision engine's pressure detection, and the guidance narrative so
+    // all three measure spend net of reimbursements in exactly the same way.
+    //   settledAdj = reimbursements actually received (matches the Budget Allocation
+    //                view) — used to net spend-so-far.
+    //   projAdj    = the forecast's own impact (anticipates not-yet-settled
+    //                reimbursements on open months, settled-only once rolled forward)
+    //                — used to net the projected month-end, consistent with the forecast.
+    // Positive = reimbursement (reduces cost); negative = you owed money back.
+    function categorySharedAdjustment(month, groupName) {
+      const key = (typeof allocationKeyForGroup === 'function') ? allocationKeyForGroup(groupName) : null;
+      if (!key || typeof splitwiseEnabledForGroup !== 'function' || !splitwiseEnabledForGroup(month, groupName)) {
+        return { settledAdj: 0, projAdj: 0 };
+      }
+      return {
+        settledAdj: Number(splitwiseCategoryAdjustmentForKey(month, key) || 0),
+        projAdj: Number(splitwiseBudgetImpactForKey(month, key) || 0)
+      };
+    }
+
     function historyNarrative(month, row) {
-      const hist = categoryHistoryContext(month, row);
-      const curr = Number(row.curr || 0);
-      if (!hist.count) {
-        return `${currency(curr)} logged this month — more history will sharpen the comparison.`;
+      // Describe the category's *projected* position against its budget. Uses the
+      // row's net projection (already net of shared-expense reimbursements in the
+      // decision engine) against its full budget, so this line agrees with the
+      // budget-watch bars instead of quoting a gross, variable-only figure.
+      const sig = row && row.signal;
+      if (!sig || !Number(sig.months || 0)) {
+        const curr = Number(row && row.curr || 0);
+        return `${currency(curr)} logged so far — more history will sharpen the comparison.`;
       }
-      const deltaText = signedCurrency(hist.delta);
-      const pctText = hist.baseline > 0 ? ` (${hist.pct >= 0 ? '+' : ''}${hist.pct.toFixed(0)}%)` : '';
-      let rangeText = '';
-      if (hist.count >= 4) {
-        const median = Number(hist.historicalMedian || 0);
-        const rangeDelta = curr - median;
-        const rangePct = median > 0 ? (rangeDelta / median) * 100 : 0;
-        if (Math.abs(rangePct) >= 20) {
-          rangeText = rangePct > 0
-            ? ` It is also running above its longer-term median.`
-            : ` It is also running below its longer-term median.`;
-        }
+      const projected = Number(row.projected || 0);
+      const budget = Number(row.target || 0);
+      const deltaPct = budget > 0 ? ((projected - budget) / budget) * 100 : (projected > 0 ? 100 : 0);
+      if (projected > budget && deltaPct >= 5) {
+        return `Projected to finish about ${deltaPct.toFixed(0)}% above its ${currency(budget)} budget, based on your recent pattern.`;
       }
-      return `${deltaText} vs ${hist.baselineLabel}${pctText}.${rangeText}`.trim();
+      if (projected < budget && deltaPct <= -5) {
+        return `Projected to finish about ${Math.abs(deltaPct).toFixed(0)}% below its ${currency(budget)} budget, in line with how you usually spend here.`;
+      }
+      return `Projected to finish close to its ${currency(budget)} budget.`;
     }
 
     function insightDecisionEngine(month) {
@@ -19065,11 +17380,20 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
         return !/savings/i.test(String(row.key || ''));
       });
       const totalCurrent = rows.reduce(function(sum, row) { return sum + Math.max(Number(row.curr || 0), 0); }, 0) || 1;
+      const decisionSpendSignal = categorySpendSignal(month);
       const contexts = rows.map(function(row) {
-        const projectedDelta = Number(row.projectedDelta || 0);
+        const name = cleanGroupName(row.key);
+        const adj = categorySharedAdjustment(month, name);
         const target = Math.max(Number(row.target || 0), 0);
-        const current = Math.max(Number(row.curr || 0), 0);
-        const actualDelta = Number(row.actualDelta || 0);
+        // Net of shared-expense reimbursements — settled basis for spend-so-far,
+        // the forecast's anticipated basis for the projection — so the live-issue
+        // selection and the at-risk numbers agree with the budget-watch bars and
+        // the overall forecast (both of which net shared expenses) rather than
+        // flagging a category that nets back under budget.
+        const current = Math.max(Number(row.curr || 0) - adj.settledAdj, 0);
+        const projected = Math.max(current, Number(row.projected || 0) - adj.projAdj);
+        const actualDelta = current - target;
+        const projectedDelta = projected - target;
         const actualOver = Math.max(actualDelta, 0);
         const futureRisk = Math.max(projectedDelta - actualOver, 0);
         const profile = controllabilityProfile(month, row.key);
@@ -19105,10 +17429,16 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
           (driverType !== 'open' ? 10 : 0);
 
         return Object.assign({}, row, {
+          curr: current,
+          projected: projected,
+          actualDelta: actualDelta,
+          projectedDelta: projectedDelta,
+          grossCurr: Math.max(Number(row.curr || 0), 0),
           profile: profile,
           driverType: driverType,
           capacity: capacity,
           history: history,
+          signal: decisionSpendSignal[cleanGroupName(row.key)] || null,
           share: share,
           actualOver: actualOver,
           futureRisk: futureRisk,
@@ -19160,148 +17490,99 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
       return { rows: contexts, liveIssue: liveIssue, adjustmentLever: adjustmentLever, backgroundAnomaly: backgroundAnomaly, positive: positive };
     }
 
-    // ── Category pace tile renderer ─────────────────────────────────────────
-    // variant: 'simulator' = full 4 rows + standalone narration (Decision Simulator Q7)
-    //          'guidance'  = compact 3 rows + factual one-liner (Smart Budget Guidance embed)
-    // Accepts a paceDrillData object from computeCategoryPaceData (+ groupName, groupHistAvg,
-    // bufferBasket augmented by callers). When paceData is null, renders a quiet placeholder.
-    function renderCategoryPaceTile(paceData, variant) {
-      const isGuidance = variant === 'guidance';
+    // Builds the multi-category "budget watch" bars for the Smart Budget Guidance
+    // card. Each bar reads from the same budget-aware signal as the Live Signal, so
+    // projections can't contradict the rest of the card. Returns the top few
+    // categories ranked by how far over budget they're heading.
+    function buildCategoryBudgetBars(month, monthClosed) {
+      const closed = !!monthClosed;
+      const rows = ((categoryTrendRows(month) || {}).rows || []);
+      const bars = [];
+      rows.forEach(function(r) {
+        const name = cleanGroupName(r.key);
+        if (/savings/i.test(name)) return;
+        // Full category budget (the allocation the user sets), not the variable-only
+        // slice the forecast works in — so the denominator matches the Budget
+        // Allocation view rather than excluding fixed/subscription commitments.
+        const budget = Math.max(0, Number(r.target || 0));
+        const grossSpent = Math.max(0, Number(r.curr || 0));
+        // Net out shared expenses. "Settled" = reimbursements actually received
+        // (matches the Budget Allocation view); "impact" additionally anticipates
+        // not-yet-settled reimbursements on open months (matches the forecast). On
+        // closed months the two collapse to the same value (settled basis). Positive
+        // adjustment = reimbursement (reduces cost); negative = you owed money back.
+        const adj = categorySharedAdjustment(month, name);
+        const settledAdj = adj.settledAdj;
+        const projAdj = adj.projAdj;
+        const spent = Math.max(0, grossSpent - settledAdj);
+        const projGross = Math.max(0, Number(r.projected || 0));
+        const projected = closed ? spent : Math.max(spent, projGross - projAdj);
+        if (budget <= 0 && spent <= 0 && projected <= 0) return;
+        const gap = projected - budget;
+        const pct = budget > 0 ? (projected / budget) * 100 : (projected > 0 ? 999 : 0);
+        bars.push({
+          name: name,
+          spent: spent,
+          budget: budget,
+          projected: projected,
+          gap: gap,
+          pct: Math.round(pct),
+          over: budget > 0 && pct > 102,
+          under: budget > 0 && pct < 98
+        });
+      });
+      // Surface the categories worth looking at: anything over budget first
+      // (most over first), then the meaningful spenders ranked by how close they
+      // are to their budget. Categories sitting exactly on budget (typically
+      // fully-committed fixed costs) are shown only to fill remaining slots, so
+      // they don't crowd out the ones that actually moved.
+      const over = bars.filter(function(b) { return b.over; }).sort(function(a, b) { return b.pct - a.pct; });
+      const movers = bars.filter(function(b) { return !b.over && b.under && b.spent > 0; }).sort(function(a, b) { return b.pct - a.pct; });
+      const rest = bars.filter(function(b) { return !b.over && !(b.under && b.spent > 0); }).sort(function(a, b) { return b.gap - a.gap; });
+      const ordered = over.concat(movers, rest);
+      return { closed: closed, bars: ordered.slice(0, 4) };
+    }
 
-      // ── Placeholder state (no live issue / no data) ──────────────────────
-      if (!paceData) {
-        const placeholderRows = [
-          '<div class="cpace-row"><span>Spent so far</span><div class="cpace-val"><strong>—</strong></div></div>',
-          '<div class="cpace-row"><span>Projected month-end</span><div class="cpace-val"><strong>—</strong></div></div>',
-          '<div class="cpace-row"><span>vs allocation</span><div class="cpace-val"><strong>—</strong></div></div>'
-        ].join('');
-        const placeholderNote = isGuidance
-          ? '<div class="cpace-note">No live category pressure detected — check back as the month progresses.</div>'
-          : '';
-        return '<div class="cpace-tile cpace-' + variant + ' cpace-empty">' +
-          '<div class="cpace-eyebrow">Category forecast</div>' +
-          placeholderRows + placeholderNote +
+    // Renders the budget-watch bars. Bullet style: light segment = projected, dark
+    // segment = spent so far, vertical line = budget. Over budget = coral, on/under
+    // budget = green. Reuses the existing .cpace-tile.cpace-guidance shell so it
+    // themes correctly (incl. dark mode).
+    function renderCategoryBudgetBars(data) {
+      const bars = (data && data.bars) ? data.bars : [];
+      if (!bars.length) {
+        return '<div class="cpace-tile cpace-guidance cpace-empty">' +
+          '<div class="cpace-eyebrow">Category budget watch</div>' +
+          '<div class="cpace-note">No category budgets to track yet — add a few to see how each is pacing.</div>' +
         '</div>';
       }
-
-      const pd = paceData;
-      const rows = [];
-
-      // Row 1: Spent so far + % of month elapsed context
-      const spentPct = pd.allocationBase > 0 ? Math.round((pd.spentSoFar / pd.allocationBase) * 100) : 0;
-      const spentCls = spentPct > 100 ? 'cpace-neg' : '';
-      rows.push('<div class="cpace-row">' +
-        '<span>Spent so far <span class="cpace-sub">(' + pd.pctThrough + '% of month)</span></span>' +
-        '<div class="cpace-val">' +
-          '<strong class="' + spentCls + '">' + currency(Math.round(pd.spentSoFar)) + '</strong>' +
-          '<span class="cpace-delta">' + spentPct + '% of ' + (pd.hasAllocation ? 'alloc.' : 'avg') + '</span>' +
-        '</div></div>');
-
-      // Row 2: Projected month-end, one-off callout when meaningful
-      const projCls = pd.isOver ? 'cpace-neg' : pd.isUnder ? 'cpace-pos' : '';
-      const oneoffNote = pd.oneoffActual > 10
-        ? '<span class="cpace-delta">incl. ' + currency(Math.round(pd.oneoffActual)) + ' one-off</span>'
-        : '';
-      rows.push('<div class="cpace-row">' +
-        '<span>Projected month-end</span>' +
-        '<div class="cpace-val">' +
-          '<strong class="' + projCls + '">' + currency(Math.round(pd.projectedTotal)) + '</strong>' +
-          oneoffNote +
-        '</div></div>');
-
-      // Row 3: vs allocation / average
-      const gapCls = pd.isOver ? 'cpace-neg' : pd.isUnder ? 'cpace-pos' : '';
-      const gapSign = pd.isOver ? '+' : pd.isUnder ? '−' : '';
-      const gapVerdict = pd.isOver ? 'over ' + (pd.hasAllocation ? 'alloc.' : 'avg')
-        : pd.isUnder ? 'under ' + (pd.hasAllocation ? 'alloc.' : 'avg')
-        : 'on track';
-      rows.push('<div class="cpace-row">' +
-        '<span>vs ' + (pd.hasAllocation ? 'allocation' : 'average') + '</span>' +
-        '<div class="cpace-val">' +
-          '<strong class="' + gapCls + '">' + gapSign + currency(Math.abs(Math.round(pd.projectedVsAllocation))) + '</strong>' +
-          '<span class="cpace-delta ' + gapCls + '">' + gapVerdict + '</span>' +
-        '</div></div>');
-
-      // Row 4: buffer / redirect (simulator variant only)
-      if (!isGuidance) {
-        const bufferBasket = pd.bufferBasket || [];
-        if (pd.isOver && bufferBasket.length > 0) {
-          const topBuf = bufferBasket[0];
-          rows.push('<div class="cpace-row">' +
-            '<span>Best available buffer</span>' +
-            '<div class="cpace-val">' +
-              '<strong>' + escapeHtml(topBuf.label) + '</strong>' +
-              '<span class="cpace-delta">' + currency(Math.round(topBuf.allocDelta || topBuf.base || 0)) + ' headroom</span>' +
-            '</div></div>');
-        } else if (pd.isUnder) {
-          rows.push('<div class="cpace-row">' +
-            '<span>Redirect to</span>' +
-            '<div class="cpace-val">' +
-              '<strong class="cpace-pos">Savings</strong>' +
-              '<span class="cpace-delta">' + currency(Math.abs(Math.round(pd.projectedVsAllocation))) + ' available</span>' +
-            '</div></div>');
-        }
-      }
-
-      // ── Narration ────────────────────────────────────────────────────────
-      let narration = '';
-      const projStr = currency(Math.round(pd.projectedTotal));
-      const allocStr = currency(Math.round(pd.allocationBase));
-      const gapStr = currency(Math.abs(Math.round(pd.projectedVsAllocation)));
-      const groupName = pd.groupName || '';
-
-      if (isGuidance) {
-        // Compact factual text — category already named in Guidance card above
-        if (pd.isOver) {
-          narration = 'Projected to finish <strong>' + gapStr + ' over</strong> allocation at ' + projStr + '.';
-          if (pd.oneoffActual > 10) {
-            const recurringProj = Math.round(pd.projectedTotal - pd.projectedOneoff - pd.oneoffActual);
-            narration += ' Recurring pace alone: <strong>' + currency(recurringProj) + '</strong>; one-off items account for ' + currency(Math.round(pd.oneoffActual)) + '.';
-          }
-        } else if (pd.isUnder) {
-          narration = 'Tracking <strong>' + gapStr + ' under</strong> allocation — ' + projStr + ' projected.';
-        } else {
-          narration = 'Pacing within allocation. Projected at <strong>' + projStr + '</strong>.';
-        }
-      } else {
-        // Full standalone narration for Decision Simulator
-        const bufferBasket = pd.bufferBasket || [];
-        if (pd.isOver) {
-          narration = '<strong>' + escapeHtml(groupName) + '</strong> is projected to finish at <strong>' + projStr + '</strong>, <strong>' + gapStr + ' over</strong> its ' + (pd.hasAllocation ? 'allocation' : 'average') + '.';
-          if (pd.oneoffActual > 10) {
-            const recurringProj = Math.round(pd.projectedTotal - pd.projectedOneoff - pd.oneoffActual);
-            narration += ' Stripping one-off items (<strong>' + currency(Math.round(pd.oneoffActual)) + '</strong>), recurring pace alone projects to <strong>' + currency(recurringProj) + '</strong>.';
-          }
-          if (bufferBasket.length > 0) {
-            const bufParts = bufferBasket.map(function(b) {
-              return '<strong>' + escapeHtml(b.label) + '</strong> (' + currency(Math.round(b.allocDelta || b.base || 0)) + ' headroom)';
-            });
-            narration += ' Most available buffer: ' + bufParts.join(' and ') + '.';
-          }
-        } else if (pd.isUnder) {
-          narration = '<strong>' + escapeHtml(groupName) + '</strong> is tracking <strong>' + gapStr + ' under</strong> its ' + (pd.hasAllocation ? 'allocation' : 'average') + ' — projected at <strong>' + projStr + '</strong>.';
-          if (pd.groupHistAvg != null && pd.groupHistAvg > 0) {
-            const vsHist = pd.projectedTotal - pd.groupHistAvg;
-            narration += vsHist < -10
-              ? ' Also <strong>below historical average</strong> of ' + currency(Math.round(pd.groupHistAvg)) + ' — underspend looks real.'
-              : ' Historical average is ' + currency(Math.round(pd.groupHistAvg)) + ' — broadly consistent.';
-          }
-          narration += ' Freed budget is best directed to <strong>savings</strong> first.';
-        } else {
-          narration = '<strong>' + escapeHtml(groupName) + '</strong> is pacing cleanly — projected at <strong>' + projStr + '</strong> vs ' + allocStr + ' ' + (pd.hasAllocation ? 'allocation' : 'average') + '. No action needed.';
-        }
-      }
-
-      const narrationHtml = narration
-        ? '<div class="cpace-narration">' + narration + '</div>'
-        : '';
-
-      return '<div class="cpace-tile cpace-' + variant + (pd.isOver ? ' cpace-over' : pd.isUnder ? ' cpace-under' : '') + '">' +
-        '<div class="cpace-eyebrow">Category forecast' +
-          (pd.groupName ? ' <span class="cpace-cat-name">· ' + escapeHtml(pd.groupName) + '</span>' : '') +
-        '</div>' +
-        rows.join('') +
-        narrationHtml +
+      const BUDGET_X = 68; // budget line sits at 68% of the track, leaving room to show overruns
+      const eyebrow = data.closed ? 'Category budget watch · final' : 'Category budget watch';
+      let rowsHtml = '';
+      bars.forEach(function(b) {
+        const scale = b.budget > 0 ? (BUDGET_X / b.budget) : 0;
+        const projW = b.budget > 0 ? Math.min(100, b.projected * scale) : (b.projected > 0 ? 100 : 0);
+        const spentW = b.budget > 0 ? Math.min(100, b.spent * scale) : 0;
+        const light = b.over ? 'rgba(196,112,93,0.32)' : 'rgba(31,106,75,0.26)';
+        const dark = b.over ? 'rgba(196,112,93,0.95)' : 'rgba(31,106,75,0.85)';
+        const labelColor = b.over ? 'var(--tone-bad-text)' : b.under ? 'var(--tone-good-text)' : 'var(--muted)';
+        const label = b.pct >= 999 ? 'no budget' : (b.pct + '%');
+        rowsHtml +=
+          '<div style="margin-bottom:8px;">' +
+            '<div style="display:flex; justify-content:space-between; align-items:baseline; font-size:0.64rem; margin-bottom:3px;">' +
+              '<span style="color:var(--accent-text);">' + escapeHtml(b.name) + '</span>' +
+              '<span style="font-family:\'Geist Mono\',monospace; font-weight:700; font-size:0.62rem; color:' + labelColor + ';">' + label + '</span>' +
+            '</div>' +
+            '<div style="position:relative; height:13px; background:rgba(65,83,100,0.10); border-radius:4px; overflow:hidden;">' +
+              '<div style="position:absolute; left:0; top:0; bottom:0; width:' + projW.toFixed(1) + '%; background:' + light + '; border-radius:4px;"></div>' +
+              (spentW > 0 ? '<div style="position:absolute; left:0; top:0; bottom:0; width:' + spentW.toFixed(1) + '%; background:' + dark + '; border-radius:4px 0 0 4px;"></div>' : '') +
+              '<div style="position:absolute; left:' + BUDGET_X + '%; top:-1px; bottom:-1px; width:2px; background:var(--accent-text); opacity:0.55;"></div>' +
+            '</div>' +
+          '</div>';
+      });
+      return '<div class="cpace-tile cpace-guidance">' +
+        '<div class="cpace-eyebrow">' + eyebrow + '</div>' +
+        '<div style="font-size:0.54rem; color:var(--muted); margin-bottom:8px; letter-spacing:0.02em;">filled = spent · light = projected · line = budget</div>' +
+        rowsHtml +
       '</div>';
     }
 
@@ -19372,6 +17653,12 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
         trackNote: pace.trackNote
       };
 
+      // Signal-based focus tile shown in the Smart Budget Guidance card (replaces
+      // the old linear-pace "Category forecast" widget). It reads from the same
+      // budget-aware signal as the Live Signal text, so its numbers stay
+      // consistent with the rest of the card instead of contradicting it.
+      result.budgetBars = buildCategoryBudgetBars(month, monthClosed);
+
       if (monthClosed) {
         result.title = 'Month closed';
         result.priority = '#1 Final read: Month summary';
@@ -19424,7 +17711,7 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
         result.priority = topRisk ? `#1 Live issue: ${topRisk.key}` : '#1 Live issue: Overall variable spend';
         result.headline = `Month-end available budget is projected at ${currency(forecast.projectedAvailableEnd)}.`;
         result.driver = topRisk
-          ? `${topRisk.key} is already ${currency(Math.max(Number(topRisk.actualOver || 0), 0))} above target, with ${currency(Math.max(Number(topRisk.futureRisk || 0), 0))} more at risk if pace continues. ${historyNarrative(month, topRisk)} ${controllabilityExplanation(topRisk.profile)}.`
+          ? `${topRisk.key} has used ${currency(Math.max(Number(topRisk.curr || 0), 0))} so far, with ${currency(Math.max(Number(topRisk.futureRisk || 0), 0))} more at risk if the pace holds. ${historyNarrative(month, topRisk)} ${recurrenceNarrative(topRisk.signal)}`.trim()
           : `${currency(forecast.fixedRemaining)} of fixed costs still remain, while current variable spending pace projects another ${currency(forecast.projectedVariable)} before month-end.`;
         result.impact = lever && topRisk && lever.key !== topRisk.key
           ? `${topRisk.key} is the cause, but ${lever.key} is the better live adjustment lever with about ${currency(lever.capacity)} still controllable.`
@@ -19593,6 +17880,7 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
     function budgetAdjustmentAdvisor(month) {
       const allocation = allocationRows(month);
       const availableFunds = Math.max(Number(allocation.availableFunds || 0), 1);
+      const spendSignal = categorySpendSignal(month, { allocation: allocation });
       const base = monthBudgetBase(month);
       const subscriptionBurden = subscriptionBurdenModel(month, base);
       const decision = insightDecisionEngine(month);
@@ -19634,22 +17922,22 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
         const currentPct = Math.max(Number(row.target || 0), 0);
         const currentSpend = Math.max(Number(trendRow.curr || row.actual || 0), 0);
         const projected = Math.max(Number(trendRow.projected || currentSpend), currentSpend);
-        const historyAnchor = hist.count >= 3
-          ? (Number(hist.recentAvg || 0) * 0.65 + Number(hist.historicalMedian || 0) * 0.35)
-          : (hist.count >= 1 ? Number(hist.baseline || 0) : currentSpend);
-
-        let suggestedAmount = planningMode
-          ? (historyAnchor * 0.7 + projected * 0.3)
-          : (historyAnchor * 0.8 + projected * 0.2);
-
-        if (hist.count === 0 && planningMode) suggestedAmount = Math.max(currentAmount, currentSpend);
-        if (profile.recurrenceClass === 'one-off' || profile.type === 'mostly-oneoff') {
+        // The recommendation is driven entirely by the shared budget-aware signal —
+        // the same source the forecast uses — so the Advisor and the forecast can
+        // never disagree. The signal models *variable* expected spend; add back the
+        // category's fixed/subscription commitment to compare against the full
+        // allocation. It already absorbs occasional/erratic patterns (low confidence
+        // holds at budget) and chronic overspend (trusted upward). The signal
+        // resolves for every eligible category in every month (verified), so the old
+        // history/projection fallback was unreachable and has been removed; the else
+        // is a defensive no-op only.
+        const sig = spendSignal[key];
+        let suggestedAmount;
+        if (sig) {
+          const fixedCommitment = Math.max(0, currentAmount - Number(sig.variableBudget || 0));
+          suggestedAmount = Math.max(0, Number(sig.expected || 0) + fixedCommitment);
+        } else {
           suggestedAmount = currentAmount;
-        } else if (profile.recurrenceClass === 'occasional' || profile.type === 'mixed') {
-          suggestedAmount = currentAmount * 0.45 + suggestedAmount * 0.55;
-        }
-        if (!planningMode && (Number(trendRow.actualOver || 0) > 0 || Number(trendRow.futureRisk || 0) > 0) && profile.type === 'repeatable') {
-          suggestedAmount = Math.max(suggestedAmount, currentAmount + Number(trendRow.futureRisk || 0) * 0.35 + Number(trendRow.actualOver || 0) * 0.2);
         }
 
         suggestedAmount = Math.max(0, suggestedAmount);
@@ -19662,9 +17950,7 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
         let action = 'keep';
         let actionLabel = `Keep ${key} unchanged`;
         let tone = 'keep';
-        if ((profile.type === 'mostly-oneoff' || profile.recurrenceClass === 'one-off') && absPct >= tolerancePct) {
-          action = 'keep';
-        } else if (deltaPct > tolerancePct) {
+        if (deltaPct > tolerancePct) {
           action = 'increase';
           actionLabel = `Increase ${key}`;
           tone = 'raise';
@@ -19685,7 +17971,7 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
           if (currentSpend > hist.baseline * 1.12) reinforcement = `Recurring pressure vs ${hist.baselineLabel}.`;
           else if (currentSpend < hist.baseline * 0.88) reinforcement = `Below recent norm vs ${hist.baselineLabel}.`;
         }
-        const recurrenceNote = recurrenceNarrative(profile);
+        const recurrenceNote = recurrenceNarrative(sig);
 
         let meta = '';
         if (action === 'increase') {
@@ -19983,12 +18269,11 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
           const actualOver = Math.max(Number(topRisk.actualOver || topRisk.actualDelta || 0), 0);
           const actualUnder = Math.max(Math.abs(Math.min(Number(topRisk.actualDelta || 0), 0)), 0);
           const riskAmount = actualOver > 0 ? actualOver : actualUnder;
-          const patternMatch = (forecastContext.patterns || []).find(function(entry) { return entry.category === topRisk.key; });
           pushInsight(
             actualOver > Math.max(60, Number(topRisk.target || 0) * 0.12) ? 'bad' : (actualOver > 0 ? 'warn' : 'good'),
             actualOver > 0
-              ? `${topRisk.key} was the clearest late-month pressure point, finishing ${currency(actualOver)} above target.${patternMatch ? ' ' + patternMatch.reinforcement : ''} ${recurrenceNarrative(topRisk.profile)}`.trim()
-              : `${topRisk.key} stood out in the final mix, closing about ${currency(riskAmount)} under target.${patternMatch ? ' ' + patternMatch.reinforcement : ''} ${recurrenceNarrative(topRisk.profile)}`.trim(),
+              ? `${topRisk.key} was the clearest late-month pressure point, finishing ${currency(actualOver)} above target. ${recurrenceNarrative(topRisk.signal)}`.trim()
+              : `${topRisk.key} stood out in the final mix, closing about ${currency(riskAmount)} under target. ${recurrenceNarrative(topRisk.signal)}`.trim(),
             riskAmount
           );
         } else if (positive) {
@@ -20031,64 +18316,135 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
         return insights.slice(0, 3);
       }
 
-      if (decision.liveIssue) {
-        const actualOver = Math.max(Number(decision.liveIssue.actualOver || 0), 0);
-        const futureRisk = Math.max(Number(decision.liveIssue.futureRisk || 0), 0);
-        const patternMatch = (forecastContext.patterns || []).find(function(entry) { return entry.category === decision.liveIssue.key; });
-        pushInsight(
-          (actualOver + futureRisk) > Math.max(60, Number(decision.liveIssue.target || 0) * 0.12) ? 'bad' : 'warn',
-          `${decision.liveIssue.key} is the main live issue: already ${currency(actualOver)} above target, with ${currency(futureRisk)} more at risk if pace holds. ${historyNarrative(month, decision.liveIssue)} ${recurrenceNarrative(decision.liveIssue.profile)}${patternMatch ? ' ' + patternMatch.reinforcement : ''}`.trim(),
-          Math.abs(actualOver + futureRisk)
-        );
-      }
-      if (decision.adjustmentLever) {
-        const patternMatch = (forecastContext.patterns || []).find(function(entry) { return entry.category === decision.adjustmentLever.key; });
-        pushInsight(
-          'good',
-          `${decision.adjustmentLever.key} is the best current lever, with about ${currency(Math.max(Number(decision.adjustmentLever.capacity || 0), 0))} still realistically controllable. ${recurrenceNarrative(decision.adjustmentLever.profile)}${patternMatch ? ' ' + patternMatch.reinforcement : ''}`.trim(),
-          Math.abs(Number(decision.adjustmentLever.capacity || 0))
-        );
-      } else if (decision.backgroundAnomaly) {
-        pushInsight(
-          Number(decision.backgroundAnomaly.pctChange || 0) > 0 ? 'warn' : 'good',
-          `${decision.backgroundAnomaly.key} is the clearest background anomaly — unusual versus ${decision.backgroundAnomaly.history.baselineLabel}, but not the main live problem. ${recurrenceNarrative(decision.backgroundAnomaly.profile)}`.trim(),
-          Math.abs(Number(decision.backgroundAnomaly.anomalyScore || 0))
-        );
-      } else if (decision.positive) {
-        pushInsight(
-          'good',
-          `${decision.positive.key} is helping most, tracking ${currency(Math.abs(Number(decision.positive.projectedDelta || 0)))} under target.`,
-          Math.abs(Number(decision.positive.projectedDelta || 0))
-        );
+      // ── Live month: complementary, net-of-reimbursement signals ──────────
+      // Surface what stands out *besides* the guidance card's live issue. Each
+      // candidate is tagged by what it actually is (not a positional Do now /
+      // Watch / Next month slot), computed net of shared-expense reimbursements,
+      // and only added when genuinely notable. No filler rows.
+      const liveKey = decision.liveIssue ? cleanGroupName(decision.liveIssue.key) : null;
+      const trendRows = (categoryTrendRows(month).rows || []).filter(function(r) {
+        return !/savings/i.test(String(r.key || ''));
+      });
+      const sigMap = categorySpendSignal(month) || {};
+      const candidates = [];
+      const usedCats = new Set();
+      function consider(cand) {
+        if (!cand || !cand.copy) return;
+        const cat = cand.category ? cleanGroupName(cand.category) : null;
+        if (cat && liveKey && cat === liveKey) return;   // stay complementary to the guidance card
+        if (cat && usedCats.has(cat)) return;             // one signal per category
+        if (cat) usedCats.add(cat);
+        candidates.push(cand);
       }
 
-      if (insights.length < 3) {
-        addSubscriptionInsight();
+      // Coming up — subscriptions already scheduled for next month
+      (function() {
+        const sig = subscriptionBehaviorSignal(month, subscriptionBurden);
+        if (sig && /scheduled for/i.test(String(sig.message || ''))) {
+          consider({
+            kind: 'upcoming', tag: 'Coming up', tone: 'warn', strength: Number(sig.strength || 0),
+            copy: rewriteBehaviorInsightMessage(sig.message, 'tile'),
+            fullCopy: rewriteBehaviorInsightMessage(sig.message, 'hero')
+          });
+        }
+      })();
+
+      // Reimbursed — a category that net-received money this month (refunds/reimbursements)
+      trendRows.forEach(function(r) {
+        const name = cleanGroupName(r.key);
+        const adj = categorySharedAdjustment(month, name);
+        const netActual = Number(r.curr || 0) - adj.settledAdj;
+        if (netActual < -15) {
+          consider({
+            kind: 'reimbursed', category: name, tag: 'Reimbursed', tone: 'good', strength: 60 + Math.abs(netActual),
+            copy: `${name} got ${currency(Math.abs(netActual))} more back in reimbursements than it spent this month, so it added nothing to your spending.`
+          });
+        }
+      });
+
+      // Recurring — a category with a strong monthly over/under pattern, shown net this month
+      trendRows.forEach(function(r) {
+        const name = cleanGroupName(r.key);
+        const s = sigMap[name];
+        if (!s || Number(s.months || 0) < 3) return;
+        const over = Number(s.overMonths || 0);
+        const under = Number(s.underMonths || 0);
+        const mo = Number(s.months || 0);
+        if (over < 3 && under < 3) return;
+        const adj = categorySharedAdjustment(month, name);
+        const target = Math.max(0, Number(r.target || 0));
+        const netProj = Math.max(0, Number(r.projected || 0) - adj.projAdj);
+        const netPct = target > 0 ? Math.round((netProj / target) * 100) : 0;
+        const overPattern = over >= under;
+        const cnt = overPattern ? over : under;
+        // A recurring under-spender that's simply on budget this month isn't notable.
+        if (!overPattern && netPct >= 92) return;
+        const tail = overPattern
+          ? (netPct > 102 ? `and it's heading ${netPct}% again this month` : `but it nets to budget this month`)
+          : `and it's lighter than planned again (${netPct}%)`;
+        consider({
+          kind: 'recurring', category: name, tag: 'Recurring', tone: overPattern ? 'warn' : 'good', strength: 40 + cnt * 6,
+          copy: `${name} runs ${overPattern ? 'over' : 'under'} budget in ${cnt} of the last ${mo} months — ${tail}.`
+        });
+      });
+
+      // Room to trim — the most controllable lever (net capacity)
+      if (decision.adjustmentLever) {
+        const cap = Math.max(0, Number(decision.adjustmentLever.capacity || 0));
+        if (cap > 10) {
+          consider({
+            kind: 'lever', category: decision.adjustmentLever.key, tag: 'Room to trim', tone: 'good', strength: cap,
+            copy: `${decision.adjustmentLever.key} has about ${currency(cap)} you could still trim if you need to recover budget.`
+          });
+        }
       }
-      if (insights.length < 3) {
-        addContextInsight();
+
+      // Ahead — a category comfortably under budget
+      if (decision.positive) {
+        const under = Math.abs(Number(decision.positive.projectedDelta || 0));
+        if (under > 10) {
+          consider({
+            kind: 'ahead', category: decision.positive.key, tag: 'Ahead', tone: 'good', strength: under,
+            copy: `${decision.positive.key} is tracking ${currency(under)} under budget.`
+          });
+        }
       }
-      if (insights.length < 3 && decision.backgroundAnomaly) {
-        pushInsight(
-          Number(decision.backgroundAnomaly.pctChange || 0) > 0 ? 'warn' : 'good',
-          `${decision.backgroundAnomaly.key} is the clearest background anomaly — unusual versus ${decision.backgroundAnomaly.history.baselineLabel}, but not the main live problem. ${recurrenceNarrative(decision.backgroundAnomaly.profile)}`.trim(),
-          Math.abs(Number(decision.backgroundAnomaly.anomalyScore || 0))
-        );
+
+      // Unusual — a background anomaly versus the category's own history
+      if (decision.backgroundAnomaly) {
+        const an = decision.backgroundAnomaly;
+        consider({
+          kind: 'anomaly', category: an.key, tag: 'Unusual', tone: Number(an.pctChange || 0) > 0 ? 'warn' : 'good',
+          strength: Math.abs(Number(an.anomalyScore || 0)),
+          copy: `${an.key} moved unusually versus ${an.history ? an.history.baselineLabel : 'its usual pattern'} — worth a look, though not the main issue.`
+        });
       }
-      if (insights.length < 3 && decision.positive) {
-        pushInsight(
-          'good',
-          `${decision.positive.key} is helping most, tracking ${currency(Math.abs(Number(decision.positive.projectedDelta || 0)))} under target.`,
-          Math.abs(Number(decision.positive.projectedDelta || 0))
-        );
+
+      // Keep the strongest of each kind so the card stays varied (never two
+      // "Recurring" tiles, etc.), then take the top three overall.
+      const bestByKind = {};
+      candidates.forEach(function(c) {
+        if (!bestByKind[c.kind] || Number(c.strength || 0) > Number(bestByKind[c.kind].strength || 0)) {
+          bestByKind[c.kind] = c;
+        }
+      });
+      // Rank by how useful each kind is for a "what stands out" scan (concrete,
+      // forward-looking, and pattern signals first; vague anomalies last), with
+      // strength only as a tiebreaker — kinds live on different numeric scales.
+      const KIND_PRIORITY = { upcoming: 6, reimbursed: 5, recurring: 4, lever: 3, ahead: 2, anomaly: 1 };
+      const picked = Object.keys(bestByKind).map(function(k) { return bestByKind[k]; })
+        .sort(function(a, b) {
+          return (Number(KIND_PRIORITY[b.kind] || 0) - Number(KIND_PRIORITY[a.kind] || 0))
+            || (Number(b.strength || 0) - Number(a.strength || 0));
+        })
+        .slice(0, 3);
+      if (!picked.length) {
+        picked.push({
+          kind: 'steady', tag: 'Steady', tone: 'good', strength: 0,
+          copy: 'Nothing notable beyond the live issue — spending is broadly tracking to plan.'
+        });
       }
-      if (insights.length < 3) {
-        pushInsight('good', `Advisor reinforcement: ${forecastContext.advisorReinforcement}`, 35);
-      }
-      if (!insights.length) {
-        pushInsight('good', 'No major behavior signals this month — spending is broadly tracking to plan.', 0);
-      }
-      return insights.slice(0, 3);
+      return picked;
     }
 
     const __insightWrap = document.getElementById("insightGrid");

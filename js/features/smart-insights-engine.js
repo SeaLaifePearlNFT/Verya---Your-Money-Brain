@@ -89,28 +89,6 @@
   function getDecision(month){
     return call(function(){ return insightDecisionEngine(month); }, null);
   }
-  function getGuidancePace(month, decision){
-    return call(function(){
-      var dec = decision || insightDecisionEngine(month);
-      var liveKey = dec && dec.liveIssue ? 'expense-group|' + dec.liveIssue.key : null;
-      var catKey = liveKey || (function(){
-        var opts = planningBucketOptions(month).filter(function(o){
-          return o.bucketType === 'expense' && o.key.indexOf('expense-group|') === 0;
-        });
-        return opts.length ? opts.sort(function(a,b){ return (b.current||0)-(a.current||0); })[0].key : null;
-      })();
-      if (!catKey) return { data: null, mode: 'guidance', hasLiveIssue: false };
-      var pd = computeCategoryPaceData(month, catKey);
-      var grpOpt = planningBucketOptions(month).find(function(o){ return o.key === catKey; });
-      var groupName = grpOpt ? grpOpt.label.replace('Expenses / ','').replace('Expenses/','').trim() : catKey.replace('expense-group|','');
-      return {
-        data: Object.assign({}, pd, { groupName: groupName, groupHistAvg: null, bufferBasket: [] }),
-        mode: 'guidance',
-        hasLiveIssue: !!liveKey,
-        categoryKey: catKey
-      };
-    }, { data: null, mode: 'guidance', hasLiveIssue: false });
-  }
   function getBehaviorIntelligence(month){
     var rows = call(function(){ return intelligenceInsightsForBehaviorCard(month); }, []);
     return Array.isArray(rows) ? rows : [];
@@ -146,6 +124,7 @@
       var forecastLockDateText = forecastLockDateLabel(month, forecastLockDay);
       var lockedForecast = ensureLockedForecastSnapshot(month, forecast);
       var forecastLocked = Boolean(lockedForecast);
+      var forecastLockIsLegacy = forecastLocked && String((lockedForecast && lockedForecast.trustLevel) || '') === 'legacy';
       var preLockWindow = !forecastLocked && Number(forecast.currentDay || 0) < forecastLockDay;
       var forecastReference = forecastLocked ? lockedForecast : forecast;
       var forecastStateMeta = resolvedDashboardStateMeta(
@@ -167,7 +146,7 @@
           })
         : Object.assign({}, burn, { forecastEndPct: forecastUsedPctForEvaluation });
       var forecastHeadlineAmount = monthClosed
-        ? Number((forecastLocked ? lockedForecast.projectedAvailableEnd : forecast.projectedAvailableEnd) || 0)
+        ? closedForecastFinalAmount
         : Number(forecastReference.projectedAvailableEnd || 0);
       var comparisonProjectedEnd = monthClosed
         ? closedForecastFinalAmount
@@ -175,39 +154,64 @@
       var forecastGapVsLock = forecastLocked
         ? comparisonProjectedEnd - Number(lockedForecast.projectedAvailableEnd || 0)
         : 0;
+      var forecastAccuracy = forecastLocked && typeof forecastAccuracyModel === 'function'
+        ? forecastAccuracyModel(month, lockedForecast, comparisonProjectedEnd)
+        : null;
+      var confidenceMeta = (model && model.confidenceMeta) || (forecast && forecast.forecastConfidenceMeta) || {};
+      var confidencePct = Number((confidenceMeta && confidenceMeta.pct) || (model && model.forecastConfidencePct) || 0);
+      var confidenceLabel = (confidenceMeta && confidenceMeta.label) || (model && model.confidenceLabel) || (confidencePct >= 75 ? 'High confidence' : (confidencePct >= 50 ? 'Medium confidence' : 'Low confidence'));
+      var confidenceTone = (confidenceMeta && confidenceMeta.tone) || (confidencePct >= 75 ? 'good' : (confidencePct >= 50 ? 'warn' : 'bad'));
+      var confidenceSupport = (confidenceMeta && confidenceMeta.support) || 'Based on month progress, recurring expenses, savings, and spending history.';
       var driftDir = forecastDriftDirection(month);
       var driftArrowHtml = '<span class="forecast-drift-arrow ' + (driftDir.cls || '') + '" title="' + (driftDir.title || '') + '">' + (driftDir.arrow || '') + '</span>';
-      var primaryMetrics = [
+      var primaryMetrics = monthClosed ? [
+        {
+          theme: 'theme-status',
+          tone: forecastLocked ? 'good' : '',
+          label: 'Locked forecast',
+          value: forecastLocked ? money(Number(lockedForecast.projectedAvailableEnd || 0)) : 'N/A',
+          support: forecastLocked
+            ? (forecastLockIsLegacy ? 'Historical lock restored from legacy data' : 'Day-' + forecastLockDay + ' expectation captured for ' + (month.name || 'this month'))
+            : 'No forecast lock was captured for comparison'
+        },
+        {
+          theme: 'theme-live',
+          tone: closedForecastFinalAmount >= 0 ? 'good' : 'bad',
+          label: 'Final result',
+          value: money(closedForecastFinalAmount),
+          support: monthEndOutcome.hasRolloverImpact ? 'Closing result before rollover transfer' : 'Final remaining allocation'
+        },
+        {
+          theme: 'theme-plan',
+          tone: forecastAccuracy ? forecastAccuracy.tone : '',
+          label: 'Forecast accuracy',
+          value: forecastAccuracy ? ((forecastAccuracy.label ? forecastAccuracy.label + ' · ' : '') + forecastAccuracy.pct + '%') : 'N/A',
+          support: forecastLocked ? ((forecastAccuracy && forecastAccuracy.support ? forecastAccuracy.support + ' · ' : '') + 'Variance ' + (forecastGapVsLock >= 0 ? '+' : '') + money(forecastGapVsLock) + (forecastLockIsLegacy ? ' vs restored legacy lock' : ' vs locked forecast')) : 'No lock available for comparison',
+          driftArrow: forecastLocked ? driftArrowHtml : ''
+        }
+      ] : [
         {
           theme: 'theme-status',
           tone: preLockWindow ? '' : 'good',
           label: 'Forecast status',
-          value: forecastLocked ? 'Locked' : 'Open',
+          value: forecastLocked ? (forecastLockIsLegacy ? 'Legacy lock' : 'Locked') : 'Open',
           support: forecastLocked
-            ? 'Reference forecast saved for ' + (month.name || 'this month')
+            ? (forecastLockIsLegacy ? 'Restored historical reference for ' + (month.name || 'this month') : 'Reference forecast saved for ' + (month.name || 'this month'))
             : Math.max(forecastLockDay - Number(forecast.currentDay || 0), 0) + ' day' + (Math.max(forecastLockDay - Number(forecast.currentDay || 0), 0) === 1 ? '' : 's') + ' until lock'
         },
         {
           theme: 'theme-live',
-          tone: monthClosed ? (forecastGapVsLock >= 0 ? 'good' : 'bad') : ((Number(forecast.projectedAvailableEnd || 0) - Number(forecastReference.projectedAvailableEnd || 0)) >= 0 ? 'good' : 'bad'),
-          label: monthClosed ? 'Final result' : (forecastLocked ? 'Live projection now' : 'Current pace'),
-          value: monthClosed
-            ? money(closedForecastFinalAmount)
-            : (forecastLocked ? money(Number(forecast.projectedAvailableEnd || 0)) : money(model.currentPace) + '/day'),
-          support: monthClosed
-            ? (monthEndOutcome.hasRolloverImpact ? 'Closing result before rollover transfer' : 'Final remaining allocation')
-            : (forecastLocked
-              ? 'Updated end-of-month projection' + (Number(forecast.projectedSavingsReserveRemaining || 0) > 0 ? ' after ' + money(Number(forecast.projectedSavingsReserveRemaining || 0)) + ' savings reserve' : '')
-              : money(model.paceGap) + '/day vs target')
+          tone: confidenceTone,
+          label: 'Forecast confidence',
+          value: confidencePct ? (confidenceLabel.replace(' confidence', '') + ' · ' + Math.round(confidencePct) + '%') : confidenceLabel.replace(' confidence', ''),
+          support: ((confidenceMeta && confidenceMeta.componentSummary) ? confidenceMeta.componentSummary + ' · ' : '') + confidenceSupport
         },
         {
           theme: 'theme-plan',
           tone: forecastLocked ? (forecastGapVsLock >= 0 ? 'good' : 'bad') : (model.planGap < 0 ? 'bad' : 'good'),
-          label: forecastLocked ? 'Vs locked forecast' : 'Buffer vs plan',
-          value: forecastLocked ? (forecastGapVsLock >= 0 ? '+' : '') + money(forecastGapVsLock) : (model.planGap >= 0 ? '+' : '') + money(model.planGap),
-          support: forecastLocked
-            ? (monthClosed ? 'Final result vs day-5 forecast' : 'Current end projection vs locked reference')
-            : (forecast.remainingDays > 0 ? forecast.remainingDays + ' day' + (forecast.remainingDays === 1 ? '' : 's') + ' left' : 'Month closed'),
+          label: forecastLocked ? (forecastLockIsLegacy ? 'Vs legacy lock' : 'Vs locked forecast') : 'Buffer vs plan',
+          value: forecastLocked ? (forecastGapVsLock >= 0 ? '+' : '') + money(forecastGapVsLock) : ((model.planGap >= 0 ? '+' : '') + money(model.planGap)),
+          support: forecastLocked ? (forecastLockIsLegacy ? 'Current end projection vs restored historical reference' : 'Current end projection vs locked reference') : (forecast.remainingDays > 0 ? forecast.remainingDays + ' day' + (forecast.remainingDays === 1 ? '' : 's') + ' left' : 'Month closed'),
           driftArrow: driftArrowHtml
         }
       ];
@@ -245,7 +249,7 @@
       }
       var summaryLabel = monthClosed ? 'Final read' : (forecastLocked ? 'vs lock' : 'Locks');
       var summaryCopy = monthClosed
-        ? (forecastGapVsLock >= 0 ? 'Above' : 'Below') + ' locked forecast by ' + money(Math.abs(forecastGapVsLock)) + '.' + (monthEndOutcome.hasRolloverImpact ? ' ' + money(monthEndOutcome.closingBeforeRollover) + ' rolled forward.' : '')
+        ? (forecastLocked ? ((forecastGapVsLock >= 0 ? 'Above' : 'Below') + (forecastLockIsLegacy ? ' legacy forecast by ' : ' locked forecast by ') + money(Math.abs(forecastGapVsLock)) + '.') : 'Closed with final result ' + money(closedForecastFinalAmount) + '.') + (monthEndOutcome.hasRolloverImpact ? ' ' + money(monthEndOutcome.closingBeforeRollover) + ' rolled forward.' : '')
         : (forecastLocked
           ? 'Live projection is ' + (forecastGapVsLock >= 0 ? 'above' : 'below') + ' the lock by ' + money(Math.abs(forecastGapVsLock)) + '.'
           : 'Locks on ' + forecastLockDateText + '.');
@@ -267,6 +271,9 @@
         forecastHeadlineAmount: forecastHeadlineAmount,
         comparisonProjectedEnd: comparisonProjectedEnd,
         forecastGapVsLock: forecastGapVsLock,
+        forecastAccuracy: forecastAccuracy,
+        confidenceMeta: confidenceMeta,
+        confidencePct: confidencePct,
         driftDir: driftDir,
         primaryMetrics: primaryMetrics,
         secondaryMetrics: secondaryMetrics,
@@ -655,14 +662,13 @@
     var categoryTrends = getCategoryTrendModel(month);
     var evolution = getEvolution(month);
     var decision = getDecision(month);
-    var guidancePace = getGuidancePace(month, decision);
     var mix = getMix(month);
     var reallocation = getReallocation(month);
     var specialFunding = getSpecialFunding(month, model);
     var forecastCard = getForecastCard(month, model, forecast, burn, subscriptions, specialFunding, reallocation);
     var burnCard = getBurnCard(month, forecastCard && forecastCard.burnDisplay ? forecastCard.burnDisplay : burn, burn, forecastCard && forecastCard.monthClosed, forecastCard && forecastCard.monthEndOutcome);
-    var projection = num(forecast.projectedAvailableEnd);
-    var burnPct = num(burn.forecastEndPct || burn.spentPct);
+    var projection = (forecastCard && forecastCard.monthClosed) ? num(forecastCard.closedForecastFinalAmount) : num(forecast.projectedAvailableEnd);
+    var burnPct = (forecastCard && forecastCard.burnDisplay) ? num(forecastCard.burnDisplay.forecastEndPct || forecastCard.burnDisplay.spentPct) : num(burn.forecastEndPct || burn.spentPct);
     var metrics = {
       month: month,
       monthName: text(month.name, 'Current month'),
@@ -703,7 +709,6 @@
         burn: burn,
         burnDisplay: null,
         guidance: guidance,
-        guidancePace: guidancePace,
         mix: mix,
         behaviorInsights: behaviorInsights,
         behaviorIntelligence: behaviorIntelligence,

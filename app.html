@@ -5,6 +5,7 @@
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&amp;family=Geist+Mono:wght@300;400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&amp;display=swap" rel="stylesheet"/>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Veyra - Your Money Brain</title>
@@ -314,11 +315,6 @@
   </div>
   <div class="side-actions tools-drawer-body">
 
-<section class="tools-section planning-section" aria-label="Planning tools">
-  <div class="tools-section-label">Planning</div>
-  <button class="secondary tools-row featured ds-simulator-btn" id="dsSimulatorBtn" type="button" aria-haspopup="dialog" aria-controls="dsSimulatorOverlay"><span class="btn-icon">🧭</span> Decision Simulator</button>
-</section>
-<div class="side-divider"></div>
 <button class="primary" id="rolloverBtn" title="Create a live linked rollover with cash spill-over and pending Shared Expenses"><span class="btn-icon">↻</span> Next Month</button>
 <button class="secondary" id="addPastMonthBtn"><span class="btn-icon">⊕</span> Add Past Month</button>
 <button class="secondary" id="addMonthBtn" title="Create a separate manual month without rolling over the current one"><span class="btn-icon">+</span> Add Custom Month</button>
@@ -396,21 +392,6 @@
 </section>
 </section>
 <!-- v1292: Smart Insights now lives as a first-class workspace tab instead of a top-bar modal. -->
-<div class="cbm-overlay ds-modal-overlay" id="dsSimulatorOverlay" data-modal-kind="decision-simulator" aria-hidden="true">
-  <div class="cbm-modal ds-modal-shell" role="dialog" aria-modal="true" aria-labelledby="dsSimulatorTitle">
-    <div class="ds-modal-header">
-      <div class="ds-modal-header-left">
-        <div class="ds-modal-title" id="dsSimulatorTitle">Decision Simulator</div>
-        <div class="ds-modal-sub">Run budget scenarios using live signals from the current month.</div>
-      </div>
-      <button class="cbm-close-btn" type="button" data-close-ds-simulator aria-label="Close Decision Simulator">×</button>
-    </div>
-    <div class="ds-modal-body" id="dsSimulatorBody"></div>
-    <div class="ds-modal-footer">
-      <button type="button" class="cbm-btn-ghost" data-close-ds-simulator>Done</button>
-    </div>
-  </div>
-</div>
 
 </section>
 <section class="view-page phase4-smart-insights-page" data-view="smart-insights">
