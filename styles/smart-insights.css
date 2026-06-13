@@ -3850,3 +3850,125 @@ html[data-theme="dark"] .debt-detail-modal:has(.debt-simulator-card) .expense-mo
   color: #eaf1fb !important;
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════
+   v758 · SMART INSIGHTS KPI TILES → OVERVIEW-KPI TREATMENT, IN PURPLE
+   Re-skins the four signal tiles (forecast / budget / subscriptions / actions)
+   to match the Overview KPI tiles: saturated dark gradient, white text, glow
+   shadow, hover lift, glassy icon badge — same in light and dark mode, but
+   purple instead of blue. Pure UI: values are set via safeText (no semantic
+   classes), so uniform-white matches current behaviour. Icon badges are
+   CSS-only (::after keyed on data-si-signal); no HTML/JS touched.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Tile shell — purple gradient + white text + glow (light / default) */
+[data-view="smart-insights"] .smart-insights-signal{
+  border-radius:16px !important;
+  padding:15px 48px 15px 16px !important;
+  color:#fff !important;
+  border:1px solid rgba(167,139,250,0.30) !important;
+  background:
+    linear-gradient(160deg, rgba(255,255,255,0.10), transparent 34%),
+    radial-gradient(440px 220px at 88% -35%, rgba(167,139,250,0.30), transparent 60%),
+    linear-gradient(140deg, #251357 0%, #3c2090 55%, #1b0f44 100%) !important;
+  box-shadow:0 2px 6px rgba(15,23,42,0.12), 0 18px 40px -16px rgba(94,23,235,0.50) !important;
+  transition:transform .18s, box-shadow .18s !important;
+}
+[data-view="smart-insights"] .smart-insights-signal:hover{
+  transform:translateY(-3px) !important;
+  box-shadow:0 4px 10px rgba(15,23,42,0.14), 0 26px 54px -16px rgba(94,23,235,0.60) !important;
+}
+/* drop the coloured top bar — the Overview KPI tiles have none */
+[data-view="smart-insights"] .smart-insights-signal::before{display:none !important;}
+
+/* glassy icon badge (replaces the ui-3d corner-glow ::after), one per signal */
+[data-view="smart-insights"] .smart-insights-signal::after{
+  top:12px; right:12px; left:auto; bottom:auto;
+  width:30px; height:30px; border-radius:10px;
+  display:grid; place-items:center; line-height:1; font-size:.95rem;
+  z-index:2; pointer-events:none;
+  background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.22);
+}
+[data-view="smart-insights"] .smart-insights-signal[data-si-signal="forecast"]::after{content:"🔮";}
+[data-view="smart-insights"] .smart-insights-signal[data-si-signal="budget"]::after{content:"📊";}
+[data-view="smart-insights"] .smart-insights-signal[data-si-signal="subscriptions"]::after{content:"🔁";}
+[data-view="smart-insights"] .smart-insights-signal[data-si-signal="actions"]::after{content:"🎯";}
+
+/* legible text on the purple fill (light / default) */
+[data-view="smart-insights"] .smart-insights-signal .si-signal-label{color:rgba(255,255,255,0.64) !important;}
+[data-view="smart-insights"] .smart-insights-signal .si-signal-value{color:#ffffff !important;}
+[data-view="smart-insights"] .smart-insights-signal .si-signal-sub{color:rgba(255,255,255,0.64) !important;}
+
+/* DARK MODE — same purple treatment (supersedes the existing dark navy rule) */
+html[data-theme="dark"] [data-view="smart-insights"] .smart-insights-signal{
+  border:1px solid rgba(167,139,250,0.28) !important;
+  background:
+    linear-gradient(160deg, rgba(255,255,255,0.08), transparent 34%),
+    radial-gradient(440px 220px at 88% -35%, rgba(167,139,250,0.26), transparent 60%),
+    linear-gradient(140deg, #221250 0%, #341c80 55%, #170d3a 100%) !important;
+  box-shadow:0 2px 6px rgba(0,0,0,0.30), 0 18px 42px -16px rgba(94,23,235,0.55) !important;
+  color:#fff !important;
+}
+html[data-theme="dark"] [data-view="smart-insights"] .smart-insights-signal .si-signal-value{color:#ffffff !important;}
+html[data-theme="dark"] [data-view="smart-insights"] .smart-insights-signal .si-signal-label,
+html[data-theme="dark"] [data-view="smart-insights"] .smart-insights-signal .si-signal-sub{color:rgba(255,255,255,0.64) !important;}
+/* ── end v758 ── */
+
+/* ══════════════════════════════════════════════════════════════════════
+   v759 · "WHAT CHANGED" (Month briefing) CARD → PURPLE, MATCHING THE KPIs
+   Same saturated-purple treatment as the v758 KPI tiles, sized up for the
+   wider briefing panel: purple gradient shell + white header + frosted-glass
+   sub-cards with light text. Applies in light and dark mode. All briefing
+   text is set via safeText (no semantic colour), so uniform-light is safe.
+   Scoped to .smart-insights-briefing so the "Insight cards" header below —
+   which reuses .smart-insights-section-head/.kicker/.pill — is untouched.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Shell — purple gradient + glow (light / default) */
+[data-view="smart-insights"] .smart-insights-briefing{
+  color:#fff !important;
+  border:1px solid rgba(167,139,250,0.28) !important;
+  background:
+    linear-gradient(160deg, rgba(255,255,255,0.10), transparent 30%),
+    radial-gradient(680px 320px at 92% -30%, rgba(167,139,250,0.30), transparent 60%),
+    linear-gradient(140deg, #2a1762 0%, #43269c 55%, #1c1046 100%) !important;
+  box-shadow:0 4px 10px rgba(15,23,42,0.10), 0 22px 50px -18px rgba(94,23,235,0.50) !important;
+}
+/* drop the leftover ui-3d top bar (KPI tiles have none) */
+[data-view="smart-insights"] .smart-insights-briefing::before{display:none !important;}
+/* Header text + month pill */
+[data-view="smart-insights"] .smart-insights-briefing .smart-insights-kicker{color:rgba(255,255,255,0.62) !important;}
+[data-view="smart-insights"] .smart-insights-briefing .smart-insights-section-head h3{color:#ffffff !important;}
+[data-view="smart-insights"] .smart-insights-briefing .smart-insights-section-pill{
+  background:rgba(255,255,255,0.12) !important;
+  border:1px solid rgba(255,255,255,0.22) !important;
+  color:rgba(255,255,255,0.85) !important;
+}
+/* Sub-cards — frosted glass on the purple shell */
+[data-view="smart-insights"] .smart-insights-briefing .si-briefing-card{
+  background:rgba(255,255,255,0.08) !important;
+  border:1px solid rgba(255,255,255,0.14) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 18px rgba(20,10,50,0.18) !important;
+}
+[data-view="smart-insights"] .smart-insights-briefing .si-briefing-card span{color:rgba(255,255,255,0.60) !important;}
+[data-view="smart-insights"] .smart-insights-briefing .si-briefing-card strong{color:#ffffff !important;}
+[data-view="smart-insights"] .smart-insights-briefing .si-briefing-card small{color:rgba(255,255,255,0.76) !important;}
+
+/* DARK MODE — same purple (supersedes the existing dark navy briefing rules) */
+html[data-theme="dark"] [data-view="smart-insights"] .smart-insights-briefing{
+  border:1px solid rgba(167,139,250,0.26) !important;
+  background:
+    linear-gradient(160deg, rgba(255,255,255,0.07), transparent 30%),
+    radial-gradient(680px 320px at 92% -30%, rgba(167,139,250,0.24), transparent 60%),
+    linear-gradient(140deg, #241356 0%, #3a2089 55%, #180e3e 100%) !important;
+  box-shadow:0 4px 10px rgba(0,0,0,0.30), 0 22px 50px -18px rgba(94,23,235,0.50) !important;
+}
+html[data-theme="dark"] [data-view="smart-insights"] .smart-insights-briefing .si-briefing-card{
+  background:rgba(255,255,255,0.06) !important;
+  border:1px solid rgba(255,255,255,0.12) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 18px rgba(0,0,0,0.26) !important;
+}
+html[data-theme="dark"] [data-view="smart-insights"] .smart-insights-briefing .si-briefing-card span{color:rgba(255,255,255,0.58) !important;}
+html[data-theme="dark"] [data-view="smart-insights"] .smart-insights-briefing .si-briefing-card strong{color:#ffffff !important;}
+html[data-theme="dark"] [data-view="smart-insights"] .smart-insights-briefing .si-briefing-card small{color:rgba(255,255,255,0.74) !important;}
+/* ── end v759 ── */

@@ -50,6 +50,10 @@
     let openExpenseGroups = {};
     let openExpenseModalRowId = null;
     let openExpenseModalGroup = null;
+    // [PERF] Render-pass dedupe for syncDerivedRows. See beginDerivePass().
+    // Flip ENABLE_DERIVE_DEDUPE to false to fully disable (one-line safety valve).
+    let __derivePass = null;
+    const ENABLE_DERIVE_DEDUPE = true;
     let openCashflowModalKind = null;
     let openCashflowModalGroup = null;
     let selectedIncomeGroup = null;
@@ -4960,6 +4964,7 @@
 
 
     function renderVisibleViewContent(viewName, month) {
+      beginDerivePass(); // [PERF] open derive pass for this render
       if (!month) return;
       if (viewName === 'smart-insights') {
         try { renderInsights(month); } catch(e) { console.error('Insights render failed', e); }
@@ -10222,7 +10227,8 @@ function applyLinkedRollover(month, sourceMonth) {
                   amount: pending,
                   settled: 0,
                   date: todayStamp(),
-                  carriedFrom: sourceMonth.name
+                  carriedFrom: sourceMonth.name,
+                  originMonth: entry.originMonth || entry.carriedFrom || sourceMonth.name
                 } : null;
               })
               .filter(Boolean)
@@ -10562,17 +10568,23 @@ function renderSplitwiseEntry(key, entry, index) {
       const metaHtml = meta.length
         ? `<span class="splitwise-entry-meta">${meta.map((item, metaIndex) => `${metaIndex ? '<span class="splitwise-entry-sep">·</span>' : ''}<span>${escapeHtml(String(item))}</span>`).join('')}</span>`
         : '';
+      const carriedFrom = entry && entry.carriedFrom ? String(entry.carriedFrom) : '';
+      const carryOrigin = entry && (entry.originMonth || entry.carriedFrom) ? String(entry.originMonth || entry.carriedFrom) : '';
+      // Small marker so carried-forward entries aren't mistaken for ones added this month.
+      const carryIcon = carriedFrom
+        ? `<span class="splitwise-entry-carry" title="Carried from ${escapeHtml(carryOrigin)}" aria-label="Carried from ${escapeHtml(carryOrigin)}" style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:6px;vertical-align:middle;border-radius:50%;font-size:10px;line-height:1;color:var(--muted);background:var(--panel-2);flex:none;">↪</span>`
+        : '';
       return `
-        <div class="splitwise-entry-chip">
+        <div class="splitwise-entry-chip${carriedFrom ? ' is-carried' : ''}">
           <div class="splitwise-entry-main">
             <span class="splitwise-entry-status ${tone}">${splitwiseEntryBadge(entry)}</span>
             <div class="splitwise-entry-text">
-              <strong class="splitwise-entry-amount ${tone}">${currency(pending)}</strong>
+              <strong class="splitwise-entry-amount ${tone}">${currency(pending)}${carryIcon}</strong>
               ${metaHtml}
             </div>
           </div>
           ${entry && entry.carriedFrom
-            ? `<button class="chip-remove" type="button" title="Carried from ${escapeHtml(String(entry.carriedFrom))} — delete it in the source month" aria-label="Carried Shared Expenses entry" disabled>×</button>`
+            ? `<button class="chip-remove" type="button" title="Carried from ${escapeHtml(carryOrigin)} — settle or delete it in ${escapeHtml(carryOrigin)}" aria-label="Carried Shared Expenses entry" disabled>×</button>`
             : `<button class="chip-remove" type="button" title="Remove entry" aria-label="Remove Shared Expenses entry" data-splitwise-remove="${key}" data-index="${index}">×</button>`}
         </div>`;
     }
@@ -10755,7 +10767,31 @@ function partnerBalance(month) {
         .reduce((sum, key) => sum + splitwisePendingForKey(month, key), 0);
     }
 
+// [PERF] Render-pass dedupe for syncDerivedRows.
+//
+// CONTRACT: derived data must be computed inside a "derive pass". Within one
+// synchronous render the source data is invariant, so syncDerivedRows(month) is
+// deterministic and only needs to run once per month; every later identical call
+// in the same pass is skipped, which is what keeps tab/month/edit renders flat
+// as history grows.
+//
+// You do NOT need to remember to open a pass: syncDerivedRows opens one itself if
+// none is active (self-bootstrapping), so ANY render path — render(),
+// renderVisibleViewContent(), or anything added later — is deduped automatically.
+// The pass is also opened explicitly at those two entry points so it spans the
+// whole render. It is released on the next microtask, i.e. the instant the
+// synchronous render finishes, so the next user action starts a fresh pass.
+function beginDerivePass() {
+  if (!ENABLE_DERIVE_DEDUPE || __derivePass) return;
+  __derivePass = { done: new Set(), runs: 0, warned: false };
+  Promise.resolve().then(function(){ __derivePass = null; });
+}
+
 function syncDerivedRows(month, monthListOverride) {
+      // [PERF] Self-bootstrap + skip if already derived this pass. Override calls
+      // (save-time normalisation) bypass the dedupe entirely.
+      if (!monthListOverride) beginDerivePass();
+      if (__derivePass && !monthListOverride && __derivePass.done.has(month)) return;
       const rolloverSource = linkedRolloverSourceForMonth(month, monthListOverride);
       if (rolloverSource && rolloverSource !== month && !month._syncingLinkedRollover) {
         month._syncingLinkedRollover = true;
@@ -10771,6 +10807,22 @@ function syncDerivedRows(month, monthListOverride) {
         const settledTotal = splitwiseSettledMonth(month);
         splitRow.transactions = settledTotal !== 0 ? [{ amount: settledTotal, note: "Settled Shared Expenses", date: todayStamp() }] : [];
         splitRow.planned = splitwiseBudgetPendingMonth(month, monthListOverride);
+      }
+      if (__derivePass && !monthListOverride) {
+        __derivePass.done.add(month);
+        __derivePass.runs++;
+        // [PERF] Regression alarm. Healthy is ~2 runs per distinct month. A large
+        // overshoot means the dedupe was bypassed — typically a new render path
+        // that doesn't sit inside a pass, or a new per-render re-sync loop. Warns
+        // once per pass so the regression announces itself instead of being felt
+        // months later. (Remove this block if you want a fully silent console.)
+        const monthCount = (typeof state === 'object' && state && Array.isArray(state.months)) ? state.months.length : 1;
+        const budget = (monthCount * 4) + 20;
+        if (!__derivePass.warned && __derivePass.runs > budget) {
+          __derivePass.warned = true;
+          console.warn('[Veyra] syncDerivedRows ran ' + __derivePass.runs + '× in one render (budget ' + budget + '). '
+            + 'The derive-pass dedupe looks bypassed — a new render path probably needs to run inside a pass. See beginDerivePass().');
+        }
       }
     }
 
@@ -11985,19 +12037,19 @@ function renderRows(targetId, rows, kind) {
             openExpenseModalGroup = btn.dataset.openExpenseGroup;
             const selectedGroupRows = groupRows(rows).find(([group]) => group === openExpenseModalGroup)?.[1] || [];
             openExpenseModalRowId = selectedGroupRows && selectedGroupRows.length ? selectedGroupRows[0].id : null;
-            render('rows');
+            renderExpenseModalNav();
           };
         });
         wrap.querySelectorAll('[data-open-expense-row]').forEach(btn => {
           btn.onclick = function() {
             openExpenseModalRowId = btn.dataset.openExpenseRow;
-            render('rows');
+            renderExpenseModalNav();
           };
         });
         wrap.querySelectorAll('[data-select-expense-row]').forEach(btn => {
           btn.onclick = function() {
             openExpenseModalRowId = btn.dataset.selectExpenseRow;
-            render('rows');
+            renderExpenseModalNav();
           };
         });
         wrap.querySelectorAll('[data-close-expense-modal]').forEach(btn => {
@@ -12005,7 +12057,7 @@ function renderRows(targetId, rows, kind) {
             openExpenseModalGroup = null;
             openExpenseModalRowId = null;
             document.body.classList.remove('expense-modal-open');
-            render('rows');
+            renderExpenseModalNav();
           };
         });
         wrap.querySelectorAll('[data-expense-modal-overlay]').forEach(overlay => {
@@ -12014,7 +12066,7 @@ function renderRows(targetId, rows, kind) {
               openExpenseModalGroup = null;
               openExpenseModalRowId = null;
               document.body.classList.remove('expense-modal-open');
-              render('rows');
+              renderExpenseModalNav();
             }
           };
         });
@@ -15979,7 +16031,29 @@ function captureExpenseModalSubcatScroll() {
       });
     }
 
+// [PERF] scoped expense-modal navigation
+// Opening an expense category, switching sub-category, or closing the modal
+// only changes WHICH sub-category is on screen (openExpenseModalGroup /
+// openExpenseModalRowId). No financial data mutates. Routing those clicks
+// through render('rows') was repainting the entire dashboard — rerunning the
+// linked-rollover chain + syncDerivedRows, then redrawing overview/insights/
+// trends/chart/subscriptions/planner, then re-serialising the whole store to
+// localStorage — on every tap. Here we redraw ONLY the expense list, which
+// (via renderRows -> renderExpensesTable) also emits the open group's modal and
+// re-wires these same handlers, so navigation stays fully functional. Handlers
+// that actually mutate data (add line, edit planned, toggle fixed, etc.) keep
+// calling render('rows') unchanged.
+function renderExpenseModalNav() {
+  const month = (typeof getActiveMonth === 'function') ? getActiveMonth() : null;
+  if (!month) return;
+  const scrollTop = openExpenseModalGroup ? captureExpenseModalSubcatScroll() : 0;
+  renderRows("expenseList", month.expenses, "expenses");
+  wireExpenseTabActionButtons();
+  if (openExpenseModalGroup) restoreExpenseModalSubcatScroll(scrollTop);
+}
+
 function render(hint) {
+      beginDerivePass(); // [PERF] open derive pass for this render
       // ── Selective rendering ─────────────────────────────────────────────
       // hint = undefined  → full render (month switch, undo/redo, import)
       // hint = 'overview' → summary + overview + insights only

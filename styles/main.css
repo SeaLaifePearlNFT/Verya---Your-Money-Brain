@@ -24865,3 +24865,154 @@ html[data-theme="dark"] #categoryTrendsModal #categoryTrendsCloseBtn{
 #overviewInlineInsights .burn-pace-fill.spent{width:var(--spent-width);background:linear-gradient(90deg,#10b981,#059669);}
 #overviewInlineInsights .burn-pace-fill.time{width:var(--time-width);background:#94a3b8;}
 @media (max-width:760px){ #overviewInlineInsights .inline-analytics{grid-template-columns:1fr;} }
+
+/* ══════════════════════════════════════════════════════════════════════
+   v756 · OVERVIEW ALLOCATION CARDS — SATURATED SHELL RE-SKIN
+   Pure UI. Re-skins only the two outer shells (Current Budget Allocation +
+   Budget Allocation) so they join the saturated hero/KPI tile family.
+   Bodies stay light (light mode) / navy (dark mode) so all inner sub-tiles,
+   dark text and semantic accents keep full contrast. No content/logic touched.
+   Signature borrowed from the tiles: gradient base + radial corner glow +
+   tinted border + colored glow shadow (no top bar, matching the KPI tiles).
+   Scoped to .grid-overview children; .ui-3d-panel added for specificity.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* — LIGHT MODE — cool/blue glass (left) — */
+.grid-overview > .current-allocation-card.ui-3d-panel{
+  background:
+    radial-gradient(560px 300px at 96% -22%, rgba(56,189,248,0.30), rgba(56,189,248,0) 60%),
+    radial-gradient(480px 330px at -6% 116%, rgba(94,23,235,0.12), rgba(94,23,235,0) 62%),
+    linear-gradient(150deg, #eef3ff 0%, #e4edff 46%, #dbe6ff 100%) !important;
+  border:1px solid rgba(56,189,248,0.40) !important;
+  box-shadow:
+    0 20px 46px -18px rgba(37,99,235,0.32),
+    0 6px 16px rgba(30,64,120,0.10) !important;
+}
+
+/* — LIGHT MODE — warm/amber glass (right) — */
+.grid-overview > .alloc-list-card.ui-3d-panel{
+  background:
+    radial-gradient(560px 300px at 96% -22%, rgba(245,158,11,0.28), rgba(245,158,11,0) 60%),
+    radial-gradient(480px 330px at -6% 116%, rgba(234,88,12,0.10), rgba(234,88,12,0) 62%),
+    linear-gradient(150deg, #fff5ea 0%, #ffeedd 46%, #ffe6d0 100%) !important;
+  border:1px solid rgba(245,158,11,0.42) !important;
+  box-shadow:
+    0 20px 46px -18px rgba(234,88,12,0.28),
+    0 6px 16px rgba(120,72,20,0.10) !important;
+}
+
+/* — DARK MODE — shared navy base, differentiated glow (matches tile system) — */
+html[data-theme="dark"] .grid-overview > .current-allocation-card.ui-3d-panel{
+  background:
+    radial-gradient(560px 300px at 96% -22%, rgba(56,189,248,0.22), rgba(56,189,248,0) 60%),
+    radial-gradient(480px 330px at -6% 116%, rgba(94,23,235,0.20), rgba(94,23,235,0) 62%),
+    linear-gradient(150deg, #101b32 0%, #122139 52%, #0c1428 100%) !important;
+  border:1px solid rgba(56,189,248,0.26) !important;
+  box-shadow:
+    0 20px 46px -18px rgba(0,0,0,0.60),
+    0 0 30px -10px rgba(56,189,248,0.18) !important;
+}
+
+html[data-theme="dark"] .grid-overview > .alloc-list-card.ui-3d-panel{
+  background:
+    radial-gradient(560px 300px at 96% -22%, rgba(245,158,11,0.20), rgba(245,158,11,0) 60%),
+    radial-gradient(480px 330px at -6% 116%, rgba(234,88,12,0.14), rgba(234,88,12,0) 62%),
+    linear-gradient(150deg, #14182a 0%, #161a2c 52%, #0f1322 100%) !important;
+  border:1px solid rgba(245,158,11,0.24) !important;
+  box-shadow:
+    0 20px 46px -18px rgba(0,0,0,0.60),
+    0 0 30px -10px rgba(245,158,11,0.16) !important;
+}
+/* ── end v756 saturated shell re-skin ── */
+
+/* ══════════════════════════════════════════════════════════════════════
+   v757 · OVERVIEW ALLOCATION CARDS — INNER SURFACE HARMONISATION
+   Follow-up to v756. The new saturated shells made the inner panels read as
+   detached white islands. Here the neutral surfaces become frosted, hue-
+   matched glass so each card's tint flows through them and they sit ON the
+   card instead of floating above it. Semantic colour is preserved: green
+   available-funds tile, usage rings, red/amber figures, lock/recurring
+   notices, indigo "show all" button, category accent bars — all untouched.
+   Pure UI. No content, values or logic changed. Scoped to the two cards.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* ---------- RIGHT (Budget Allocation) — warm frosted glass ----------
+   Retint the whole av2 tile system in one move via its own variables. */
+.grid-overview > .alloc-list-card .alloc-v2{
+  --av2-card-bg: rgba(255,250,243,0.55);
+  --av2-card-border: rgba(245,158,11,0.22);
+  --av2-card-shadow: 0 1px 2px rgba(120,72,20,0.04), 0 8px 18px rgba(234,88,12,0.06);
+  --av2-divider: rgba(180,120,40,0.14);
+}
+/* Details buttons set #fff directly — frost them to match. */
+.grid-overview > .alloc-list-card .alloc-v2 .alloc-v2-details-btn{
+  background: rgba(255,250,243,0.62);
+  border-color: rgba(245,158,11,0.24);
+}
+.grid-overview > .alloc-list-card .alloc-v2 .alloc-v2-details-btn:hover{
+  background: rgba(255,247,236,0.85);
+  border-color: rgba(245,158,11,0.40);
+}
+
+/* ---------- LEFT (Current Budget Allocation) — cool frosted glass ---------- */
+/* Donut tile */
+.grid-overview > .current-allocation-card .distribution-chart-tile{
+  background: linear-gradient(145deg, rgba(255,255,255,0.58), rgba(231,240,255,0.30)) !important;
+  border:1px solid rgba(56,189,248,0.18) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.45), 0 6px 16px rgba(30,64,120,0.05) !important;
+}
+/* Allocation breakdown rows */
+.grid-overview > .current-allocation-card .distribution-legend-tile .chart-legend-item{
+  background: rgba(255,255,255,0.50);
+  border-color: rgba(56,189,248,0.16);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.40), 0 4px 10px rgba(30,64,120,0.03);
+}
+.grid-overview > .current-allocation-card .distribution-legend-tile .chart-legend-item:hover,
+.grid-overview > .current-allocation-card .distribution-legend-tile .chart-legend-item.is-active{
+  background: rgba(255,255,255,0.78);
+  border-color: rgba(56,189,248,0.34);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.7), 0 8px 18px rgba(30,64,120,0.07);
+}
+/* Category Trends rows */
+.grid-overview > .current-allocation-card .trends-card-inline .trend-insight-row{
+  background: rgba(255,255,255,0.50) !important;
+  border-color: rgba(56,189,248,0.16) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.40), 0 6px 16px rgba(30,64,120,0.04) !important;
+}
+/* ACTUAL / TARGET / PROJECTED metric boxes inside trend rows */
+.grid-overview > .current-allocation-card .trend-metric{
+  background: rgba(255,255,255,0.56);
+  border-color: rgba(56,189,248,0.16);
+}
+
+/* ---------- DARK MODE — translucent so each card's glow shows through ---------- */
+html[data-theme="dark"] .grid-overview > .alloc-list-card .alloc-v2{
+  --av2-card-bg: rgba(34,28,20,0.50);
+  --av2-card-border: rgba(245,158,11,0.20);
+  --av2-card-shadow: 0 1px 2px rgba(0,0,0,0.30), 0 8px 18px rgba(0,0,0,0.26);
+  --av2-divider: rgba(245,158,11,0.14);
+}
+html[data-theme="dark"] .grid-overview > .alloc-list-card .alloc-v2 .alloc-v2-details-btn{
+  background: rgba(40,33,22,0.55);
+  border-color: rgba(245,158,11,0.22);
+}
+html[data-theme="dark"] .grid-overview > .current-allocation-card .distribution-chart-tile{
+  background: linear-gradient(145deg, rgba(26,38,62,0.55), rgba(16,27,50,0.40)) !important;
+  border:1px solid rgba(56,189,248,0.20) !important;
+  box-shadow: none !important;
+}
+html[data-theme="dark"] .grid-overview > .current-allocation-card .distribution-legend-tile .chart-legend-item{
+  background: rgba(22,34,58,0.50) !important;
+  border-color: rgba(56,189,248,0.18) !important;
+  box-shadow: none !important;
+}
+html[data-theme="dark"] .grid-overview > .current-allocation-card .trends-card-inline .trend-insight-row{
+  background: rgba(22,34,58,0.50) !important;
+  border-color: rgba(56,189,248,0.16) !important;
+  box-shadow: none !important;
+}
+html[data-theme="dark"] .grid-overview > .current-allocation-card .trend-metric{
+  background: rgba(22,34,58,0.55) !important;
+  border-color: rgba(56,189,248,0.16) !important;
+}
+/* ── end v757 inner surface harmonisation ── */
