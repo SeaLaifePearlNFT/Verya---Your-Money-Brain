@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Veyra — Your Money Brain</title>
+  <meta name="description" content="Veyra is a calm, focused budget tracker that helps you understand where your money goes." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@300;400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="landing.css" />
+
+  <!-- Identity/sign-in check runs before the choice buttons are shown, so a
+       returning signed-in user sees a welcome-back state instead of the
+       first-time choice. Same files app.html uses — single source of truth,
+       nothing landing-page-specific duplicated here. -->
+  <script src="js/data/identity.js?v=20260808"></script>
+  <script src="js/data/google-sync-config.js?v=20260808"></script>
+  <script src="js/data/google-sync.js?v=20260808"></script>
+</head>
+<body>
+  <main class="landing">
+    <section class="hero">
+      <img
+        class="hero-logo"
+        src="veyra-logo.svg"
+        alt="Veyra — Your Money Brain"
+      />
+
+      <p class="lede">
+        Built to help you understand your financial reality today — and feel
+        more prepared for tomorrow.
+      </p>
+
+      <!-- Default state: shown to first-time visitors, signed-out visitors,
+           or anyone who has never used Google sync. Hidden by script if a
+           signed-in identity is found. -->
+      <div id="landingChoice">
+        <div class="cta-row">
+          <a class="cta" href="app.html">
+            Open Dashboard
+            <span class="cta-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="cta cta-secondary" href="app.html" id="landingGoogleSignInBtn">
+            <span class="cta-google-icon" aria-hidden="true">G</span>
+            Sign in with Google
+          </a>
+        </div>
+
+        <p class="sub-cta">
+          Open Dashboard — no signup, your data stays on this device.<br />
+          Sign in with Google — back up your budget and share it with a partner.
+        </p>
+      </div>
+
+      <!-- Returning-user state: hidden by default, shown by script only when
+           a signed-in Google identity is found on this device. -->
+      <div id="landingWelcome" hidden>
+        <p class="welcome-copy">Welcome back, <strong id="landingWelcomeName"></strong></p>
+        <a class="cta" href="app.html">
+          Continue
+          <span class="cta-arrow" aria-hidden="true">→</span>
+        </a>
+        <p class="sub-cta">
+          <button class="logout-link" id="landingLogoutBtn" type="button">Not you? Log out</button>
+        </p>
+      </div>
+    </section>
+
+    <footer class="landing-foot">
+      <span>© Veyra</span>
+      <span class="dot" aria-hidden="true">·</span>
+      <span>Built for clarity</span>
+    </footer>
+  </main>
+  <script>
+    /* Register the Veyra service worker so the app shell is cached early. */
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      });
+    }
+
+    /* Show "welcome back" instead of the sign-in choice for a returning,
+       currently-signed-in visitor. Runs as early as possible (right after
+       the markup it affects) to minimize any flash of the wrong state. */
+    (function () {
+      function firstName(label) {
+        var trimmed = String(label || '').trim();
+        if (!trimmed) return trimmed;
+        return trimmed.split(/\s+/)[0];
+      }
+
+      function applyIdentityState() {
+        if (!window.VeyraIdentity) return setTimeout(applyIdentityState, 30);
+        var choiceEl = document.getElementById('landingChoice');
+        var welcomeEl = document.getElementById('landingWelcome');
+        if (!choiceEl || !welcomeEl) return;
+
+        if (window.VeyraIdentity.isDefault()) {
+          // No one signed in (or they logged out) — the default dual-choice
+          // markup is already visible, nothing to do.
+          return;
+        }
+
+        var activeId = window.VeyraIdentity.getActiveId();
+        var known = window.VeyraIdentity.listKnownIdentities();
+        var current = null;
+        known.forEach(function (item) { if (item && item.id === activeId) current = item; });
+        var displayName = firstName(current && (current.label || current.email)) || activeId;
+
+        document.getElementById('landingWelcomeName').textContent = displayName;
+        choiceEl.hidden = true;
+        welcomeEl.hidden = false;
+      }
+
+      document.addEventListener('click', function (e) {
+        if (e.target.closest('#landingGoogleSignInBtn')) {
+          // Trigger the Google popup right here on the landing page — no
+          // navigation to app.html first. google-sync.js itself decides
+          // where to send the browser once sign-in actually succeeds.
+          e.preventDefault();
+          if (window.VeyraGoogleSync) window.VeyraGoogleSync.signIn();
+          return;
+        }
+        if (!e.target.closest('#landingLogoutBtn')) return;
+        // Reuses the exact same sign-out logic app.html's Backup popover
+        // uses — on this page there's simply no in-memory access token yet
+        // to revoke (a fresh page load never had one), so this just clears
+        // the active identity and reloads back to the signed-out choice.
+        if (window.VeyraGoogleSync) window.VeyraGoogleSync.signOut();
+      });
+
+      applyIdentityState();
+    })();
+  </script>
+</body>
+</html>

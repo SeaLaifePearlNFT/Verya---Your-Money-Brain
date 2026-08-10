@@ -1,0 +1,165 @@
+/* Veyra Phase 2.1 — account selector and account manager only. */
+.account-switcher-block{position:relative;margin-top:10px}
+.account-switcher{width:100%;display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--border,rgba(148,163,184,.28));border-radius:14px;background:var(--surface,#fff);color:var(--text,#18212f);cursor:pointer;text-align:left}
+.account-switcher:hover{border-color:rgba(0,151,178,.55)}
+.account-switcher-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:10px;background:rgba(0,151,178,.12);flex:0 0 auto}
+.account-switcher-copy{min-width:0;display:flex;flex-direction:column;flex:1}
+.account-switcher-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted,#667085);font-weight:700}
+.account-switcher-label{font-size:13px;font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-switcher-arrow{font-size:16px;color:var(--muted,#667085)}
+.account-popover{display:none;position:absolute;z-index:80;left:0;right:0;top:calc(100% + 8px);padding:8px;border:1px solid var(--border,rgba(148,163,184,.28));border-radius:14px;background:var(--surface,#fff);box-shadow:0 16px 34px rgba(15,23,42,.18)}
+.account-popover.is-open{display:block}
+.account-popover-head{padding:6px 8px 8px;font-size:11px;font-weight:750;color:var(--muted,#667085);text-transform:uppercase;letter-spacing:.07em}
+.account-choice{width:100%;display:flex;align-items:center;gap:9px;border:0;background:transparent;color:inherit;padding:9px;border-radius:10px;cursor:pointer;text-align:left}
+.account-choice:hover,.account-choice.is-active{background:rgba(0,151,178,.11)}
+.account-choice-dot{width:9px;height:9px;border-radius:50%;background:#0097b2;flex:0 0 auto}
+.account-choice-copy{display:flex;flex-direction:column;min-width:0;flex:1}.account-choice-name{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.account-choice-type{font-size:11px;color:var(--muted,#667085)}
+.account-popover-sep{height:1px;background:var(--border,rgba(148,163,184,.22));margin:6px 2px}
+.account-manage-link{width:100%;border:0;background:transparent;color:#0097b2;font-weight:750;text-align:left;padding:9px;border-radius:10px;cursor:pointer}.account-manage-link:hover{background:rgba(0,151,178,.1)}
+.account-manager-modal[hidden]{display:none!important}.account-manager-modal{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:22px}.account-manager-backdrop{position:absolute;inset:0;background:rgba(2,8,23,.62);backdrop-filter:blur(3px)}
+.account-manager-dialog{position:relative;width:min(760px,100%);max-height:min(82vh,760px);overflow:auto;border-radius:22px;border:1px solid var(--border,rgba(148,163,184,.3));background:var(--surface,#fff);color:var(--text,#18212f);box-shadow:0 28px 80px rgba(2,8,23,.35)}
+.account-manager-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:22px 24px;border-bottom:1px solid var(--border,rgba(148,163,184,.22))}.account-manager-head h2{margin:0 0 4px;font-size:21px}.account-manager-head p{margin:0;color:var(--muted,#667085);font-size:13px}.account-manager-close{border:0;background:transparent;color:inherit;font-size:22px;cursor:pointer;padding:4px 8px;border-radius:9px}.account-manager-close:hover{background:rgba(148,163,184,.14)}
+.account-manager-body{padding:20px 24px 24px}.account-manager-toolbar{display:flex;justify-content:flex-end;margin-bottom:14px}.account-add-btn{border:0;border-radius:11px;background:#0097b2;color:#fff;font-weight:750;padding:10px 14px;cursor:pointer}
+.account-manager-list{display:grid;gap:10px}.account-manager-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px;border:1px solid var(--border,rgba(148,163,184,.25));border-radius:15px;background:var(--panel,var(--surface,#fff))}.account-manager-card.is-archived{opacity:.62}.account-card-icon{width:38px;height:38px;display:grid;place-items:center;border-radius:12px;background:rgba(0,151,178,.12)}.account-card-title{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.account-card-title strong{font-size:14px}.account-card-meta{font-size:12px;color:var(--muted,#667085);margin-top:3px}.account-badge{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:3px 6px;border-radius:999px;background:rgba(0,151,178,.12);color:#007c94}.account-badge-shared{background:rgba(34,197,94,.14);color:#15803d}.account-card-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.account-icon-btn{border:1px solid var(--border,rgba(148,163,184,.3));background:transparent;color:inherit;border-radius:9px;padding:7px 9px;cursor:pointer;font-size:12px}.account-icon-btn:hover{border-color:rgba(0,151,178,.55)}.account-icon-btn:disabled{opacity:.35;cursor:not-allowed}
+.account-editor{margin-bottom:15px;padding:15px;border:1px solid var(--border,rgba(148,163,184,.25));border-radius:15px;background:rgba(0,151,178,.045)}.account-editor[hidden]{display:none}.account-editor-grid{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:11px}.account-field{display:flex;flex-direction:column;gap:5px}.account-field label{font-size:11px;font-weight:750;color:var(--muted,#667085)}.account-field input,.account-field select{width:100%;box-sizing:border-box;border:1px solid var(--border,rgba(148,163,184,.34));border-radius:10px;background:var(--surface,#fff);color:inherit;padding:9px 10px;font:inherit}.account-editor-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.account-secondary-btn{border:1px solid var(--border,rgba(148,163,184,.34));background:transparent;color:inherit;border-radius:10px;padding:9px 12px;cursor:pointer}.account-save-btn{border:0;background:#0097b2;color:#fff;border-radius:10px;padding:9px 13px;font-weight:750;cursor:pointer}
+.account-phase-note{margin-top:14px;padding:11px 13px;border-radius:12px;background:rgba(0,151,178,.08);color:var(--muted,#667085);font-size:12px;line-height:1.45}
+html[data-theme="dark"] .account-switcher,body.dark-mode .account-switcher,html[data-theme="dark"] .account-popover,body.dark-mode .account-popover,html[data-theme="dark"] .account-manager-dialog,body.dark-mode .account-manager-dialog,html[data-theme="dark"] .account-field input,html[data-theme="dark"] .account-field select,body.dark-mode .account-field input,body.dark-mode .account-field select{background:#111b2a;color:#eef5ff;border-color:rgba(148,163,184,.26)}
+@media(max-width:620px){.account-editor-grid{grid-template-columns:1fr}.account-manager-card{grid-template-columns:auto 1fr}.account-card-actions{grid-column:1/-1;justify-content:flex-start}}
+
+/* Phase 2.2 account setup and destructive action */
+.account-copy-options{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border,rgba(148,163,184,.25))}
+.account-delete-btn{color:#dc2626!important}
+.account-delete-btn:hover{background:rgba(220,38,38,.1)!important;border-color:rgba(220,38,38,.35)!important}
+@media(max-width:700px){.account-copy-options{grid-template-columns:1fr}}
+
+/* Phase 2.3: transfers and consolidated account overview */
+.transfer-toolbar,.transfer-manager-shortcut{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.transfer-manager-shortcut{padding:0 24px 14px}.transfer-editor{margin:16px 0}.transfer-list{display:grid;gap:10px;margin-top:16px}.transfer-card{display:grid;grid-template-columns:minmax(180px,1fr) auto auto;gap:12px;align-items:center;padding:14px;border:1px solid var(--border,#d9dee8);border-radius:14px;background:var(--surface,#fff)}.transfer-direction{display:flex;gap:8px;align-items:center;min-width:0}.transfer-amount{font-weight:750;font-size:1.05rem}.transfer-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--text-muted,#687083);font-size:.82rem;grid-column:1/3}.transfer-actions{display:flex;gap:6px;justify-content:flex-end}.transfer-status{padding:3px 8px;border-radius:999px;text-transform:capitalize;background:rgba(128,128,128,.14)}.transfer-status.is-completed{background:rgba(34,197,94,.16)}.transfer-status.is-planned{background:rgba(59,130,246,.16)}.transfer-status.is-cancelled,.transfer-status.is-skipped{background:rgba(148,163,184,.18)}.all-accounts-overview{margin-top:18px}.all-overview-head p{color:var(--text-muted,#687083)}.all-account-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.all-account-card{border:1px solid var(--border,#d9dee8);border-radius:15px;padding:16px;background:var(--surface,#fff)}.all-account-card>div{display:flex;justify-content:space-between;gap:8px}.all-account-card>div span{color:var(--text-muted,#687083);text-transform:capitalize}.all-account-card dl{margin:14px 0 0;display:grid;gap:7px}.all-account-card dl div{display:flex;justify-content:space-between;gap:12px}.all-account-card dt{color:var(--text-muted,#687083)}.all-account-card dd{margin:0;font-weight:650}.all-account-net{padding-top:8px;margin-top:4px;border-top:1px solid var(--border,#d9dee8)}
+@media(max-width:700px){.transfer-card{grid-template-columns:1fr auto}.transfer-meta{grid-column:1/-1}.transfer-actions{grid-column:1/-1;justify-content:flex-start}}
+
+/* Phase 2.3 hotfix: ensure the transfer dialog uses the visible account-manager surface. */
+.transfer-dialog{width:min(820px,100%)}
+.transfer-toolbar{justify-content:flex-start;margin-bottom:14px}
+
+/* Phase 2.3.1 transfer stabilisation */
+.transfer-history-filter{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--muted,#64748b);margin-left:auto}
+.transfer-history-filter select{min-width:150px;border:1px solid var(--border,#d8dee8);border-radius:10px;background:var(--surface,#fff);color:var(--text,#172033);padding:8px 10px}
+.transfer-note-field{grid-column:1/-1}
+.transfer-month-badge{display:inline-flex;align-items:center;width:max-content;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800;background:rgba(99,102,241,.10);color:var(--primary,#4f46e5)}
+@media(max-width:720px){.transfer-history-filter{width:100%;margin-left:0;justify-content:space-between}.transfer-history-filter select{flex:1}}
+
+/* Phase 2.3.4 — Account Transfers tracking tab */
+.phase4-account-transfers-page{padding:0}
+.phase4-account-transfers-layout{display:grid;gap:18px}
+.transfer-tracking-hero{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px;border:1px solid var(--border,rgba(148,163,184,.25));border-radius:22px;background:var(--panel,#fff);box-shadow:var(--shadow-sm,0 10px 30px rgba(15,23,42,.06))}
+.transfer-tracking-hero h2{margin:4px 0 7px;font-size:clamp(1.45rem,2vw,2rem);line-height:1.1}
+.transfer-tracking-hero p{margin:0;max-width:720px;color:var(--muted,#64748b)}
+.transfer-tracking-kicker{display:block;font-size:.72rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--accent,#7c3aed)}
+.transfer-tracking-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.transfer-tracking-summary article{display:grid;gap:5px;padding:18px 20px;border:1px solid var(--border,rgba(148,163,184,.25));border-radius:18px;background:var(--panel,#fff)}
+.transfer-tracking-summary span{font-size:.78rem;font-weight:750;color:var(--muted,#64748b)}
+.transfer-tracking-summary strong{font-size:1.45rem;line-height:1.1;color:var(--text,#0f172a)}
+.transfer-tracking-summary small{color:var(--muted,#64748b)}
+.transfer-tracking-section{margin:0}
+.transfer-tracking-head{align-items:flex-end;gap:18px}
+.transfer-tracking-filters{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.transfer-tracking-filters label{display:grid;gap:5px;min-width:155px;font-size:.72rem;font-weight:750;color:var(--muted,#64748b)}
+.transfer-tracking-filters select{min-height:40px;padding:0 34px 0 12px;border:1px solid var(--border,rgba(148,163,184,.3));border-radius:11px;background:var(--input-bg,var(--panel,#fff));color:var(--text,#0f172a);font:inherit}
+.transfer-tracking-list{display:grid;gap:10px;margin-top:16px}
+.transfer-tracking-row{display:grid;grid-template-columns:minmax(120px,.75fr) minmax(280px,2fr) minmax(105px,.6fr) minmax(120px,.7fr);align-items:center;gap:16px;padding:16px 18px;border:1px solid var(--border,rgba(148,163,184,.23));border-radius:16px;background:var(--panel,#fff)}
+.transfer-tracking-date,.transfer-tracking-route{display:grid;gap:4px}
+.transfer-tracking-date strong{font-size:.9rem}.transfer-tracking-date span,.transfer-tracking-route small{font-size:.78rem;color:var(--muted,#64748b)}
+.transfer-tracking-route{grid-template-columns:auto 28px auto;align-items:center;justify-content:start}
+.transfer-tracking-route small{grid-column:1/-1}
+.transfer-account-chip{display:inline-flex;align-items:center;min-height:31px;padding:5px 10px;border-radius:999px;background:var(--soft-bg,rgba(124,58,237,.08));font-size:.82rem;font-weight:750;white-space:nowrap}
+.transfer-route-arrow{text-align:center;color:var(--muted,#64748b);font-weight:800}
+.transfer-tracking-status{justify-self:start}.transfer-tracking-amount{justify-self:end;font-size:1rem;font-weight:850;white-space:nowrap}
+.transfer-tracking-empty{display:grid;gap:5px;text-align:center;padding:36px 20px}.transfer-tracking-empty span{color:var(--muted,#64748b)}
+@media (max-width:900px){.transfer-tracking-summary{grid-template-columns:1fr}.transfer-tracking-row{grid-template-columns:1fr 1fr}.transfer-tracking-route{grid-column:1/-1;grid-row:1}.transfer-tracking-date{grid-row:2}.transfer-tracking-status{grid-row:2}.transfer-tracking-amount{grid-column:2;grid-row:2}}
+@media (max-width:640px){.transfer-tracking-hero{align-items:flex-start;flex-direction:column}.transfer-tracking-hero .feature-action-btn{width:100%}.transfer-tracking-head{align-items:stretch;flex-direction:column}.transfer-tracking-filters{display:grid;grid-template-columns:1fr 1fr}.transfer-tracking-filters label{min-width:0}.transfer-tracking-row{grid-template-columns:1fr}.transfer-tracking-route,.transfer-tracking-date,.transfer-tracking-status,.transfer-tracking-amount{grid-column:1;grid-row:auto;justify-self:stretch}.transfer-tracking-amount{text-align:left}}
+.transfer-list-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:22px 0 10px;padding-top:18px;border-top:1px solid var(--border,#d9dee8)}
+.transfer-list-head h3{margin:0 0 4px}.transfer-list-head p{margin:0;color:var(--text-muted,#687083);font-size:.86rem}
+.transfer-list-pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:12px 0 2px;color:var(--text-muted,#687083);font-size:.85rem}
+.transfer-list-pager button[disabled]{opacity:.45;cursor:not-allowed}
+.all-accounts-overview:not([hidden])+.transfer-list{margin-top:8px}
+
+
+/* Transfer modal: fixed desktop canvas, responsive only when viewport requires it. */
+@media (min-width: 901px) and (min-height: 760px){
+  .transfer-modal{padding:18px}
+  .transfer-dialog{
+    width:min(1040px,calc(100vw - 36px));
+    height:min(840px,calc(100vh - 36px));
+    max-height:none;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  }
+  .transfer-dialog>.account-manager-head{flex:0 0 auto;padding:14px 24px 12px}
+  .transfer-dialog>.account-manager-body{
+    flex:1 1 auto;
+    min-height:0;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    padding:12px 24px 14px;
+  }
+  .transfer-toolbar{flex:0 0 auto;margin-bottom:7px}
+  .transfer-list{flex:0 0 auto;gap:5px;margin-top:6px}
+  .transfer-list-head{margin:6px 0 5px;padding-top:7px}
+  .transfer-list-head p{font-size:.78rem}
+  .transfer-card{
+    min-height:54px;
+    padding:7px 11px;
+    gap:7px 10px;
+    border-radius:12px;
+    grid-template-columns:minmax(230px,1fr) auto auto;
+  }
+  .transfer-month-badge{padding:3px 7px;font-size:10px}
+  .transfer-direction{font-size:.91rem}
+  .transfer-amount{font-size:1rem}
+  .transfer-meta{font-size:.72rem;gap:4px 6px;line-height:1.18}
+  .transfer-actions .account-icon-btn{padding:5px 7px}
+  .transfer-list-pager{padding:5px 0 0;min-height:30px}
+  .all-accounts-overview{flex:0 0 auto;margin-top:5px}
+  .all-overview-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px}
+  .all-overview-head h3{margin:0}
+  .all-overview-title{display:flex;align-items:center;gap:7px}
+  .all-overview-title .inline-info-trigger{width:20px;height:20px;min-width:20px;font-size:11px}
+  .all-account-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px}
+  .all-account-card{padding:8px 11px;border-radius:12px}
+  .all-account-card dl{margin:5px 0 0;gap:2px;font-size:.75rem}
+  .all-account-net{padding-top:4px;margin-top:1px}
+  .transfer-modal.is-overview-mode .transfer-list-head{margin-top:5px}
+  .transfer-editor{flex:1 1 auto;margin:10px 0 0;overflow:hidden}
+  .transfer-modal.is-editor-mode .transfer-toolbar{opacity:.72}
+}
+
+/* On genuinely constrained windows, shrink the frame first; only then allow body scrolling. */
+@media (max-width:900px), (max-height:759px){
+  .transfer-dialog{
+    width:min(900px,100%);
+    height:auto;
+    max-height:calc(100vh - 28px);
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  }
+  .transfer-dialog>.account-manager-body{min-height:0;overflow:auto}
+}
+.sync-switcher-block{position:relative;margin-top:8px}
+.sync-switcher{width:100%;display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border,rgba(148,163,184,.28));border-radius:14px;background:var(--surface,#fff);color:var(--text,#18212f);cursor:pointer;text-align:left}
+.sync-switcher:hover{border-color:rgba(0,151,178,.55)}
+.sync-switcher-icon{width:26px;height:26px;display:grid;place-items:center;border-radius:9px;background:rgba(148,163,184,.14);flex:0 0 auto;font-size:13px}
+.sync-switcher-copy{min-width:0;display:flex;flex-direction:column;flex:1}
+.sync-switcher-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted,#667085);font-weight:700}
+.sync-switcher-label{font-size:12px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted,#667085)}
+.sync-popover{display:none;position:absolute;z-index:80;left:0;right:0;top:calc(100% + 8px);padding:14px;border:1px solid var(--border,rgba(148,163,184,.28));border-radius:14px;background:var(--surface,#fff);box-shadow:0 16px 34px rgba(15,23,42,.18)}
+.sync-popover.is-open{display:block}
+.sync-popover-head{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#667085);margin-bottom:8px}
+.sync-popover-copy{font-size:13px;line-height:1.45;margin:0 0 10px}
+.sync-popover-muted{color:var(--muted,#667085);font-size:12px}
+.sync-popover-footnote{font-size:11px;color:var(--muted,#667085);margin:8px 0 0}
+.sync-google-btn{width:100%;padding:10px 12px;border-radius:11px;border:1px solid rgba(0,151,178,.4);background:#0097b2;color:#fff;font-weight:700;font-size:13px;cursor:pointer}
+.sync-google-btn:hover{background:#007c94}
+.sync-secondary-btn{width:100%;padding:9px 12px;border-radius:11px;border:1px solid var(--border,rgba(148,163,184,.3));background:transparent;color:inherit;font-weight:650;font-size:13px;cursor:pointer}
+.sync-secondary-btn:hover{border-color:rgba(0,151,178,.55)}

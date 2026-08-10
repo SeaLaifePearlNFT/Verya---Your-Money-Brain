@@ -1,0 +1,3471 @@
+/* v1316 — Overview spacing stability
+   Keeps the Overview stack spacing stable after month changes, tab switches, and partial re-renders. */
+.view-page[data-view="overview"]{
+  --overview-section-gap: 24px;
+  --overview-major-gap: 34px;
+}
+.view-page[data-view="overview"] > #finStateBanner{
+  display:block;
+  min-width:0;
+  margin:0;
+}
+.view-page[data-view="overview"] > #finStateBanner:not(:empty){
+  margin-bottom:var(--overview-section-gap) !important;
+}
+.view-page[data-view="overview"] > #finStateBanner:empty{
+  display:none;
+}
+.view-page[data-view="overview"] > #summaryCards.summary{
+  margin-top:0 !important;
+  margin-bottom:var(--overview-major-gap) !important;
+}
+.view-page[data-view="overview"] > #overviewInlineInsights.inline-smart-insights{
+  margin-top:0 !important;
+  margin-bottom:var(--overview-major-gap) !important;
+}
+.view-page[data-view="overview"] > .grid-overview{
+  margin-top:0 !important;
+}
+.view-page[data-view="overview"] .status-banner{
+  margin:0 !important;
+  box-sizing:border-box;
+}
+@media (max-width: 760px){
+  .view-page[data-view="overview"]{
+    --overview-section-gap:18px;
+    --overview-major-gap:24px;
+  }
+}
+
+
+/* v1317 — Bank Account hero KPI alignment refinement
+   Keeps the Bank Account label anchored to the card's visual padding while
+   preserving the large balance as the focal point of the tile. */
+#summaryCards .hero-kpi.bank-account-kpi{
+  justify-content:flex-start;
+  align-items:stretch;
+  padding:30px 30px 28px 32px;
+  gap:0;
+}
+#summaryCards .hero-kpi.bank-account-kpi .hero-kpi-eyebrow,
+#summaryCards .hero-kpi.bank-account-kpi .kpi-label{
+  align-self:flex-start;
+  margin:0;
+  padding-left:0;
+  line-height:1.1;
+}
+#summaryCards .hero-kpi.bank-account-kpi .hero-kpi-value,
+#summaryCards .hero-kpi.bank-account-kpi .kpi-value{
+  align-self:center;
+  margin-top:auto;
+  margin-bottom:10px;
+  text-align:center;
+}
+#summaryCards .hero-kpi.bank-account-kpi .hero-kpi-foot,
+#summaryCards .hero-kpi.bank-account-kpi .kpi-foot{
+  align-self:center;
+  margin-bottom:auto;
+  text-align:center;
+}
+@media (max-width:900px){
+  #summaryCards .hero-kpi.bank-account-kpi{
+    padding:26px 24px;
+  }
+}
+
+
+/* v1320 — Shared Expenses totals tooltip + popover layout cleanup */
+.shared-outstanding-panel {
+  width: min(380px, calc(100vw - 32px));
+  max-width: min(380px, calc(100vw - 32px));
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+.shared-outstanding-section {
+  display: grid;
+  gap: 6px;
+}
+.shared-outstanding-section-title {
+  font-size: 0.58rem;
+  font-weight: 850;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.055em;
+}
+.shared-outstanding-empty {
+  display: block;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white-72);
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 650;
+}
+.splitwise-panel {
+  box-sizing: border-box;
+  overflow-x: hidden !important;
+  scrollbar-gutter: auto !important;
+}
+.splitwise-panel *,
+.splitwise-panel *::before,
+.splitwise-panel *::after {
+  box-sizing: border-box;
+}
+.splitwise-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.splitwise-form input {
+  min-width: 0;
+  height: 34px;
+  text-align: right;
+}
+.splitwise-form .ghost-btn {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  margin: 0;
+}
+.splitwise-entries-list {
+  overflow-x: hidden !important;
+  scrollbar-gutter: auto !important;
+}
+.splitwise-entry-chip {
+  min-width: 0;
+  max-width: 100%;
+}
+.splitwise-entry-main,
+.splitwise-entry-text,
+.splitwise-entry-meta {
+  min-width: 0;
+}
+@media (max-width: 420px) {
+  .splitwise-form {
+    grid-template-columns: 1fr;
+  }
+  .splitwise-form .ghost-btn {
+    width: 100%;
+  }
+}
+
+
+/* v1321 — Shared Expenses UI rebuild: inline manager + concise totals tooltip */
+.shared-outstanding-summary-row.is-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.shared-outstanding-panel {
+  width: min(420px, calc(100vw - 32px));
+  max-width: min(420px, calc(100vw - 32px));
+  overflow-x: hidden !important;
+}
+.shared-outstanding-panel *,
+.shared-outstanding-panel *::before,
+.shared-outstanding-panel *::after {
+  box-sizing: border-box;
+}
+.alloc-focus-panel .splitwise-details {
+  width: 100%;
+  min-width: 0;
+}
+.alloc-focus-panel .splitwise-toggle {
+  min-height: 36px;
+  padding: 7px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border-radius: 12px;
+  white-space: normal;
+  text-align: left;
+}
+.splitwise-toggle-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-ui);
+  font-weight: 780;
+  color: var(--accent-text);
+}
+.splitwise-toggle-value {
+  font-family: var(--font-mono);
+  font-weight: 850;
+  white-space: nowrap;
+}
+.alloc-focus-panel .splitwise-panel {
+  position: static !important;
+  visibility: visible !important;
+  display: grid !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  max-height: none !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  margin-top: 8px;
+  padding: 0;
+  overflow: hidden !important;
+  border-radius: 14px;
+  border: 1px solid rgba(148,163,184,0.28);
+  background: rgba(255,255,255,0.74);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);
+  grid-template-rows: auto auto minmax(0, auto);
+}
+.alloc-focus-panel .splitwise-panel::before,
+.alloc-focus-panel .splitwise-panel::after {
+  display: none !important;
+}
+.splitwise-manager-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(145deg, rgba(255,255,255,0.88), rgba(241,248,255,0.66));
+}
+.splitwise-manager-title {
+  font-size: 0.72rem;
+  font-weight: 850;
+  color: var(--accent-text);
+  line-height: 1.2;
+}
+.splitwise-manager-sub {
+  margin-top: 3px;
+  font-size: 0.61rem;
+  color: var(--muted);
+  font-weight: 650;
+  line-height: 1.35;
+}
+.splitwise-manager-total {
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--white-72);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 850;
+  color: var(--accent-text);
+  white-space: nowrap;
+}
+.splitwise-manager-total.receivable { color: var(--green-700); background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.22); }
+.splitwise-manager-total.payable { color: var(--red-700); background: rgba(239,68,68,0.07); border-color: rgba(239,68,68,0.20); }
+.alloc-focus-panel .splitwise-form {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  background: rgba(248,250,252,0.72);
+  border-bottom: 1px solid var(--line);
+}
+.splitwise-input-label {
+  font-size: 0.58rem;
+  font-weight: 850;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.alloc-focus-panel .splitwise-form input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 6px 9px;
+  border-radius: 9px;
+}
+.alloc-focus-panel .splitwise-form .ghost-btn {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  margin: 0;
+  white-space: nowrap;
+  border-radius: 9px;
+}
+.alloc-focus-panel .splitwise-entries-list {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: hidden !important;
+  padding: 10px 12px 12px;
+  scrollbar-gutter: stable;
+}
+.alloc-focus-panel .splitwise-entry-chip {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  padding: 8px 9px;
+  border-radius: 10px;
+}
+.alloc-focus-panel .splitwise-entry-main,
+.alloc-focus-panel .splitwise-entry-text,
+.alloc-focus-panel .splitwise-entry-meta {
+  min-width: 0;
+}
+.alloc-focus-panel .splitwise-entry-text {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.alloc-focus-panel .splitwise-entry-meta {
+  white-space: nowrap;
+}
+.alloc-focus-panel .splitwise-empty {
+  padding: 12px;
+  text-align: left;
+  font-style: normal;
+  line-height: 1.35;
+}
+@media (max-width: 560px) {
+  .alloc-focus-panel .splitwise-form {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .splitwise-input-label {
+    margin-bottom: -3px;
+  }
+  .alloc-focus-panel .splitwise-form .ghost-btn {
+    width: 100%;
+  }
+}
+
+
+/* === v1352 HARD FIX: remove all white simulator framing === */
+
+/* Main simulator modal shell */
+.debt-simulator-modal,
+.debt-simulation-modal,
+#debtSimulationModal,
+[id*="simulation"] .modal-content,
+[id*="Simulation"] .modal-content {
+    background: linear-gradient(180deg,#0a1222 0%, #08101d 100%) !important;
+    border: 1px solid rgba(120,140,180,.22) !important;
+    box-shadow: 0 24px 80px rgba(0,0,0,.55) !important;
+}
+
+/* Inner content wrapper */
+.debt-simulator-modal .modal-body,
+.debt-simulation-modal .modal-body,
+#debtSimulationModal .modal-body,
+[id*="simulation"] .modal-body,
+[id*="Simulation"] .modal-body {
+    background: #08101d !important;
+}
+
+/* Kill ALL light backgrounds inside simulation modal */
+.debt-simulator-modal div,
+.debt-simulation-modal div,
+#debtSimulationModal div {
+    scrollbar-color: #334155 #0b1220;
+}
+
+/* Outer gutters shown left/right in screenshot */
+.debt-simulator-modal,
+.debt-simulation-modal,
+#debtSimulationModal {
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Explicitly fix the visible pale side rails */
+.debt-simulator-modal::before,
+.debt-simulator-modal::after,
+.debt-simulation-modal::before,
+.debt-simulation-modal::after,
+#debtSimulationModal::before,
+#debtSimulationModal::after {
+    content: none !important;
+    display: none !important;
+}
+
+/* Content area behind cards */
+.debt-simulator-modal .simulation-grid,
+.debt-simulator-modal .simulation-layout,
+.debt-simulator-modal .simulation-columns,
+.debt-simulation-modal .simulation-grid,
+#debtSimulationModal .simulation-grid {
+    background: transparent !important;
+}
+
+/* Force dark background on any unnamed wrappers */
+.debt-simulator-modal > div,
+.debt-simulation-modal > div,
+#debtSimulationModal > div {
+    background-color: #08101d !important;
+}
+
+/* Modal overlay */
+.modal-overlay:has(.debt-simulator-modal),
+.modal-overlay:has(.debt-simulation-modal),
+.modal-overlay:has(#debtSimulationModal) {
+    background: rgba(2,6,23,.82) !important;
+    backdrop-filter: blur(12px) !important;
+}
+
+
+/* === v1353 EXACT FIX: Debt Simulation white frame / gutter removal ===
+   The visible white frame is the generated .debt-simulation-body, not the card.
+   This is intentionally scoped to #debtSimulationOverlay only. */
+
+#debtSimulationOverlay,
+#debtSimulationOverlay.cbm-overlay,
+#debtSimulationOverlay[data-modal-kind="debt-simulation"] {
+  background: rgba(2, 6, 23, 0.86) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+#debtSimulationOverlay .debt-simulation-modal,
+#debtSimulationOverlay .cbm-modal.debt-simulation-modal {
+  background: #0b1220 !important;
+  border: 1px solid rgba(148, 163, 184, 0.26) !important;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.62) !important;
+  overflow: hidden !important;
+}
+
+/* This is the actual white/grey frame visible around the simulator content. */
+#debtSimulationOverlay .debt-simulation-body,
+#debtSimulationOverlay .cbm-body.debt-simulation-body {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(56, 189, 248, 0.055), transparent 42%),
+    linear-gradient(180deg, #070b14 0%, #070b14 100%) !important;
+  background-color: #070b14 !important;
+  color: #eaf1fb !important;
+  padding: 14px 18px !important;
+  border: 0 !important;
+  scrollbar-color: #334155 #070b14 !important;
+}
+
+/* Chrome/WebKit scrollbar inside the simulator modal */
+#debtSimulationOverlay .debt-simulation-body::-webkit-scrollbar {
+  width: 12px !important;
+}
+
+#debtSimulationOverlay .debt-simulation-body::-webkit-scrollbar-track {
+  background: #070b14 !important;
+}
+
+#debtSimulationOverlay .debt-simulation-body::-webkit-scrollbar-thumb {
+  background: #334155 !important;
+  border-radius: 999px !important;
+  border: 3px solid #070b14 !important;
+}
+
+/* Remove any pale inherited wrapper or background strips. */
+#debtSimulationOverlay .debt-simulation-body > *,
+#debtSimulationOverlay .debt-simulation-body .debt-simulator-card {
+  background-color: transparent !important;
+}
+
+#debtSimulationOverlay .debt-simulator-card {
+  background:
+    radial-gradient(circle at 96% -10%, rgba(56, 189, 248, 0.10), transparent 38%),
+    linear-gradient(145deg, rgba(13, 20, 34, 0.99), rgba(7, 11, 20, 0.99)) !important;
+  border: 1px solid rgba(148, 163, 184, 0.26) !important;
+}
+
+/* Footer/header consistency */
+#debtSimulationOverlay .cbm-header,
+#debtSimulationOverlay .cbm-footer {
+  background: #111827 !important;
+  border-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+/* Final hard guard against light frame backgrounds in this modal only. */
+#debtSimulationOverlay [style*="rgba(234,246,255"],
+#debtSimulationOverlay [style*="rgba(255,255,255"],
+#debtSimulationOverlay [style*="background: #fff"],
+#debtSimulationOverlay [style*="background:#fff"],
+#debtSimulationOverlay [style*="background: white"],
+#debtSimulationOverlay [style*="background:white"] {
+  background: #070b14 !important;
+  background-color: #070b14 !important;
+  color: #eaf1fb !important;
+}
+
+
+/* === v1354 EXACT FIX: Debt Details popup dark-mode completion ===
+   Scoped only to #debtDetailOverlay. Fixes the remaining pale tiles/rows:
+   Loan basics, Extra repayment source, Payment activity, Timeline/history,
+   top KPI tiles, row lists, footer/body frame, and buttons. */
+
+#debtDetailOverlay,
+#debtDetailOverlay.cbm-overlay,
+#debtDetailOverlay[data-modal-kind="debt-detail"],
+#debtDetailOverlay[data-view="debt"] {
+  background: rgba(2, 6, 23, 0.86) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+#debtDetailOverlay .debt-detail-modal,
+#debtDetailOverlay .cbm-modal.debt-detail-modal {
+  background:
+    radial-gradient(circle at 96% -10%, rgba(56,189,248,0.08), transparent 38%),
+    linear-gradient(145deg, #0b1220 0%, #070b14 100%) !important;
+  border: 1px solid rgba(148,163,184,0.28) !important;
+  color: #eaf1fb !important;
+  overflow: hidden !important;
+  box-shadow: 0 28px 80px rgba(0,0,0,0.62) !important;
+}
+
+#debtDetailOverlay .cbm-header,
+#debtDetailOverlay .cbm-footer {
+  background: #111827 !important;
+  border-color: rgba(148,163,184,0.22) !important;
+  color: #f8fafc !important;
+}
+
+#debtDetailOverlay .debt-detail-body,
+#debtDetailOverlay .cbm-body.debt-detail-body {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(56,189,248,0.045), transparent 42%),
+    linear-gradient(180deg, #070b14 0%, #070b14 100%) !important;
+  background-color: #070b14 !important;
+  color: #eaf1fb !important;
+  scrollbar-color: #334155 #070b14 !important;
+}
+
+#debtDetailOverlay .debt-detail-body::-webkit-scrollbar { width: 12px !important; }
+#debtDetailOverlay .debt-detail-body::-webkit-scrollbar-track { background: #070b14 !important; }
+#debtDetailOverlay .debt-detail-body::-webkit-scrollbar-thumb {
+  background: #334155 !important;
+  border-radius: 999px !important;
+  border: 3px solid #070b14 !important;
+}
+
+/* Main cards and all readable detail sections */
+#debtDetailOverlay .debt-readable-card,
+#debtDetailOverlay .debt-mock-card,
+#debtDetailOverlay .debt-detail-mini-card,
+#debtDetailOverlay .debt-detail-setup-summary,
+#debtDetailOverlay .debt-detail-extra-summary,
+#debtDetailOverlay .debt-detail-monthly-summary,
+#debtDetailOverlay .debt-extra-source-card,
+#debtDetailOverlay .debt-history-card,
+#debtDetailOverlay .debt-detail-status,
+#debtDetailOverlay section[class*="debt-detail"],
+#debtDetailOverlay section[class*="debt-readable"],
+#debtDetailOverlay section[class*="debt-extra"],
+#debtDetailOverlay section[class*="debt-history"] {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.075), transparent 38%),
+    linear-gradient(145deg, rgba(15,23,42,0.97), rgba(9,14,25,0.985)) !important;
+  border: 1px solid rgba(148,163,184,0.24) !important;
+  color: #eaf1fb !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 12px 28px rgba(0,0,0,0.24) !important;
+}
+
+/* Top hero/status area */
+#debtDetailOverlay .debt-readable-hero,
+#debtDetailOverlay .debt-health-card,
+#debtDetailOverlay .debt-detail-hero,
+#debtDetailOverlay .debt-progress-block {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(56,189,248,0.09), transparent 38%),
+    linear-gradient(145deg, rgba(15,23,42,0.96), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #eaf1fb !important;
+}
+
+/* KPI / readable tiles */
+#debtDetailOverlay .debt-readable-tile,
+#debtDetailOverlay .debt-detail-activity-tiles > *,
+#debtDetailOverlay .debt-readable-grid > *,
+#debtDetailOverlay .debt-detail-row-list > div,
+#debtDetailOverlay .debt-detail-stat,
+#debtDetailOverlay .debt-detail-metric {
+  background: rgba(15,23,42,0.86) !important;
+  border: 1px solid rgba(148,163,184,0.22) !important;
+  color: #eaf1fb !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035) !important;
+}
+
+#debtDetailOverlay .debt-readable-tile.good,
+#debtDetailOverlay .debt-readable-grid > .good,
+#debtDetailOverlay .debt-detail-activity-tiles > .good {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(16,185,129,0.12), transparent 38%),
+    linear-gradient(145deg, rgba(13,43,34,0.92), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(110,231,183,0.30) !important;
+}
+
+#debtDetailOverlay .debt-readable-tile.warn,
+#debtDetailOverlay .debt-readable-grid > .warn,
+#debtDetailOverlay .debt-detail-activity-tiles > .warn {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(245,158,11,0.13), transparent 38%),
+    linear-gradient(145deg, rgba(31,25,16,0.94), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(245,158,11,0.34) !important;
+}
+
+#debtDetailOverlay .debt-readable-tile.neutral,
+#debtDetailOverlay .debt-readable-grid > .neutral,
+#debtDetailOverlay .debt-detail-activity-tiles > .neutral {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.08), transparent 38%),
+    linear-gradient(145deg, rgba(15,23,42,0.90), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+}
+
+/* Loan basics and extra source row list exact fix */
+#debtDetailOverlay .debt-detail-row-list {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+#debtDetailOverlay .debt-detail-row-list > div {
+  border-radius: 10px !important;
+  min-height: 34px !important;
+  padding: 8px 10px !important;
+}
+
+#debtDetailOverlay .debt-detail-row-list > div span,
+#debtDetailOverlay .debt-readable-label,
+#debtDetailOverlay .debt-readable-eyebrow,
+#debtDetailOverlay .debt-readable-helper {
+  color: #a8b6ca !important;
+  opacity: 1 !important;
+}
+
+#debtDetailOverlay .debt-detail-row-list > div strong,
+#debtDetailOverlay .debt-readable-value,
+#debtDetailOverlay .debt-readable-title,
+#debtDetailOverlay .debt-card-title,
+#debtDetailOverlay .debt-readable-head h3,
+#debtDetailOverlay .debt-readable-head h4 {
+  color: #f8fafc !important;
+  text-shadow: none !important;
+}
+
+/* Text contrast globally within detail popup */
+#debtDetailOverlay h1,
+#debtDetailOverlay h2,
+#debtDetailOverlay h3,
+#debtDetailOverlay h4,
+#debtDetailOverlay strong,
+#debtDetailOverlay .cbm-title {
+  color: #f8fafc !important;
+  text-shadow: none !important;
+}
+
+#debtDetailOverlay p,
+#debtDetailOverlay span,
+#debtDetailOverlay small,
+#debtDetailOverlay label,
+#debtDetailOverlay .debt-card-copy,
+#debtDetailOverlay .debt-readable-copy {
+  color: #cbd5e1 !important;
+}
+
+/* Pills / badges */
+#debtDetailOverlay .debt-phase-chip,
+#debtDetailOverlay .debt-health-status,
+#debtDetailOverlay .debt-status-neutral,
+#debtDetailOverlay .debt-status-warn,
+#debtDetailOverlay .debt-status-good,
+#debtDetailOverlay .debt-status-bad {
+  background: rgba(30,41,59,0.96) !important;
+  border: 1px solid rgba(148,163,184,0.30) !important;
+  color: #dbeafe !important;
+  text-shadow: none !important;
+}
+
+#debtDetailOverlay .debt-status-good {
+  background: rgba(16,185,129,0.14) !important;
+  border-color: rgba(110,231,183,0.34) !important;
+  color: #86efac !important;
+}
+
+#debtDetailOverlay .debt-status-warn {
+  background: rgba(245,158,11,0.14) !important;
+  border-color: rgba(245,158,11,0.34) !important;
+  color: #fcd34d !important;
+}
+
+/* Buttons inside detail popup */
+#debtDetailOverlay button,
+#debtDetailOverlay .feature-action-btn,
+#debtDetailOverlay .cbm-btn-ghost,
+#debtDetailOverlay .cbm-btn-primary {
+  border-color: rgba(148,163,184,0.34) !important;
+  color: #f8fafc !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 14px rgba(0,0,0,0.24) !important;
+}
+
+#debtDetailOverlay .feature-action-btn,
+#debtDetailOverlay .cbm-btn-ghost {
+  background: linear-gradient(145deg, rgba(30,41,59,0.96), rgba(15,23,42,0.98)) !important;
+}
+
+#debtDetailOverlay .cbm-btn-primary {
+  background: linear-gradient(145deg, rgba(59,130,246,0.96), rgba(37,99,235,0.98)) !important;
+  border-color: rgba(147,197,253,0.55) !important;
+}
+
+/* Progress bar area */
+#debtDetailOverlay .debt-progress-shell {
+  background: rgba(203,213,225,0.16) !important;
+  border-color: rgba(148,163,184,0.18) !important;
+}
+
+#debtDetailOverlay .debt-progress-meta,
+#debtDetailOverlay .debt-progress-meta span {
+  color: #cbd5e1 !important;
+}
+
+/* Kill any remaining pale/legacy backgrounds in the Details popup only */
+#debtDetailOverlay [style*="background: rgba(255"],
+#debtDetailOverlay [style*="background:rgba(255"],
+#debtDetailOverlay [style*="background: #fff"],
+#debtDetailOverlay [style*="background:#fff"],
+#debtDetailOverlay [style*="background: white"],
+#debtDetailOverlay [style*="background:white"],
+#debtDetailOverlay [style*="rgba(234,246,255"],
+#debtDetailOverlay [style*="rgba(241,249,255"] {
+  background: rgba(15,23,42,0.92) !important;
+  background-color: rgba(15,23,42,0.92) !important;
+  color: #eaf1fb !important;
+  border-color: rgba(148,163,184,0.24) !important;
+}
+
+
+/* === v1355 Debt Details: calculation details button dark-mode fix ===
+   Fixes the "Show calculation details" pill inside the Debt Details popup. */
+
+#debtDetailOverlay .debt-calculation-toggle,
+#debtDetailOverlay .debt-calc-toggle,
+#debtDetailOverlay .debt-detail-calc-toggle,
+#debtDetailOverlay button[data-debt-calculation-toggle],
+#debtDetailOverlay button[data-debt-calc-toggle],
+#debtDetailOverlay details summary,
+#debtDetailOverlay .debt-readable-card details summary,
+#debtDetailOverlay [class*="calculation"] summary,
+#debtDetailOverlay [class*="calc"] summary {
+  background:
+    linear-gradient(145deg, rgba(30,41,59,0.96), rgba(15,23,42,0.98)) !important;
+  border: 1px solid rgba(148,163,184,0.32) !important;
+  color: #dbeafe !important;
+  border-radius: 999px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 5px 16px rgba(0,0,0,0.26) !important;
+  text-shadow: none !important;
+}
+
+#debtDetailOverlay .debt-calculation-toggle:hover,
+#debtDetailOverlay .debt-calc-toggle:hover,
+#debtDetailOverlay .debt-detail-calc-toggle:hover,
+#debtDetailOverlay button[data-debt-calculation-toggle]:hover,
+#debtDetailOverlay button[data-debt-calc-toggle]:hover,
+#debtDetailOverlay details summary:hover,
+#debtDetailOverlay .debt-readable-card details summary:hover,
+#debtDetailOverlay [class*="calculation"] summary:hover,
+#debtDetailOverlay [class*="calc"] summary:hover {
+  background:
+    linear-gradient(145deg, rgba(37,99,235,0.92), rgba(30,64,175,0.98)) !important;
+  border-color: rgba(147,197,253,0.48) !important;
+  color: #eff6ff !important;
+  transform: translateY(-1px) !important;
+}
+
+#debtDetailOverlay .debt-calculation-toggle *,
+#debtDetailOverlay .debt-calc-toggle *,
+#debtDetailOverlay .debt-detail-calc-toggle *,
+#debtDetailOverlay button[data-debt-calculation-toggle] *,
+#debtDetailOverlay button[data-debt-calc-toggle] *,
+#debtDetailOverlay details summary *,
+#debtDetailOverlay [class*="calculation"] summary *,
+#debtDetailOverlay [class*="calc"] summary * {
+  color: inherit !important;
+}
+
+
+/* === v1356 Financial Goals dark-mode rework ===
+   Fixes main goal cards, goal metric tiles, History modal, and Goals Manager modal. */
+
+/* Main Financial Goals tab */
+body.dark-mode [data-view="goals"],
+html[data-theme="dark"] [data-view="goals"],
+.dark-mode [data-view="goals"] {
+  color-scheme: dark;
+  --fg-bg: #070b14;
+  --fg-card: #101827;
+  --fg-card-2: #142033;
+  --fg-border: rgba(148,163,184,0.24);
+  --fg-text: #eaf1fb;
+  --fg-strong: #f8fafc;
+  --fg-muted: #a8b6ca;
+  --fg-purple: #a78bfa;
+  --fg-green: #86efac;
+  --fg-amber: #fcd34d;
+  --fg-red: #fca5a5;
+  background: #070b14 !important;
+  color: #eaf1fb !important;
+}
+
+/* Page shells / KPI cards */
+body.dark-mode [data-view="goals"] .ui-3d-panel,
+body.dark-mode [data-view="goals"] .financial-goals-board,
+body.dark-mode [data-view="goals"] .financial-goals-kpi,
+body.dark-mode [data-view="goals"] .goal-summary-card,
+html[data-theme="dark"] [data-view="goals"] .ui-3d-panel,
+html[data-theme="dark"] [data-view="goals"] .financial-goals-board,
+html[data-theme="dark"] [data-view="goals"] .financial-goals-kpi,
+html[data-theme="dark"] [data-view="goals"] .goal-summary-card,
+.dark-mode [data-view="goals"] .ui-3d-panel,
+.dark-mode [data-view="goals"] .financial-goals-board,
+.dark-mode [data-view="goals"] .financial-goals-kpi,
+.dark-mode [data-view="goals"] .goal-summary-card {
+  background:
+    radial-gradient(circle at 96% -10%, rgba(167,139,250,0.10), transparent 38%),
+    linear-gradient(145deg, rgba(16,24,39,0.98), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #eaf1fb !important;
+  box-shadow: 0 18px 44px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+
+body.dark-mode [data-view="goals"] h1,
+body.dark-mode [data-view="goals"] h2,
+body.dark-mode [data-view="goals"] h3,
+body.dark-mode [data-view="goals"] h4,
+body.dark-mode [data-view="goals"] strong,
+html[data-theme="dark"] [data-view="goals"] h1,
+html[data-theme="dark"] [data-view="goals"] h2,
+html[data-theme="dark"] [data-view="goals"] h3,
+html[data-theme="dark"] [data-view="goals"] h4,
+html[data-theme="dark"] [data-view="goals"] strong,
+.dark-mode [data-view="goals"] h1,
+.dark-mode [data-view="goals"] h2,
+.dark-mode [data-view="goals"] h3,
+.dark-mode [data-view="goals"] h4,
+.dark-mode [data-view="goals"] strong {
+  color: #f8fafc !important;
+  text-shadow: none !important;
+}
+
+body.dark-mode [data-view="goals"] p,
+body.dark-mode [data-view="goals"] span,
+body.dark-mode [data-view="goals"] small,
+body.dark-mode [data-view="goals"] label,
+html[data-theme="dark"] [data-view="goals"] p,
+html[data-theme="dark"] [data-view="goals"] span,
+html[data-theme="dark"] [data-view="goals"] small,
+html[data-theme="dark"] [data-view="goals"] label,
+.dark-mode [data-view="goals"] p,
+.dark-mode [data-view="goals"] span,
+.dark-mode [data-view="goals"] small,
+.dark-mode [data-view="goals"] label {
+  color: #cbd5e1 !important;
+}
+
+/* Main goal cards */
+body.dark-mode [data-view="goals"] .fg-goal-card,
+body.dark-mode [data-view="goals"] .financial-goal-card,
+body.dark-mode [data-view="goals"] [class*="goal-card"],
+html[data-theme="dark"] [data-view="goals"] .fg-goal-card,
+html[data-theme="dark"] [data-view="goals"] .financial-goal-card,
+html[data-theme="dark"] [data-view="goals"] [class*="goal-card"],
+.dark-mode [data-view="goals"] .fg-goal-card,
+.dark-mode [data-view="goals"] .financial-goal-card,
+.dark-mode [data-view="goals"] [class*="goal-card"] {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(167,139,250,0.10), transparent 38%),
+    linear-gradient(145deg, rgba(17,24,39,0.98), rgba(8,13,24,0.98)) !important;
+  border-color: rgba(148,163,184,0.26) !important;
+  color: #eaf1fb !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 14px 30px rgba(0,0,0,0.26) !important;
+}
+
+body.dark-mode [data-view="goals"] .fg-goal-card.state-lagging,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-card.state-lagging,
+.dark-mode [data-view="goals"] .fg-goal-card.state-lagging {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(248,113,113,0.12), transparent 38%),
+    linear-gradient(145deg, rgba(31,20,25,0.98), rgba(8,13,24,0.98)) !important;
+  border-color: rgba(248,113,113,0.30) !important;
+}
+
+body.dark-mode [data-view="goals"] .fg-goal-card.state-active,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-card.state-active,
+.dark-mode [data-view="goals"] .fg-goal-card.state-active {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(245,158,11,0.12), transparent 38%),
+    linear-gradient(145deg, rgba(31,25,16,0.98), rgba(8,13,24,0.98)) !important;
+  border-color: rgba(245,158,11,0.34) !important;
+}
+
+/* Goal metric tiles */
+body.dark-mode [data-view="goals"] .fg-goal-metric,
+body.dark-mode [data-view="goals"] .goal-metric,
+body.dark-mode [data-view="goals"] [class*="goal-metric"],
+html[data-theme="dark"] [data-view="goals"] .fg-goal-metric,
+html[data-theme="dark"] [data-view="goals"] .goal-metric,
+html[data-theme="dark"] [data-view="goals"] [class*="goal-metric"],
+.dark-mode [data-view="goals"] .fg-goal-metric,
+.dark-mode [data-view="goals"] .goal-metric,
+.dark-mode [data-view="goals"] [class*="goal-metric"] {
+  background: rgba(15,23,42,0.86) !important;
+  border: 1px solid rgba(148,163,184,0.22) !important;
+  color: #eaf1fb !important;
+}
+
+body.dark-mode [data-view="goals"] .fg-goal-title,
+body.dark-mode [data-view="goals"] .fg-goal-metric-value,
+body.dark-mode [data-view="goals"] [class*="goal-title"],
+body.dark-mode [data-view="goals"] [class*="goal-value"],
+html[data-theme="dark"] [data-view="goals"] .fg-goal-title,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-metric-value,
+html[data-theme="dark"] [data-view="goals"] [class*="goal-title"],
+html[data-theme="dark"] [data-view="goals"] [class*="goal-value"],
+.dark-mode [data-view="goals"] .fg-goal-title,
+.dark-mode [data-view="goals"] .fg-goal-metric-value,
+.dark-mode [data-view="goals"] [class*="goal-title"],
+.dark-mode [data-view="goals"] [class*="goal-value"] {
+  color: #f8fafc !important;
+  text-shadow: none !important;
+}
+
+body.dark-mode [data-view="goals"] .fg-goal-source,
+body.dark-mode [data-view="goals"] .fg-goal-metric-label,
+body.dark-mode [data-view="goals"] [class*="goal-label"],
+body.dark-mode [data-view="goals"] [class*="goal-source"],
+html[data-theme="dark"] [data-view="goals"] .fg-goal-source,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-metric-label,
+html[data-theme="dark"] [data-view="goals"] [class*="goal-label"],
+html[data-theme="dark"] [data-view="goals"] [class*="goal-source"],
+.dark-mode [data-view="goals"] .fg-goal-source,
+.dark-mode [data-view="goals"] .fg-goal-metric-label,
+.dark-mode [data-view="goals"] [class*="goal-label"],
+.dark-mode [data-view="goals"] [class*="goal-source"] {
+  color: #a8b6ca !important;
+}
+
+/* Financial Goals History + Manager modal frame */
+body.dark-mode .financial-goals-history-modal,
+body.dark-mode .financial-goals-manager-modal,
+html[data-theme="dark"] .financial-goals-history-modal,
+html[data-theme="dark"] .financial-goals-manager-modal,
+.dark-mode .financial-goals-history-modal,
+.dark-mode .financial-goals-manager-modal {
+  background:
+    radial-gradient(circle at 96% -10%, rgba(16,185,129,0.08), transparent 38%),
+    linear-gradient(145deg, #0b1220 0%, #070b14 100%) !important;
+  border: 1px solid rgba(148,163,184,0.28) !important;
+  color: #eaf1fb !important;
+  overflow: hidden !important;
+  box-shadow: 0 28px 80px rgba(0,0,0,0.62) !important;
+}
+
+body.dark-mode .financial-goals-history-modal .cbm-header,
+body.dark-mode .financial-goals-history-modal .cbm-footer,
+body.dark-mode .financial-goals-manager-modal .cbm-header,
+body.dark-mode .financial-goals-manager-modal .cbm-footer,
+html[data-theme="dark"] .financial-goals-history-modal .cbm-header,
+html[data-theme="dark"] .financial-goals-history-modal .cbm-footer,
+html[data-theme="dark"] .financial-goals-manager-modal .cbm-header,
+html[data-theme="dark"] .financial-goals-manager-modal .cbm-footer,
+.dark-mode .financial-goals-history-modal .cbm-header,
+.dark-mode .financial-goals-history-modal .cbm-footer,
+.dark-mode .financial-goals-manager-modal .cbm-header,
+.dark-mode .financial-goals-manager-modal .cbm-footer {
+  background: #111827 !important;
+  border-color: rgba(148,163,184,0.22) !important;
+  color: #f8fafc !important;
+}
+
+body.dark-mode .financial-goals-history-body,
+body.dark-mode .financial-goals-manager-body,
+body.dark-mode .financial-goals-workspace-strip,
+html[data-theme="dark"] .financial-goals-history-body,
+html[data-theme="dark"] .financial-goals-manager-body,
+html[data-theme="dark"] .financial-goals-workspace-strip,
+.dark-mode .financial-goals-history-body,
+.dark-mode .financial-goals-manager-body,
+.dark-mode .financial-goals-workspace-strip {
+  background: #070b14 !important;
+  color: #eaf1fb !important;
+}
+
+/* History cards and workspace cards */
+body.dark-mode .financial-goals-history-item,
+body.dark-mode .financial-goals-history-card,
+body.dark-mode .fg-history-card,
+body.dark-mode .financial-goals-workspace-stat,
+body.dark-mode .financial-goals-workspace-card,
+body.dark-mode .financial-goals-manager-modal .fg-goal-card,
+html[data-theme="dark"] .financial-goals-history-item,
+html[data-theme="dark"] .financial-goals-history-card,
+html[data-theme="dark"] .fg-history-card,
+html[data-theme="dark"] .financial-goals-workspace-stat,
+html[data-theme="dark"] .financial-goals-workspace-card,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-card,
+.dark-mode .financial-goals-history-item,
+.dark-mode .financial-goals-history-card,
+.dark-mode .fg-history-card,
+.dark-mode .financial-goals-workspace-stat,
+.dark-mode .financial-goals-workspace-card,
+.dark-mode .financial-goals-manager-modal .fg-goal-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(16,185,129,0.08), transparent 38%),
+    linear-gradient(145deg, rgba(15,23,42,0.96), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #eaf1fb !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 12px 28px rgba(0,0,0,0.22) !important;
+}
+
+/* History + manager inner metric tiles */
+body.dark-mode .financial-goals-history-modal .fg-goal-metric,
+body.dark-mode .financial-goals-manager-modal .fg-goal-metric,
+body.dark-mode .financial-goals-manager-modal input,
+body.dark-mode .financial-goals-manager-modal select,
+body.dark-mode .financial-goals-manager-modal .keyword-pill,
+body.dark-mode .financial-goals-manager-modal .fg-keyword-pill,
+html[data-theme="dark"] .financial-goals-history-modal .fg-goal-metric,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-metric,
+html[data-theme="dark"] .financial-goals-manager-modal input,
+html[data-theme="dark"] .financial-goals-manager-modal select,
+html[data-theme="dark"] .financial-goals-manager-modal .keyword-pill,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-keyword-pill,
+.dark-mode .financial-goals-history-modal .fg-goal-metric,
+.dark-mode .financial-goals-manager-modal .fg-goal-metric,
+.dark-mode .financial-goals-manager-modal input,
+.dark-mode .financial-goals-manager-modal select,
+.dark-mode .financial-goals-manager-modal .keyword-pill,
+.dark-mode .financial-goals-manager-modal .fg-keyword-pill {
+  background: rgba(15,23,42,0.86) !important;
+  border: 1px solid rgba(148,163,184,0.22) !important;
+  color: #eaf1fb !important;
+}
+
+/* Modal text contrast */
+body.dark-mode .financial-goals-history-modal h3,
+body.dark-mode .financial-goals-history-modal h4,
+body.dark-mode .financial-goals-history-modal strong,
+body.dark-mode .financial-goals-manager-modal h3,
+body.dark-mode .financial-goals-manager-modal h4,
+body.dark-mode .financial-goals-manager-modal strong,
+body.dark-mode .financial-goals-history-modal .cbm-title,
+body.dark-mode .financial-goals-manager-modal .cbm-title,
+html[data-theme="dark"] .financial-goals-history-modal h3,
+html[data-theme="dark"] .financial-goals-history-modal h4,
+html[data-theme="dark"] .financial-goals-history-modal strong,
+html[data-theme="dark"] .financial-goals-manager-modal h3,
+html[data-theme="dark"] .financial-goals-manager-modal h4,
+html[data-theme="dark"] .financial-goals-manager-modal strong,
+html[data-theme="dark"] .financial-goals-history-modal .cbm-title,
+html[data-theme="dark"] .financial-goals-manager-modal .cbm-title,
+.dark-mode .financial-goals-history-modal h3,
+.dark-mode .financial-goals-history-modal h4,
+.dark-mode .financial-goals-history-modal strong,
+.dark-mode .financial-goals-manager-modal h3,
+.dark-mode .financial-goals-manager-modal h4,
+.dark-mode .financial-goals-manager-modal strong,
+.dark-mode .financial-goals-history-modal .cbm-title,
+.dark-mode .financial-goals-manager-modal .cbm-title {
+  color: #f8fafc !important;
+  text-shadow: none !important;
+}
+
+body.dark-mode .financial-goals-history-modal p,
+body.dark-mode .financial-goals-history-modal span,
+body.dark-mode .financial-goals-history-modal small,
+body.dark-mode .financial-goals-manager-modal p,
+body.dark-mode .financial-goals-manager-modal span,
+body.dark-mode .financial-goals-manager-modal small,
+body.dark-mode .financial-goals-manager-modal label,
+body.dark-mode .financial-goals-history-modal .cbm-sub,
+body.dark-mode .financial-goals-manager-modal .cbm-sub,
+html[data-theme="dark"] .financial-goals-history-modal p,
+html[data-theme="dark"] .financial-goals-history-modal span,
+html[data-theme="dark"] .financial-goals-history-modal small,
+html[data-theme="dark"] .financial-goals-manager-modal p,
+html[data-theme="dark"] .financial-goals-manager-modal span,
+html[data-theme="dark"] .financial-goals-manager-modal small,
+html[data-theme="dark"] .financial-goals-manager-modal label,
+html[data-theme="dark"] .financial-goals-history-modal .cbm-sub,
+html[data-theme="dark"] .financial-goals-manager-modal .cbm-sub,
+.dark-mode .financial-goals-history-modal p,
+.dark-mode .financial-goals-history-modal span,
+.dark-mode .financial-goals-history-modal small,
+.dark-mode .financial-goals-manager-modal p,
+.dark-mode .financial-goals-manager-modal span,
+.dark-mode .financial-goals-manager-modal small,
+.dark-mode .financial-goals-manager-modal label,
+.dark-mode .financial-goals-history-modal .cbm-sub,
+.dark-mode .financial-goals-manager-modal .cbm-sub {
+  color: #cbd5e1 !important;
+}
+
+/* State pills */
+body.dark-mode .financial-goals-state-pill,
+html[data-theme="dark"] .financial-goals-state-pill,
+.dark-mode .financial-goals-state-pill {
+  background: rgba(30,41,59,0.96) !important;
+  border-color: rgba(148,163,184,0.30) !important;
+  color: #dbeafe !important;
+}
+
+body.dark-mode .financial-goals-state-pill.state-complete,
+html[data-theme="dark"] .financial-goals-state-pill.state-complete,
+.dark-mode .financial-goals-state-pill.state-complete {
+  background: rgba(16,185,129,0.14) !important;
+  border-color: rgba(110,231,183,0.34) !important;
+  color: #86efac !important;
+}
+
+body.dark-mode .financial-goals-state-pill.state-active,
+html[data-theme="dark"] .financial-goals-state-pill.state-active,
+.dark-mode .financial-goals-state-pill.state-active {
+  background: rgba(245,158,11,0.14) !important;
+  border-color: rgba(245,158,11,0.34) !important;
+  color: #fcd34d !important;
+}
+
+body.dark-mode .financial-goals-state-pill.state-lagging,
+html[data-theme="dark"] .financial-goals-state-pill.state-lagging,
+.dark-mode .financial-goals-state-pill.state-lagging {
+  background: rgba(248,113,113,0.14) !important;
+  border-color: rgba(248,113,113,0.34) !important;
+  color: #fca5a5 !important;
+}
+
+/* Delete buttons */
+body.dark-mode .financial-goals-manager-modal .fg-goal-delete,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-delete,
+.dark-mode .financial-goals-manager-modal .fg-goal-delete {
+  background: rgba(127,29,29,0.88) !important;
+  border-color: rgba(248,113,113,0.50) !important;
+  color: #fecaca !important;
+}
+
+/* Kill leftover light surfaces */
+body.dark-mode [data-view="goals"] [style*="background: #fff"],
+body.dark-mode [data-view="goals"] [style*="background:#fff"],
+body.dark-mode [data-view="goals"] [style*="background: white"],
+body.dark-mode [data-view="goals"] [style*="background:white"],
+body.dark-mode .financial-goals-history-modal [style*="background: #fff"],
+body.dark-mode .financial-goals-history-modal [style*="background:#fff"],
+body.dark-mode .financial-goals-manager-modal [style*="background: #fff"],
+body.dark-mode .financial-goals-manager-modal [style*="background:#fff"],
+html[data-theme="dark"] [data-view="goals"] [style*="background: #fff"],
+html[data-theme="dark"] [data-view="goals"] [style*="background:#fff"],
+html[data-theme="dark"] [data-view="goals"] [style*="background: white"],
+html[data-theme="dark"] [data-view="goals"] [style*="background:white"],
+html[data-theme="dark"] .financial-goals-history-modal [style*="background: #fff"],
+html[data-theme="dark"] .financial-goals-history-modal [style*="background:#fff"],
+html[data-theme="dark"] .financial-goals-manager-modal [style*="background: #fff"],
+html[data-theme="dark"] .financial-goals-manager-modal [style*="background:#fff"] {
+  background: rgba(15,23,42,0.92) !important;
+  color: #eaf1fb !important;
+  border-color: rgba(148,163,184,0.24) !important;
+}
+
+
+/* === v1357 Financial Goals review pass: restore red/orange identity + finish dark-mode tiles ===
+   Keeps the goal status colors visible in dark mode instead of flattening everything to neutral. */
+
+/* Main page and manager cards: status-specific borders + glow */
+body.dark-mode [data-view="goals"] .fg-goal-card.state-lagging,
+body.dark-mode .financial-goals-manager-modal .fg-goal-card.state-lagging,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-card.state-lagging,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-card.state-lagging,
+.dark-mode [data-view="goals"] .fg-goal-card.state-lagging,
+.dark-mode .financial-goals-manager-modal .fg-goal-card.state-lagging {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(248,113,113,0.16), transparent 38%),
+    linear-gradient(145deg, rgba(39,18,24,0.98), rgba(9,14,25,0.98)) !important;
+  border: 1px solid rgba(248,113,113,0.48) !important;
+  border-top: 3px solid #ef4444 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 0 0 1px rgba(248,113,113,0.10),
+    0 14px 30px rgba(0,0,0,0.28) !important;
+}
+
+body.dark-mode [data-view="goals"] .fg-goal-card.state-active,
+body.dark-mode .financial-goals-manager-modal .fg-goal-card.state-active,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-card.state-active,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-card.state-active,
+.dark-mode [data-view="goals"] .fg-goal-card.state-active,
+.dark-mode .financial-goals-manager-modal .fg-goal-card.state-active {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(245,158,11,0.18), transparent 38%),
+    linear-gradient(145deg, rgba(42,29,13,0.98), rgba(9,14,25,0.98)) !important;
+  border: 1px solid rgba(245,158,11,0.52) !important;
+  border-top: 3px solid #f59e0b !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 0 0 1px rgba(245,158,11,0.11),
+    0 14px 30px rgba(0,0,0,0.28) !important;
+}
+
+body.dark-mode [data-view="goals"] .fg-goal-card.state-complete,
+body.dark-mode .financial-goals-manager-modal .fg-goal-card.state-complete,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-card.state-complete,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-card.state-complete,
+.dark-mode [data-view="goals"] .fg-goal-card.state-complete,
+.dark-mode .financial-goals-manager-modal .fg-goal-card.state-complete {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(16,185,129,0.14), transparent 38%),
+    linear-gradient(145deg, rgba(13,43,34,0.96), rgba(9,14,25,0.98)) !important;
+  border: 1px solid rgba(110,231,183,0.38) !important;
+  border-top: 3px solid #10b981 !important;
+}
+
+/* Preserve status progress colors */
+body.dark-mode [data-view="goals"] .fg-goal-card.state-lagging .financial-goals-progress-fill,
+body.dark-mode .financial-goals-manager-modal .fg-goal-card.state-lagging .financial-goals-progress-fill,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-card.state-lagging .financial-goals-progress-fill,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-card.state-lagging .financial-goals-progress-fill,
+.dark-mode [data-view="goals"] .fg-goal-card.state-lagging .financial-goals-progress-fill,
+.dark-mode .financial-goals-manager-modal .fg-goal-card.state-lagging .financial-goals-progress-fill {
+  background: linear-gradient(90deg, #fb7185, #ef4444) !important;
+}
+
+body.dark-mode [data-view="goals"] .fg-goal-card.state-active .financial-goals-progress-fill,
+body.dark-mode .financial-goals-manager-modal .fg-goal-card.state-active .financial-goals-progress-fill,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-card.state-active .financial-goals-progress-fill,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-card.state-active .financial-goals-progress-fill,
+.dark-mode [data-view="goals"] .fg-goal-card.state-active .financial-goals-progress-fill,
+.dark-mode .financial-goals-manager-modal .fg-goal-card.state-active .financial-goals-progress-fill {
+  background: linear-gradient(90deg, #facc15, #f59e0b) !important;
+}
+
+body.dark-mode [data-view="goals"] .fg-goal-card.state-complete .financial-goals-progress-fill,
+body.dark-mode .financial-goals-manager-modal .fg-goal-card.state-complete .financial-goals-progress-fill,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-card.state-complete .financial-goals-progress-fill,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-card.state-complete .financial-goals-progress-fill,
+.dark-mode [data-view="goals"] .fg-goal-card.state-complete .financial-goals-progress-fill,
+.dark-mode .financial-goals-manager-modal .fg-goal-card.state-complete .financial-goals-progress-fill {
+  background: linear-gradient(90deg, #34d399, #10b981) !important;
+}
+
+body.dark-mode [data-view="goals"] .financial-goals-progress,
+body.dark-mode .financial-goals-manager-modal .financial-goals-progress,
+html[data-theme="dark"] [data-view="goals"] .financial-goals-progress,
+html[data-theme="dark"] .financial-goals-manager-modal .financial-goals-progress,
+.dark-mode [data-view="goals"] .financial-goals-progress,
+.dark-mode .financial-goals-manager-modal .financial-goals-progress {
+  background: rgba(203,213,225,0.16) !important;
+}
+
+/* Metric tiles in goal cards should be dark but not erase card identity */
+body.dark-mode [data-view="goals"] .fg-goal-card.state-lagging .fg-goal-metric,
+body.dark-mode .financial-goals-manager-modal .fg-goal-card.state-lagging .fg-goal-metric,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-card.state-lagging .fg-goal-metric,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-card.state-lagging .fg-goal-metric,
+.dark-mode [data-view="goals"] .fg-goal-card.state-lagging .fg-goal-metric,
+.dark-mode .financial-goals-manager-modal .fg-goal-card.state-lagging .fg-goal-metric {
+  background: rgba(127,29,29,0.20) !important;
+  border-color: rgba(248,113,113,0.26) !important;
+}
+
+body.dark-mode [data-view="goals"] .fg-goal-card.state-active .fg-goal-metric,
+body.dark-mode .financial-goals-manager-modal .fg-goal-card.state-active .fg-goal-metric,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-card.state-active .fg-goal-metric,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-card.state-active .fg-goal-metric,
+.dark-mode [data-view="goals"] .fg-goal-card.state-active .fg-goal-metric,
+.dark-mode .financial-goals-manager-modal .fg-goal-card.state-active .fg-goal-metric {
+  background: rgba(120,53,15,0.22) !important;
+  border-color: rgba(245,158,11,0.28) !important;
+}
+
+body.dark-mode [data-view="goals"] .fg-goal-card.state-complete .fg-goal-metric,
+body.dark-mode .financial-goals-manager-modal .fg-goal-card.state-complete .fg-goal-metric,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-card.state-complete .fg-goal-metric,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-card.state-complete .fg-goal-metric,
+.dark-mode [data-view="goals"] .fg-goal-card.state-complete .fg-goal-metric,
+.dark-mode .financial-goals-manager-modal .fg-goal-card.state-complete .fg-goal-metric {
+  background: rgba(6,78,59,0.20) !important;
+  border-color: rgba(110,231,183,0.24) !important;
+}
+
+/* Workspace inputs/selects and keyword chips: finish readable dark styling */
+body.dark-mode .financial-goals-manager-modal .fg-goal-card input,
+body.dark-mode .financial-goals-manager-modal .fg-goal-card select,
+body.dark-mode .financial-goals-manager-modal .fg-keyword-input,
+body.dark-mode .financial-goals-manager-modal .fg-goal-keyword-input,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-card input,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-card select,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-keyword-input,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-keyword-input,
+.dark-mode .financial-goals-manager-modal .fg-goal-card input,
+.dark-mode .financial-goals-manager-modal .fg-goal-card select,
+.dark-mode .financial-goals-manager-modal .fg-keyword-input,
+.dark-mode .financial-goals-manager-modal .fg-goal-keyword-input {
+  background: #0f172a !important;
+  border: 1px solid rgba(148,163,184,0.30) !important;
+  color: #eaf1fb !important;
+}
+
+body.dark-mode .financial-goals-manager-modal .fg-goal-card input::placeholder,
+body.dark-mode .financial-goals-manager-modal .fg-keyword-input::placeholder,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-card input::placeholder,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-keyword-input::placeholder,
+.dark-mode .financial-goals-manager-modal .fg-goal-card input::placeholder,
+.dark-mode .financial-goals-manager-modal .fg-keyword-input::placeholder {
+  color: #7f8da3 !important;
+}
+
+/* History modal completed cards: keep completed green, make inner metrics dark */
+body.dark-mode .financial-goals-history-modal .fg-history-card,
+body.dark-mode .financial-goals-history-modal .financial-goals-history-item,
+html[data-theme="dark"] .financial-goals-history-modal .fg-history-card,
+html[data-theme="dark"] .financial-goals-history-modal .financial-goals-history-item,
+.dark-mode .financial-goals-history-modal .fg-history-card,
+.dark-mode .financial-goals-history-modal .financial-goals-history-item {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(16,185,129,0.12), transparent 38%),
+    linear-gradient(145deg, rgba(13,43,34,0.88), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(110,231,183,0.28) !important;
+}
+
+body.dark-mode .financial-goals-history-modal .fg-goal-metric,
+html[data-theme="dark"] .financial-goals-history-modal .fg-goal-metric,
+.dark-mode .financial-goals-history-modal .fg-goal-metric {
+  background: rgba(15,23,42,0.86) !important;
+  border-color: rgba(148,163,184,0.22) !important;
+  color: #eaf1fb !important;
+}
+
+/* Ensure labels remain visible and values bright */
+body.dark-mode .financial-goals-manager-modal .fg-goal-metric-label,
+body.dark-mode .financial-goals-history-modal .fg-goal-metric-label,
+body.dark-mode [data-view="goals"] .fg-goal-metric-label,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-metric-label,
+html[data-theme="dark"] .financial-goals-history-modal .fg-goal-metric-label,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-metric-label,
+.dark-mode .financial-goals-manager-modal .fg-goal-metric-label,
+.dark-mode .financial-goals-history-modal .fg-goal-metric-label,
+.dark-mode [data-view="goals"] .fg-goal-metric-label {
+  color: #a8b6ca !important;
+}
+
+body.dark-mode .financial-goals-manager-modal .fg-goal-metric-value,
+body.dark-mode .financial-goals-history-modal .fg-goal-metric-value,
+body.dark-mode [data-view="goals"] .fg-goal-metric-value,
+html[data-theme="dark"] .financial-goals-manager-modal .fg-goal-metric-value,
+html[data-theme="dark"] .financial-goals-history-modal .fg-goal-metric-value,
+html[data-theme="dark"] [data-view="goals"] .fg-goal-metric-value,
+.dark-mode .financial-goals-manager-modal .fg-goal-metric-value,
+.dark-mode .financial-goals-history-modal .fg-goal-metric-value,
+.dark-mode [data-view="goals"] .fg-goal-metric-value {
+  color: #f8fafc !important;
+}
+
+
+/* === v1358 Financial Goals main screen exact dark-mode fix ===
+   The main tab uses phase4-goals-* classes, not only fg-goal-card. */
+
+/* Main page scope */
+body.dark-mode [data-view="financial-goals"],
+html[data-theme="dark"] [data-view="financial-goals"],
+.dark-mode [data-view="financial-goals"] {
+  background: #070b14 !important;
+  color: #eaf1fb !important;
+}
+
+/* KPI cards */
+body.dark-mode [data-view="financial-goals"] .phase4-goals-kpi,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goals-kpi,
+.dark-mode [data-view="financial-goals"] .phase4-goals-kpi {
+  background:
+    radial-gradient(circle at 96% -10%, rgba(167,139,250,0.10), transparent 38%),
+    linear-gradient(145deg, rgba(16,24,39,0.98), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #eaf1fb !important;
+  box-shadow: 0 18px 44px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+
+body.dark-mode [data-view="financial-goals"] .phase4-goals-kpi.primary,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goals-kpi.primary,
+.dark-mode [data-view="financial-goals"] .phase4-goals-kpi.primary {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(139,92,246,0.16), transparent 38%),
+    linear-gradient(145deg, rgba(30,27,75,0.94), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(167,139,250,0.36) !important;
+}
+
+body.dark-mode [data-view="financial-goals"] .phase4-goals-kpi-label,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goals-kpi-label,
+.dark-mode [data-view="financial-goals"] .phase4-goals-kpi-label {
+  color: #a8b6ca !important;
+}
+
+body.dark-mode [data-view="financial-goals"] .phase4-goals-kpi-value,
+body.dark-mode [data-view="financial-goals"] .phase4-goals-kpi-sub,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goals-kpi-value,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goals-kpi-sub,
+.dark-mode [data-view="financial-goals"] .phase4-goals-kpi-value,
+.dark-mode [data-view="financial-goals"] .phase4-goals-kpi-sub {
+  color: #f8fafc !important;
+  text-shadow: none !important;
+}
+
+/* Board shell */
+body.dark-mode [data-view="financial-goals"] .phase4-goals-board,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goals-board,
+.dark-mode [data-view="financial-goals"] .phase4-goals-board {
+  background:
+    radial-gradient(circle at 96% -10%, rgba(148,163,184,0.08), transparent 38%),
+    linear-gradient(145deg, rgba(16,24,39,0.98), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #eaf1fb !important;
+  box-shadow: 0 18px 44px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+
+body.dark-mode [data-view="financial-goals"] .phase4-goals-board-title,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goals-board-title,
+.dark-mode [data-view="financial-goals"] .phase4-goals-board-title {
+  color: #f8fafc !important;
+}
+
+body.dark-mode [data-view="financial-goals"] .phase4-goals-board-sub,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goals-board-sub,
+.dark-mode [data-view="financial-goals"] .phase4-goals-board-sub {
+  color: #a8b6ca !important;
+}
+
+/* Main financial goal cards */
+body.dark-mode [data-view="financial-goals"] .phase4-goal-card,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-card,
+.dark-mode [data-view="financial-goals"] .phase4-goal-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(139,92,246,0.11), transparent 38%),
+    linear-gradient(145deg, rgba(17,24,39,0.98), rgba(8,13,24,0.98)) !important;
+  border-color: rgba(167,139,250,0.36) !important;
+  color: #eaf1fb !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 14px 30px rgba(0,0,0,0.26) !important;
+}
+
+body.dark-mode [data-view="financial-goals"] .phase4-goal-title,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-main,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-stat-value,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-title,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-main,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-stat-value,
+.dark-mode [data-view="financial-goals"] .phase4-goal-title,
+.dark-mode [data-view="financial-goals"] .phase4-goal-main,
+.dark-mode [data-view="financial-goals"] .phase4-goal-stat-value {
+  color: #f8fafc !important;
+  text-shadow: none !important;
+}
+
+body.dark-mode [data-view="financial-goals"] .phase4-goal-kicker,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-source,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-count,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-stat-label,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-progress-row,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-kicker,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-source,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-count,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-stat-label,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-progress-row,
+.dark-mode [data-view="financial-goals"] .phase4-goal-kicker,
+.dark-mode [data-view="financial-goals"] .phase4-goal-source,
+.dark-mode [data-view="financial-goals"] .phase4-goal-count,
+.dark-mode [data-view="financial-goals"] .phase4-goal-stat-label,
+.dark-mode [data-view="financial-goals"] .phase4-goal-progress-row {
+  color: #a8b6ca !important;
+}
+
+/* Inner stat tiles */
+body.dark-mode [data-view="financial-goals"] .phase4-goal-stat,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-stat,
+.dark-mode [data-view="financial-goals"] .phase4-goal-stat {
+  background: rgba(15,23,42,0.86) !important;
+  border: 1px solid rgba(148,163,184,0.22) !important;
+  color: #eaf1fb !important;
+}
+
+/* Keep purple progress identity but make track dark */
+body.dark-mode [data-view="financial-goals"] .phase4-goal-progress-track,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-progress-track,
+.dark-mode [data-view="financial-goals"] .phase4-goal-progress-track {
+  background: rgba(203,213,225,0.16) !important;
+}
+
+body.dark-mode [data-view="financial-goals"] .phase4-goal-progress-fill,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-progress-fill,
+.dark-mode [data-view="financial-goals"] .phase4-goal-progress-fill {
+  background: linear-gradient(90deg, #7c3aed, #a855f7) !important;
+}
+
+/* The “left” accent line and remaining pill */
+body.dark-mode [data-view="financial-goals"] .phase4-goal-left-accent,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-left-accent,
+.dark-mode [data-view="financial-goals"] .phase4-goal-left-accent {
+  background: #8b5cf6 !important;
+}
+
+body.dark-mode [data-view="financial-goals"] .phase4-goal-count,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-count,
+.dark-mode [data-view="financial-goals"] .phase4-goal-count {
+  background: rgba(30,41,59,0.96) !important;
+  border: 1px solid rgba(148,163,184,0.30) !important;
+  color: #dbeafe !important;
+}
+
+/* Catch any leftover pale surfaces in the financial-goals view */
+body.dark-mode [data-view="financial-goals"] [style*="background: #fff"],
+body.dark-mode [data-view="financial-goals"] [style*="background:#fff"],
+body.dark-mode [data-view="financial-goals"] [style*="background: white"],
+body.dark-mode [data-view="financial-goals"] [style*="background:white"],
+html[data-theme="dark"] [data-view="financial-goals"] [style*="background: #fff"],
+html[data-theme="dark"] [data-view="financial-goals"] [style*="background:#fff"],
+html[data-theme="dark"] [data-view="financial-goals"] [style*="background: white"],
+html[data-theme="dark"] [data-view="financial-goals"] [style*="background:white"] {
+  background: rgba(15,23,42,0.92) !important;
+  color: #eaf1fb !important;
+  border-color: rgba(148,163,184,0.24) !important;
+}
+
+
+/* === v1359 Financial Goals: remaining amount pill dark-mode fix ===
+   Fixes the bright "€100.00 left" / "€3,000.00 left" pills on the main goal cards. */
+
+body.dark-mode [data-view="financial-goals"] .phase4-goal-count,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-left,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-badge,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-pill,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="count"],
+body.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="left"],
+body.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="pill"],
+body.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="badge"],
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-count,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-left,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-badge,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-pill,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-card [class*="count"],
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-card [class*="left"],
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-card [class*="pill"],
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-card [class*="badge"],
+.dark-mode [data-view="financial-goals"] .phase4-goal-count,
+.dark-mode [data-view="financial-goals"] .phase4-goal-left,
+.dark-mode [data-view="financial-goals"] .phase4-goal-badge,
+.dark-mode [data-view="financial-goals"] .phase4-goal-pill,
+.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="count"],
+.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="left"],
+.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="pill"],
+.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="badge"] {
+  background:
+    linear-gradient(145deg, rgba(30,41,59,0.96), rgba(15,23,42,0.98)) !important;
+  border: 1px solid rgba(148,163,184,0.32) !important;
+  color: #dbeafe !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 5px 16px rgba(0,0,0,0.24) !important;
+  text-shadow: none !important;
+}
+
+/* Make sure the text inside the pill inherits the readable dark-mode color. */
+body.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="count"] *,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="left"] *,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="pill"] *,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="badge"] *,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-card [class*="count"] *,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-card [class*="left"] *,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-card [class*="pill"] *,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-card [class*="badge"] *,
+.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="count"] *,
+.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="left"] *,
+.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="pill"] *,
+.dark-mode [data-view="financial-goals"] .phase4-goal-card [class*="badge"] * {
+  color: inherit !important;
+}
+
+
+/* === v1360 Financial Goals: ACTUAL remaining pill class fix ===
+   The main screen uses .phase4-goal-status, not count/left/pill classes. */
+
+body.dark-mode [data-view="financial-goals"] .phase4-goal-card .phase4-goal-status,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-card .phase4-goal-status,
+.dark-mode [data-view="financial-goals"] .phase4-goal-card .phase4-goal-status {
+  background:
+    linear-gradient(145deg, rgba(30,41,59,0.98), rgba(15,23,42,0.98)) !important;
+  border: 1px solid rgba(167,139,250,0.34) !important;
+  color: #ddd6fe !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 6px 16px rgba(0,0,0,0.28) !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+}
+
+/* Keep completed status green if/when it appears on this main screen. */
+body.dark-mode [data-view="financial-goals"] .phase4-goal-card .phase4-goal-status.state-complete,
+body.dark-mode [data-view="financial-goals"] .phase4-goal-card .phase4-goal-status.complete,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-card .phase4-goal-status.state-complete,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-card .phase4-goal-status.complete,
+.dark-mode [data-view="financial-goals"] .phase4-goal-card .phase4-goal-status.state-complete,
+.dark-mode [data-view="financial-goals"] .phase4-goal-card .phase4-goal-status.complete {
+  background: rgba(16,185,129,0.14) !important;
+  border-color: rgba(110,231,183,0.34) !important;
+  color: #86efac !important;
+}
+
+/* Preserve card accents and prevent future broad pill selectors from overriding it. */
+body.dark-mode [data-view="financial-goals"] .phase4-goal-card .phase4-goal-status *,
+html[data-theme="dark"] [data-view="financial-goals"] .phase4-goal-card .phase4-goal-status *,
+.dark-mode [data-view="financial-goals"] .phase4-goal-card .phase4-goal-status * {
+  color: inherit !important;
+}
+
+
+/* === v1361 Subscription Manager dark-mode completion ===
+   Fixes manager table, stats, controls, colored rows with darkened category layering,
+   month cells, inputs/selects, usage tracking controls, and text contrast. */
+
+body.dark-mode .subscriptions-manager-overlay,
+html[data-theme="dark"] .subscriptions-manager-overlay,
+.dark-mode .subscriptions-manager-overlay {
+  background: rgba(2,6,23,0.86) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+body.dark-mode .subscriptions-manager-modal,
+html[data-theme="dark"] .subscriptions-manager-modal,
+.dark-mode .subscriptions-manager-modal {
+  background:
+    radial-gradient(circle at 96% -10%, rgba(96,165,250,0.08), transparent 38%),
+    linear-gradient(145deg, #0b1220 0%, #070b14 100%) !important;
+  border: 1px solid rgba(148,163,184,0.28) !important;
+  color: #eaf1fb !important;
+  box-shadow: 0 28px 80px rgba(0,0,0,0.62) !important;
+}
+
+body.dark-mode .subscriptions-manager-header,
+body.dark-mode .subscriptions-manager-footer,
+html[data-theme="dark"] .subscriptions-manager-header,
+html[data-theme="dark"] .subscriptions-manager-footer,
+.dark-mode .subscriptions-manager-header,
+.dark-mode .subscriptions-manager-footer {
+  background: #111827 !important;
+  border-color: rgba(148,163,184,0.22) !important;
+  color: #f8fafc !important;
+}
+
+body.dark-mode .subscriptions-manager-body,
+html[data-theme="dark"] .subscriptions-manager-body,
+.dark-mode .subscriptions-manager-body {
+  background: #070b14 !important;
+  color: #eaf1fb !important;
+}
+
+/* Workspace / toolbar / cards */
+body.dark-mode .subscriptions-manager-modal .subscriptions-manager-toolbar,
+body.dark-mode .subscriptions-manager-modal .subscriptions-controls-card,
+body.dark-mode .subscriptions-manager-modal .subscriptions-table-card,
+body.dark-mode .subscriptions-manager-modal .subscription-stat-card,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-manager-toolbar,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-controls-card,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-table-card,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-stat-card,
+.dark-mode .subscriptions-manager-modal .subscriptions-manager-toolbar,
+.dark-mode .subscriptions-manager-modal .subscriptions-controls-card,
+.dark-mode .subscriptions-manager-modal .subscriptions-table-card,
+.dark-mode .subscriptions-manager-modal .subscription-stat-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.075), transparent 38%),
+    linear-gradient(145deg, rgba(15,23,42,0.97), rgba(9,14,25,0.985)) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #eaf1fb !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 12px 28px rgba(0,0,0,0.24) !important;
+}
+
+/* Header/text contrast */
+body.dark-mode .subscriptions-manager-modal .cbm-title,
+body.dark-mode .subscriptions-manager-modal .subscriptions-table-title,
+body.dark-mode .subscriptions-manager-modal .subscription-stat-value,
+body.dark-mode .subscriptions-manager-modal strong,
+html[data-theme="dark"] .subscriptions-manager-modal .cbm-title,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-table-title,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-stat-value,
+html[data-theme="dark"] .subscriptions-manager-modal strong,
+.dark-mode .subscriptions-manager-modal .cbm-title,
+.dark-mode .subscriptions-manager-modal .subscriptions-table-title,
+.dark-mode .subscriptions-manager-modal .subscription-stat-value,
+.dark-mode .subscriptions-manager-modal strong {
+  color: #f8fafc !important;
+  text-shadow: none !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .subscriptions-table-eyebrow,
+body.dark-mode .subscriptions-manager-modal .subscription-stat-label,
+body.dark-mode .subscriptions-manager-modal .subscriptions-table-copy,
+body.dark-mode .subscriptions-manager-modal .subscription-stat-support,
+body.dark-mode .subscriptions-manager-modal .subscription-note,
+body.dark-mode .subscriptions-manager-modal .subscription-field-label,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-table-eyebrow,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-stat-label,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-table-copy,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-stat-support,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-note,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-field-label,
+.dark-mode .subscriptions-manager-modal .subscriptions-table-eyebrow,
+.dark-mode .subscriptions-manager-modal .subscription-stat-label,
+.dark-mode .subscriptions-manager-modal .subscriptions-table-copy,
+.dark-mode .subscriptions-manager-modal .subscription-stat-support,
+.dark-mode .subscriptions-manager-modal .subscription-note,
+.dark-mode .subscriptions-manager-modal .subscription-field-label {
+  color: #a8b6ca !important;
+}
+
+/* Table shell */
+body.dark-mode .subscriptions-manager-modal .subscriptions-table-wrap,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-table-wrap,
+.dark-mode .subscriptions-manager-modal .subscriptions-table-wrap {
+  background: rgba(7,11,20,0.66) !important;
+  border: 1px solid rgba(148,163,184,0.18) !important;
+  border-radius: 14px !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .subscriptions-table,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-table,
+.dark-mode .subscriptions-manager-modal .subscriptions-table {
+  background: #070b14 !important;
+  color: #eaf1fb !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .subscriptions-table thead th,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-table thead th,
+.dark-mode .subscriptions-manager-modal .subscriptions-table thead th {
+  background: #0f172a !important;
+  color: #cbd5e1 !important;
+  border-color: rgba(148,163,184,0.20) !important;
+}
+
+/* Category-colored rows, darkened but still recognizably tinted by Expenses category color */
+body.dark-mode .subscriptions-manager-modal .subscriptions-row td,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-row td,
+.dark-mode .subscriptions-manager-modal .subscriptions-row td {
+  background:
+    linear-gradient(0deg, rgba(7,11,20,0.78), rgba(7,11,20,0.78)),
+    color-mix(in srgb, var(--subscription-accent, #64748b) 42%, #111827) !important;
+  border-color: rgba(148,163,184,0.13) !important;
+  color: #eaf1fb !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .subscriptions-row:hover td,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-row:hover td,
+.dark-mode .subscriptions-manager-modal .subscriptions-row:hover td {
+  background:
+    linear-gradient(0deg, rgba(7,11,20,0.66), rgba(7,11,20,0.66)),
+    color-mix(in srgb, var(--subscription-accent, #64748b) 52%, #111827) !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .subscriptions-row td:first-child,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-row td:first-child,
+.dark-mode .subscriptions-manager-modal .subscriptions-row td:first-child {
+  border-left: 4px solid color-mix(in srgb, var(--subscription-accent, #64748b) 86%, #a78bfa) !important;
+}
+
+/* Inputs/selects */
+body.dark-mode .subscriptions-manager-modal input,
+body.dark-mode .subscriptions-manager-modal select,
+body.dark-mode .subscriptions-manager-modal textarea,
+body.dark-mode .subscriptions-manager-modal .filter-dropdown-toggle,
+html[data-theme="dark"] .subscriptions-manager-modal input,
+html[data-theme="dark"] .subscriptions-manager-modal select,
+html[data-theme="dark"] .subscriptions-manager-modal textarea,
+html[data-theme="dark"] .subscriptions-manager-modal .filter-dropdown-toggle,
+.dark-mode .subscriptions-manager-modal input,
+.dark-mode .subscriptions-manager-modal select,
+.dark-mode .subscriptions-manager-modal textarea,
+.dark-mode .subscriptions-manager-modal .filter-dropdown-toggle {
+  background: #0f172a !important;
+  border: 1px solid rgba(148,163,184,0.30) !important;
+  color: #eaf1fb !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035) !important;
+}
+
+body.dark-mode .subscriptions-manager-modal input::placeholder,
+html[data-theme="dark"] .subscriptions-manager-modal input::placeholder,
+.dark-mode .subscriptions-manager-modal input::placeholder {
+  color: #7f8da3 !important;
+}
+
+/* Meta chips */
+body.dark-mode .subscriptions-manager-modal .subscription-meta-chip,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-meta-chip,
+.dark-mode .subscriptions-manager-modal .subscription-meta-chip {
+  background: rgba(30,41,59,0.82) !important;
+  border-color: rgba(148,163,184,0.22) !important;
+  color: #cbd5e1 !important;
+}
+
+/* Month cells */
+body.dark-mode .subscriptions-manager-modal .subscription-cell-btn,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-cell-btn,
+.dark-mode .subscriptions-manager-modal .subscription-cell-btn {
+  background: #101827 !important;
+  border: 1px solid rgba(148,163,184,0.18) !important;
+  color: #cbd5e1 !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .subscription-cell-btn small,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-cell-btn small,
+.dark-mode .subscriptions-manager-modal .subscription-cell-btn small {
+  color: #94a3b8 !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .subscription-cell-btn.is-empty,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-cell-btn.is-empty,
+.dark-mode .subscriptions-manager-modal .subscription-cell-btn.is-empty {
+  background: rgba(30,41,59,0.70) !important;
+  color: #94a3b8 !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .subscription-cell-btn.is-due,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-cell-btn.is-due,
+.dark-mode .subscriptions-manager-modal .subscription-cell-btn.is-due {
+  background: rgba(120,53,15,0.28) !important;
+  border-color: rgba(245,158,11,0.30) !important;
+  color: #fcd34d !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .subscription-cell-btn.is-paid,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-cell-btn.is-paid,
+.dark-mode .subscriptions-manager-modal .subscription-cell-btn.is-paid {
+  background: rgba(6,78,59,0.26) !important;
+  border-color: rgba(110,231,183,0.30) !important;
+  color: #86efac !important;
+}
+
+/* Buttons and toggles */
+body.dark-mode .subscriptions-manager-modal .subscription-status-btn,
+body.dark-mode .subscriptions-manager-modal .subscription-delete-btn,
+body.dark-mode .subscriptions-manager-modal .subscription-cell-btn,
+body.dark-mode .subscriptions-manager-modal .sub-track-freq-select,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-status-btn,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-delete-btn,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-cell-btn,
+html[data-theme="dark"] .subscriptions-manager-modal .sub-track-freq-select,
+.dark-mode .subscriptions-manager-modal .subscription-status-btn,
+.dark-mode .subscriptions-manager-modal .subscription-delete-btn,
+.dark-mode .subscriptions-manager-modal .subscription-cell-btn,
+.dark-mode .subscriptions-manager-modal .sub-track-freq-select {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 12px rgba(0,0,0,0.22) !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .subscription-status-btn,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-status-btn,
+.dark-mode .subscriptions-manager-modal .subscription-status-btn {
+  background: rgba(16,185,129,0.16) !important;
+  border: 1px solid rgba(110,231,183,0.30) !important;
+  color: #86efac !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .subscription-status-btn.is-paused,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-status-btn.is-paused,
+.dark-mode .subscriptions-manager-modal .subscription-status-btn.is-paused {
+  background: rgba(30,41,59,0.80) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #cbd5e1 !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .subscription-delete-btn,
+html[data-theme="dark"] .subscriptions-manager-modal .subscription-delete-btn,
+.dark-mode .subscriptions-manager-modal .subscription-delete-btn {
+  background: rgba(127,29,29,0.88) !important;
+  border: 1px solid rgba(248,113,113,0.50) !important;
+  color: #fecaca !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .sub-track-track,
+html[data-theme="dark"] .subscriptions-manager-modal .sub-track-track,
+.dark-mode .subscriptions-manager-modal .sub-track-track {
+  background: rgba(30,41,59,0.90) !important;
+  border: 1px solid rgba(148,163,184,0.26) !important;
+}
+
+body.dark-mode .subscriptions-manager-modal .sub-track-checkbox:checked + .sub-track-track,
+html[data-theme="dark"] .subscriptions-manager-modal .sub-track-checkbox:checked + .sub-track-track,
+.dark-mode .subscriptions-manager-modal .sub-track-checkbox:checked + .sub-track-track {
+  background: rgba(16,185,129,0.26) !important;
+  border-color: rgba(110,231,183,0.38) !important;
+}
+
+/* Dropdown menu */
+body.dark-mode .subscriptions-manager-modal .filter-dropdown-menu,
+html[data-theme="dark"] .subscriptions-manager-modal .filter-dropdown-menu,
+.dark-mode .subscriptions-manager-modal .filter-dropdown-menu {
+  background: #0f172a !important;
+  border-color: rgba(148,163,184,0.28) !important;
+  color: #eaf1fb !important;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.46) !important;
+}
+
+/* Strong text inside table */
+body.dark-mode .subscriptions-manager-modal .subscriptions-table td strong,
+body.dark-mode .subscriptions-manager-modal .subscriptions-table td span,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-table td strong,
+html[data-theme="dark"] .subscriptions-manager-modal .subscriptions-table td span,
+.dark-mode .subscriptions-manager-modal .subscriptions-table td strong,
+.dark-mode .subscriptions-manager-modal .subscriptions-table td span {
+  color: inherit;
+}
+
+/* Catch leftover pale subscription manager surfaces */
+body.dark-mode .subscriptions-manager-modal [style*="background: #fff"],
+body.dark-mode .subscriptions-manager-modal [style*="background:#fff"],
+body.dark-mode .subscriptions-manager-modal [style*="background: white"],
+body.dark-mode .subscriptions-manager-modal [style*="background:white"],
+body.dark-mode .subscriptions-manager-modal [style*="rgba(255,255,255"],
+html[data-theme="dark"] .subscriptions-manager-modal [style*="background: #fff"],
+html[data-theme="dark"] .subscriptions-manager-modal [style*="background:#fff"],
+html[data-theme="dark"] .subscriptions-manager-modal [style*="background: white"],
+html[data-theme="dark"] .subscriptions-manager-modal [style*="background:white"],
+html[data-theme="dark"] .subscriptions-manager-modal [style*="rgba(255,255,255"] {
+  background: rgba(15,23,42,0.92) !important;
+  color: #eaf1fb !important;
+  border-color: rgba(148,163,184,0.24) !important;
+}
+
+
+/* === v1362 Usage tab + Usage Workspace dark-mode rework ===
+   Fixes main Usage page KPI/insight cards, Usage Workspace cards, and Add App / Service modal. */
+
+/* Main Usage page */
+body.dark-mode [data-view="usage"],
+html[data-theme="dark"] [data-view="usage"],
+.dark-mode [data-view="usage"] {
+  background: #070b14 !important;
+  color: #eaf1fb !important;
+}
+
+/* KPI cards */
+body.dark-mode [data-view="usage"] .phase4-usage-kpi,
+html[data-theme="dark"] [data-view="usage"] .phase4-usage-kpi,
+.dark-mode [data-view="usage"] .phase4-usage-kpi {
+  background:
+    radial-gradient(circle at 96% -10%, rgba(167,139,250,0.10), transparent 38%),
+    linear-gradient(145deg, rgba(16,24,39,0.98), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #eaf1fb !important;
+  box-shadow: 0 18px 44px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+
+body.dark-mode [data-view="usage"] .phase4-usage-kpi.primary,
+html[data-theme="dark"] [data-view="usage"] .phase4-usage-kpi.primary,
+.dark-mode [data-view="usage"] .phase4-usage-kpi.primary {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(139,92,246,0.16), transparent 38%),
+    linear-gradient(145deg, rgba(30,27,75,0.94), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(167,139,250,0.36) !important;
+}
+
+body.dark-mode [data-view="usage"] .phase4-usage-kpi-label,
+html[data-theme="dark"] [data-view="usage"] .phase4-usage-kpi-label,
+.dark-mode [data-view="usage"] .phase4-usage-kpi-label {
+  color: #a8b6ca !important;
+}
+
+body.dark-mode [data-view="usage"] .phase4-usage-kpi-value,
+body.dark-mode [data-view="usage"] .phase4-usage-kpi-sub,
+body.dark-mode [data-view="usage"] .usage-howto-item,
+html[data-theme="dark"] [data-view="usage"] .phase4-usage-kpi-value,
+html[data-theme="dark"] [data-view="usage"] .phase4-usage-kpi-sub,
+html[data-theme="dark"] [data-view="usage"] .usage-howto-item,
+.dark-mode [data-view="usage"] .phase4-usage-kpi-value,
+.dark-mode [data-view="usage"] .phase4-usage-kpi-sub,
+.dark-mode [data-view="usage"] .usage-howto-item {
+  color: #f8fafc !important;
+  text-shadow: none !important;
+}
+
+/* Board and insight cards */
+body.dark-mode [data-view="usage"] .phase4-usage-board,
+html[data-theme="dark"] [data-view="usage"] .phase4-usage-board,
+.dark-mode [data-view="usage"] .phase4-usage-board {
+  background:
+    radial-gradient(circle at 96% -10%, rgba(148,163,184,0.08), transparent 38%),
+    linear-gradient(145deg, rgba(16,24,39,0.98), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #eaf1fb !important;
+  box-shadow: 0 18px 44px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+
+body.dark-mode [data-view="usage"] .phase4-usage-board-title,
+html[data-theme="dark"] [data-view="usage"] .phase4-usage-board-title,
+.dark-mode [data-view="usage"] .phase4-usage-board-title {
+  color: #f8fafc !important;
+}
+
+body.dark-mode [data-view="usage"] .phase4-usage-board-sub,
+html[data-theme="dark"] [data-view="usage"] .phase4-usage-board-sub,
+.dark-mode [data-view="usage"] .phase4-usage-board-sub {
+  color: #a8b6ca !important;
+}
+
+body.dark-mode [data-view="usage"] .phase4-usage-insight,
+body.dark-mode [data-view="usage"] .usage-summary-card,
+body.dark-mode [data-view="usage"] .usage-kpi-cell,
+html[data-theme="dark"] [data-view="usage"] .phase4-usage-insight,
+html[data-theme="dark"] [data-view="usage"] .usage-summary-card,
+html[data-theme="dark"] [data-view="usage"] .usage-kpi-cell,
+.dark-mode [data-view="usage"] .phase4-usage-insight,
+.dark-mode [data-view="usage"] .usage-summary-card,
+.dark-mode [data-view="usage"] .usage-kpi-cell {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(139,92,246,0.10), transparent 38%),
+    linear-gradient(145deg, rgba(17,24,39,0.98), rgba(8,13,24,0.98)) !important;
+  border-color: rgba(167,139,250,0.30) !important;
+  color: #eaf1fb !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 14px 30px rgba(0,0,0,0.26) !important;
+}
+
+body.dark-mode [data-view="usage"] .phase4-usage-insight-title,
+body.dark-mode [data-view="usage"] .usage-summary-title,
+body.dark-mode [data-view="usage"] .usage-kpi-value,
+html[data-theme="dark"] [data-view="usage"] .phase4-usage-insight-title,
+html[data-theme="dark"] [data-view="usage"] .usage-summary-title,
+html[data-theme="dark"] [data-view="usage"] .usage-kpi-value,
+.dark-mode [data-view="usage"] .phase4-usage-insight-title,
+.dark-mode [data-view="usage"] .usage-summary-title,
+.dark-mode [data-view="usage"] .usage-kpi-value {
+  color: #f8fafc !important;
+}
+
+body.dark-mode [data-view="usage"] .phase4-usage-insight-label,
+body.dark-mode [data-view="usage"] .phase4-usage-insight-sub,
+body.dark-mode [data-view="usage"] .usage-summary-sub,
+body.dark-mode [data-view="usage"] .usage-kpi-label,
+body.dark-mode [data-view="usage"] .usage-kpi-sub,
+html[data-theme="dark"] [data-view="usage"] .phase4-usage-insight-label,
+html[data-theme="dark"] [data-view="usage"] .phase4-usage-insight-sub,
+html[data-theme="dark"] [data-view="usage"] .usage-summary-sub,
+html[data-theme="dark"] [data-view="usage"] .usage-kpi-label,
+html[data-theme="dark"] [data-view="usage"] .usage-kpi-sub,
+.dark-mode [data-view="usage"] .phase4-usage-insight-label,
+.dark-mode [data-view="usage"] .phase4-usage-insight-sub,
+.dark-mode [data-view="usage"] .usage-summary-sub,
+.dark-mode [data-view="usage"] .usage-kpi-label,
+.dark-mode [data-view="usage"] .usage-kpi-sub {
+  color: #a8b6ca !important;
+}
+
+/* Usage Workspace modal frame */
+body.dark-mode .usage-manager-overlay,
+html[data-theme="dark"] .usage-manager-overlay,
+.dark-mode .usage-manager-overlay {
+  background: rgba(2,6,23,0.86) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+body.dark-mode .usage-manager-modal,
+html[data-theme="dark"] .usage-manager-modal,
+.dark-mode .usage-manager-modal {
+  background:
+    radial-gradient(circle at 96% -10%, rgba(96,165,250,0.08), transparent 38%),
+    linear-gradient(145deg, #0b1220 0%, #070b14 100%) !important;
+  border: 1px solid rgba(148,163,184,0.28) !important;
+  color: #eaf1fb !important;
+  box-shadow: 0 28px 80px rgba(0,0,0,0.62) !important;
+}
+
+body.dark-mode .usage-manager-modal .cbm-header,
+body.dark-mode .usage-manager-modal .cbm-footer,
+html[data-theme="dark"] .usage-manager-modal .cbm-header,
+html[data-theme="dark"] .usage-manager-modal .cbm-footer,
+.dark-mode .usage-manager-modal .cbm-header,
+.dark-mode .usage-manager-modal .cbm-footer {
+  background: #111827 !important;
+  border-color: rgba(148,163,184,0.22) !important;
+  color: #f8fafc !important;
+}
+
+body.dark-mode .usage-manager-modal .cbm-body,
+html[data-theme="dark"] .usage-manager-modal .cbm-body,
+.dark-mode .usage-manager-modal .cbm-body {
+  background: #070b14 !important;
+  color: #eaf1fb !important;
+}
+
+/* Usage Workspace cards */
+body.dark-mode .usage-manager-modal .usage-card,
+html[data-theme="dark"] .usage-manager-modal .usage-card,
+.dark-mode .usage-manager-modal .usage-card {
+  background:
+    linear-gradient(0deg, rgba(7,11,20,0.76), rgba(7,11,20,0.76)),
+    radial-gradient(circle at 100% 0%, rgba(139,92,246,0.13), transparent 38%),
+    linear-gradient(145deg, rgba(17,24,39,0.98), rgba(8,13,24,0.98)) !important;
+  border-color: rgba(148,163,184,0.26) !important;
+  color: #eaf1fb !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 14px 30px rgba(0,0,0,0.30) !important;
+}
+
+body.dark-mode .usage-manager-modal .usage-card-header,
+html[data-theme="dark"] .usage-manager-modal .usage-card-header,
+.dark-mode .usage-manager-modal .usage-card-header {
+  background:
+    linear-gradient(0deg, rgba(7,11,20,0.72), rgba(7,11,20,0.72)),
+    var(--usage-card-tint, rgba(139,92,246,0.10)) !important;
+  border-color: rgba(148,163,184,0.18) !important;
+}
+
+body.dark-mode .usage-manager-modal .usage-card-name,
+body.dark-mode .usage-manager-modal .usage-card h3,
+body.dark-mode .usage-manager-modal .usage-card strong,
+html[data-theme="dark"] .usage-manager-modal .usage-card-name,
+html[data-theme="dark"] .usage-manager-modal .usage-card h3,
+html[data-theme="dark"] .usage-manager-modal .usage-card strong,
+.dark-mode .usage-manager-modal .usage-card-name,
+.dark-mode .usage-manager-modal .usage-card h3,
+.dark-mode .usage-manager-modal .usage-card strong {
+  color: #f8fafc !important;
+  text-shadow: none !important;
+}
+
+body.dark-mode .usage-manager-modal .usage-card span,
+body.dark-mode .usage-manager-modal .usage-card small,
+body.dark-mode .usage-manager-modal .usage-card p,
+body.dark-mode .usage-manager-modal .usage-card label,
+html[data-theme="dark"] .usage-manager-modal .usage-card span,
+html[data-theme="dark"] .usage-manager-modal .usage-card small,
+html[data-theme="dark"] .usage-manager-modal .usage-card p,
+html[data-theme="dark"] .usage-manager-modal .usage-card label,
+.dark-mode .usage-manager-modal .usage-card span,
+.dark-mode .usage-manager-modal .usage-card small,
+.dark-mode .usage-manager-modal .usage-card p,
+.dark-mode .usage-manager-modal .usage-card label {
+  color: #cbd5e1 !important;
+}
+
+/* Usage card stats/inner tiles */
+body.dark-mode .usage-manager-modal .usage-card-stats,
+body.dark-mode .usage-manager-modal .usage-card-stat,
+body.dark-mode .usage-manager-modal .usage-card-row,
+html[data-theme="dark"] .usage-manager-modal .usage-card-stats,
+html[data-theme="dark"] .usage-manager-modal .usage-card-stat,
+html[data-theme="dark"] .usage-manager-modal .usage-card-row,
+.dark-mode .usage-manager-modal .usage-card-stats,
+.dark-mode .usage-manager-modal .usage-card-stat,
+.dark-mode .usage-manager-modal .usage-card-row {
+  background: rgba(15,23,42,0.78) !important;
+  border-color: rgba(148,163,184,0.22) !important;
+  color: #eaf1fb !important;
+}
+
+body.dark-mode .usage-manager-modal .usage-meta-pill,
+html[data-theme="dark"] .usage-manager-modal .usage-meta-pill,
+.dark-mode .usage-manager-modal .usage-meta-pill {
+  background: rgba(30,41,59,0.90) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #cbd5e1 !important;
+}
+
+/* Usage question buttons and use count pills */
+body.dark-mode .usage-manager-modal .usage-answer-btn,
+body.dark-mode .usage-manager-modal .usage-use-btn,
+body.dark-mode .usage-manager-modal .usage-card-action-btn,
+html[data-theme="dark"] .usage-manager-modal .usage-answer-btn,
+html[data-theme="dark"] .usage-manager-modal .usage-use-btn,
+html[data-theme="dark"] .usage-manager-modal .usage-card-action-btn,
+.dark-mode .usage-manager-modal .usage-answer-btn,
+.dark-mode .usage-manager-modal .usage-use-btn,
+.dark-mode .usage-manager-modal .usage-card-action-btn {
+  background: #0f172a !important;
+  border: 1px solid rgba(148,163,184,0.28) !important;
+  color: #f8fafc !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 5px 14px rgba(0,0,0,0.25) !important;
+}
+
+body.dark-mode .usage-manager-modal .usage-answer-btn.is-selected,
+body.dark-mode .usage-manager-modal .usage-use-btn.is-selected,
+html[data-theme="dark"] .usage-manager-modal .usage-answer-btn.is-selected,
+html[data-theme="dark"] .usage-manager-modal .usage-use-btn.is-selected,
+.dark-mode .usage-manager-modal .usage-answer-btn.is-selected,
+.dark-mode .usage-manager-modal .usage-use-btn.is-selected {
+  background: rgba(16,185,129,0.20) !important;
+  border-color: rgba(110,231,183,0.34) !important;
+  color: #ecfdf5 !important;
+}
+
+/* Add/Edit App modal */
+body.dark-mode .usage-modal-overlay,
+html[data-theme="dark"] .usage-modal-overlay,
+.dark-mode .usage-modal-overlay {
+  background: rgba(2,6,23,0.78) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+body.dark-mode .usage-modal-card,
+html[data-theme="dark"] .usage-modal-card,
+.dark-mode .usage-modal-card {
+  background:
+    radial-gradient(circle at 96% -10%, rgba(96,165,250,0.08), transparent 38%),
+    linear-gradient(145deg, #0b1220 0%, #070b14 100%) !important;
+  border: 1px solid rgba(148,163,184,0.28) !important;
+  color: #eaf1fb !important;
+  box-shadow: 0 28px 80px rgba(0,0,0,0.62) !important;
+}
+
+body.dark-mode .usage-modal-head,
+body.dark-mode .usage-modal-foot,
+html[data-theme="dark"] .usage-modal-head,
+html[data-theme="dark"] .usage-modal-foot,
+.dark-mode .usage-modal-head,
+.dark-mode .usage-modal-foot {
+  background: #111827 !important;
+  border-color: rgba(148,163,184,0.22) !important;
+  color: #f8fafc !important;
+}
+
+body.dark-mode .usage-modal-body,
+html[data-theme="dark"] .usage-modal-body,
+.dark-mode .usage-modal-body {
+  background: #070b14 !important;
+  color: #eaf1fb !important;
+}
+
+body.dark-mode .usage-form-row,
+body.dark-mode .usage-form-row-2 > .usage-form-row,
+html[data-theme="dark"] .usage-form-row,
+html[data-theme="dark"] .usage-form-row-2 > .usage-form-row,
+.dark-mode .usage-form-row,
+.dark-mode .usage-form-row-2 > .usage-form-row {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.06), transparent 38%),
+    linear-gradient(145deg, rgba(15,23,42,0.96), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #eaf1fb !important;
+}
+
+body.dark-mode .usage-form-label,
+html[data-theme="dark"] .usage-form-label,
+.dark-mode .usage-form-label {
+  color: #a8b6ca !important;
+}
+
+body.dark-mode .usage-form-input,
+body.dark-mode .usage-form-select,
+html[data-theme="dark"] .usage-form-input,
+html[data-theme="dark"] .usage-form-select,
+.dark-mode .usage-form-input,
+.dark-mode .usage-form-select {
+  background: #0f172a !important;
+  border: 1px solid rgba(148,163,184,0.30) !important;
+  color: #eaf1fb !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035) !important;
+}
+
+body.dark-mode .usage-form-input::placeholder,
+html[data-theme="dark"] .usage-form-input::placeholder,
+.dark-mode .usage-form-input::placeholder {
+  color: #7f8da3 !important;
+}
+
+body.dark-mode .usage-modal-close,
+html[data-theme="dark"] .usage-modal-close,
+.dark-mode .usage-modal-close {
+  background: rgba(30,41,59,0.96) !important;
+  border: 1px solid rgba(148,163,184,0.30) !important;
+  color: #f8fafc !important;
+}
+
+/* Catch remaining pale Usage surfaces */
+body.dark-mode [data-view="usage"] [style*="background: #fff"],
+body.dark-mode [data-view="usage"] [style*="background:#fff"],
+body.dark-mode [data-view="usage"] [style*="background: white"],
+body.dark-mode [data-view="usage"] [style*="background:white"],
+body.dark-mode .usage-manager-modal [style*="background: #fff"],
+body.dark-mode .usage-manager-modal [style*="background:#fff"],
+body.dark-mode .usage-modal-card [style*="background: #fff"],
+body.dark-mode .usage-modal-card [style*="background:#fff"],
+html[data-theme="dark"] [data-view="usage"] [style*="background: #fff"],
+html[data-theme="dark"] [data-view="usage"] [style*="background:#fff"],
+html[data-theme="dark"] [data-view="usage"] [style*="background: white"],
+html[data-theme="dark"] [data-view="usage"] [style*="background:white"],
+html[data-theme="dark"] .usage-manager-modal [style*="background: #fff"],
+html[data-theme="dark"] .usage-manager-modal [style*="background:#fff"],
+html[data-theme="dark"] .usage-modal-card [style*="background: #fff"],
+html[data-theme="dark"] .usage-modal-card [style*="background:#fff"] {
+  background: rgba(15,23,42,0.92) !important;
+  color: #eaf1fb !important;
+  border-color: rgba(148,163,184,0.24) !important;
+}
+
+
+/* === v1363 Usage modal title visibility fix === */
+
+body.dark-mode .usage-modal-head h4,
+body.dark-mode .usage-modal-head #usageModalTitle,
+html[data-theme="dark"] .usage-modal-head h4,
+html[data-theme="dark"] .usage-modal-head #usageModalTitle,
+.dark-mode .usage-modal-head h4,
+.dark-mode .usage-modal-head #usageModalTitle {
+  color: #f8fafc !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em !important;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.03) !important;
+}
+
+body.dark-mode .usage-modal-head,
+html[data-theme="dark"] .usage-modal-head,
+.dark-mode .usage-modal-head {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.10), transparent 42%),
+    linear-gradient(145deg, rgba(17,24,39,0.98), rgba(11,18,32,0.98)) !important;
+}
+
+
+/* === v1364 Dark-mode hover-state fixes ===
+   Prevents Month selector and Category Trends rows from turning bright on hover. */
+
+/* Month selector / current month control */
+body.dark-mode .month-selector,
+body.dark-mode .month-selector-card,
+body.dark-mode .month-dropdown,
+body.dark-mode .current-month-selector,
+body.dark-mode .current-month-card,
+body.dark-mode .month-list,
+html[data-theme="dark"] .month-selector,
+html[data-theme="dark"] .month-selector-card,
+html[data-theme="dark"] .month-dropdown,
+html[data-theme="dark"] .current-month-selector,
+html[data-theme="dark"] .current-month-card,
+html[data-theme="dark"] .month-list,
+.dark-mode .month-selector,
+.dark-mode .month-selector-card,
+.dark-mode .month-dropdown,
+.dark-mode .current-month-selector,
+.dark-mode .current-month-card,
+.dark-mode .month-list {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.08), transparent 38%),
+    linear-gradient(145deg, rgba(15,23,42,0.96), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #eaf1fb !important;
+}
+
+body.dark-mode .month-selector:hover,
+body.dark-mode .month-selector-card:hover,
+body.dark-mode .month-dropdown:hover,
+body.dark-mode .current-month-selector:hover,
+body.dark-mode .current-month-card:hover,
+body.dark-mode .month-option:hover,
+body.dark-mode .month-list button:hover,
+body.dark-mode [data-month-option]:hover,
+html[data-theme="dark"] .month-selector:hover,
+html[data-theme="dark"] .month-selector-card:hover,
+html[data-theme="dark"] .month-dropdown:hover,
+html[data-theme="dark"] .current-month-selector:hover,
+html[data-theme="dark"] .current-month-card:hover,
+html[data-theme="dark"] .month-option:hover,
+html[data-theme="dark"] .month-list button:hover,
+html[data-theme="dark"] [data-month-option]:hover,
+.dark-mode .month-selector:hover,
+.dark-mode .month-selector-card:hover,
+.dark-mode .month-dropdown:hover,
+.dark-mode .current-month-selector:hover,
+.dark-mode .current-month-card:hover,
+.dark-mode .month-option:hover,
+.dark-mode .month-list button:hover,
+.dark-mode [data-month-option]:hover {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.12), transparent 38%),
+    linear-gradient(145deg, rgba(30,41,59,0.96), rgba(15,23,42,0.98)) !important;
+  border-color: rgba(147,197,253,0.34) !important;
+  color: #f8fafc !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 18px rgba(0,0,0,0.24) !important;
+}
+
+/* Left sidebar month buttons */
+body.dark-mode .month-item,
+body.dark-mode .month-button,
+body.dark-mode .month-list-item,
+html[data-theme="dark"] .month-item,
+html[data-theme="dark"] .month-button,
+html[data-theme="dark"] .month-list-item,
+.dark-mode .month-item,
+.dark-mode .month-button,
+.dark-mode .month-list-item {
+  color: #eaf1fb !important;
+}
+
+body.dark-mode .month-item:hover,
+body.dark-mode .month-button:hover,
+body.dark-mode .month-list-item:hover,
+html[data-theme="dark"] .month-item:hover,
+html[data-theme="dark"] .month-button:hover,
+html[data-theme="dark"] .month-list-item:hover,
+.dark-mode .month-item:hover,
+.dark-mode .month-button:hover,
+.dark-mode .month-list-item:hover {
+  background: rgba(30,41,59,0.92) !important;
+  border-color: rgba(147,197,253,0.34) !important;
+  color: #f8fafc !important;
+}
+
+/* Category Trends popup rows/cards */
+body.dark-mode .category-trends-modal,
+body.dark-mode .category-trends-card,
+body.dark-mode .category-trends-row,
+body.dark-mode .trend-category-card,
+body.dark-mode .category-trend-row,
+html[data-theme="dark"] .category-trends-modal,
+html[data-theme="dark"] .category-trends-card,
+html[data-theme="dark"] .category-trends-row,
+html[data-theme="dark"] .trend-category-card,
+html[data-theme="dark"] .category-trend-row,
+.dark-mode .category-trends-modal,
+.dark-mode .category-trends-card,
+.dark-mode .category-trends-row,
+.dark-mode .trend-category-card,
+.dark-mode .category-trend-row {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.06), transparent 38%),
+    linear-gradient(145deg, rgba(15,23,42,0.96), rgba(9,14,25,0.98)) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #eaf1fb !important;
+}
+
+body.dark-mode .category-trends-row:hover,
+body.dark-mode .trend-category-card:hover,
+body.dark-mode .category-trend-row:hover,
+body.dark-mode .category-trends-modal article:hover,
+body.dark-mode .category-trends-modal .ui-3d-panel:hover,
+html[data-theme="dark"] .category-trends-row:hover,
+html[data-theme="dark"] .trend-category-card:hover,
+html[data-theme="dark"] .category-trend-row:hover,
+html[data-theme="dark"] .category-trends-modal article:hover,
+html[data-theme="dark"] .category-trends-modal .ui-3d-panel:hover,
+.dark-mode .category-trends-row:hover,
+.dark-mode .trend-category-card:hover,
+.dark-mode .category-trend-row:hover,
+.dark-mode .category-trends-modal article:hover,
+.dark-mode .category-trends-modal .ui-3d-panel:hover {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.10), transparent 38%),
+    linear-gradient(145deg, rgba(30,41,59,0.94), rgba(15,23,42,0.98)) !important;
+  border-color: rgba(148,163,184,0.34) !important;
+  color: #f8fafc !important;
+  transform: none !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 24px rgba(0,0,0,0.26) !important;
+}
+
+/* Catch the actual All Category Trends modal if it uses generic modal classes */
+body.dark-mode .modal-card:has(.category-trends-row) article:hover,
+body.dark-mode .modal-card:has(.trend-category-card) article:hover,
+body.dark-mode .modal-card:has(.category-trend-row) article:hover,
+body.dark-mode .chart-modal-card:has(.category-trends-row) article:hover,
+body.dark-mode .chart-modal-card:has(.trend-category-card) article:hover,
+html[data-theme="dark"] .modal-card:has(.category-trends-row) article:hover,
+html[data-theme="dark"] .modal-card:has(.trend-category-card) article:hover,
+html[data-theme="dark"] .modal-card:has(.category-trend-row) article:hover,
+html[data-theme="dark"] .chart-modal-card:has(.category-trends-row) article:hover,
+html[data-theme="dark"] .chart-modal-card:has(.trend-category-card) article:hover {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.10), transparent 38%),
+    linear-gradient(145deg, rgba(30,41,59,0.94), rgba(15,23,42,0.98)) !important;
+  color: #f8fafc !important;
+}
+
+/* Ensure texts stay visible after hover */
+body.dark-mode .category-trends-modal h3,
+body.dark-mode .category-trends-modal h4,
+body.dark-mode .category-trends-modal strong,
+body.dark-mode .category-trends-modal span,
+body.dark-mode .category-trends-modal small,
+html[data-theme="dark"] .category-trends-modal h3,
+html[data-theme="dark"] .category-trends-modal h4,
+html[data-theme="dark"] .category-trends-modal strong,
+html[data-theme="dark"] .category-trends-modal span,
+html[data-theme="dark"] .category-trends-modal small,
+.dark-mode .category-trends-modal h3,
+.dark-mode .category-trends-modal h4,
+.dark-mode .category-trends-modal strong,
+.dark-mode .category-trends-modal span,
+.dark-mode .category-trends-modal small {
+  text-shadow: none !important;
+}
+
+
+/* === v1365 Final All Category Trends hover fix ===
+   Force dark hover styling on the actual trend cards regardless of generated classes. */
+
+/* Main trend list cards */
+body.dark-mode [id*="trend"] article,
+body.dark-mode [class*="trend"] article,
+body.dark-mode [id*="trend"] .card,
+body.dark-mode [class*="trend"] .card,
+body.dark-mode [id*="trend"] .category-row,
+body.dark-mode [class*="trend"] .category-row,
+body.dark-mode [id*="trend"] .ui-panel,
+body.dark-mode [class*="trend"] .ui-panel,
+html[data-theme="dark"] [id*="trend"] article,
+html[data-theme="dark"] [class*="trend"] article,
+html[data-theme="dark"] [id*="trend"] .card,
+html[data-theme="dark"] [class*="trend"] .card,
+html[data-theme="dark"] [id*="trend"] .category-row,
+html[data-theme="dark"] [class*="trend"] .category-row,
+html[data-theme="dark"] [id*="trend"] .ui-panel,
+html[data-theme="dark"] [class*="trend"] .ui-panel,
+.dark-mode [id*="trend"] article,
+.dark-mode [class*="trend"] article,
+.dark-mode [id*="trend"] .card,
+.dark-mode [class*="trend"] .card,
+.dark-mode [id*="trend"] .category-row,
+.dark-mode [class*="trend"] .category-row,
+.dark-mode [id*="trend"] .ui-panel,
+.dark-mode [class*="trend"] .ui-panel {
+  background:
+    linear-gradient(0deg, rgba(8,13,24,0.72), rgba(8,13,24,0.72)),
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.06), transparent 38%),
+    linear-gradient(145deg, rgba(17,24,39,0.98), rgba(8,13,24,0.98)) !important;
+  color: #eaf1fb !important;
+  border-color: rgba(148,163,184,0.24) !important;
+}
+
+/* Hover state override */
+body.dark-mode [id*="trend"] article:hover,
+body.dark-mode [class*="trend"] article:hover,
+body.dark-mode [id*="trend"] .card:hover,
+body.dark-mode [class*="trend"] .card:hover,
+body.dark-mode [id*="trend"] .category-row:hover,
+body.dark-mode [class*="trend"] .category-row:hover,
+body.dark-mode [id*="trend"] .ui-panel:hover,
+body.dark-mode [class*="trend"] .ui-panel:hover,
+html[data-theme="dark"] [id*="trend"] article:hover,
+html[data-theme="dark"] [class*="trend"] article:hover,
+html[data-theme="dark"] [id*="trend"] .card:hover,
+html[data-theme="dark"] [class*="trend"] .card:hover,
+html[data-theme="dark"] [id*="trend"] .category-row:hover,
+html[data-theme="dark"] [class*="trend"] .category-row:hover,
+html[data-theme="dark"] [id*="trend"] .ui-panel:hover,
+html[data-theme="dark"] [class*="trend"] .ui-panel:hover,
+.dark-mode [id*="trend"] article:hover,
+.dark-mode [class*="trend"] article:hover,
+.dark-mode [id*="trend"] .card:hover,
+.dark-mode [class*="trend"] .card:hover,
+.dark-mode [id*="trend"] .category-row:hover,
+.dark-mode [class*="trend"] .category-row:hover,
+.dark-mode [id*="trend"] .ui-panel:hover,
+.dark-mode [class*="trend"] .ui-panel:hover {
+  background:
+    linear-gradient(0deg, rgba(15,23,42,0.84), rgba(15,23,42,0.84)),
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.12), transparent 38%),
+    linear-gradient(145deg, rgba(30,41,59,0.98), rgba(15,23,42,0.98)) !important;
+  color: #f8fafc !important;
+  border-color: rgba(147,197,253,0.34) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 10px 24px rgba(0,0,0,0.28) !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+/* Prevent white overlay flashes on nested stat boxes */
+body.dark-mode [id*="trend"] article:hover *,
+body.dark-mode [class*="trend"] article:hover *,
+html[data-theme="dark"] [id*="trend"] article:hover *,
+html[data-theme="dark"] [class*="trend"] article:hover *,
+.dark-mode [id*="trend"] article:hover *,
+.dark-mode [class*="trend"] article:hover * {
+  color: inherit !important;
+}
+
+/* Specific stat tiles inside trends popup */
+body.dark-mode [id*="trend"] .metric,
+body.dark-mode [class*="trend"] .metric,
+body.dark-mode [id*="trend"] .stat,
+body.dark-mode [class*="trend"] .stat,
+html[data-theme="dark"] [id*="trend"] .metric,
+html[data-theme="dark"] [class*="trend"] .metric,
+html[data-theme="dark"] [id*="trend"] .stat,
+html[data-theme="dark"] [class*="trend"] .stat,
+.dark-mode [id*="trend"] .metric,
+.dark-mode [class*="trend"] .metric,
+.dark-mode [id*="trend"] .stat,
+.dark-mode [class*="trend"] .stat {
+  background: rgba(15,23,42,0.88) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #f8fafc !important;
+}
+
+
+/* === v1366 ACTUAL All Category Trends hover fix ===
+   The real row class is .trend-insight-row and an older rule sets:
+   .trend-insight-row:hover { background:#f3f6ff; }
+   This override comes later and targets the exact modal/list classes. */
+
+body.dark-mode #categoryTrendsModal .trend-insight-row,
+body.dark-mode .trend-modal-card .trend-insight-row,
+body.dark-mode .trend-modal-list .trend-insight-row,
+html[data-theme="dark"] #categoryTrendsModal .trend-insight-row,
+html[data-theme="dark"] .trend-modal-card .trend-insight-row,
+html[data-theme="dark"] .trend-modal-list .trend-insight-row,
+.dark-mode #categoryTrendsModal .trend-insight-row,
+.dark-mode .trend-modal-card .trend-insight-row,
+.dark-mode .trend-modal-list .trend-insight-row {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.07), transparent 38%),
+    linear-gradient(145deg, rgba(17,24,39,0.98), rgba(8,13,24,0.98)) !important;
+  border-color: rgba(148,163,184,0.24) !important;
+  color: #eaf1fb !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 18px rgba(0,0,0,0.20) !important;
+}
+
+body.dark-mode #categoryTrendsModal .trend-insight-row:hover,
+body.dark-mode .trend-modal-card .trend-insight-row:hover,
+body.dark-mode .trend-modal-list .trend-insight-row:hover,
+html[data-theme="dark"] #categoryTrendsModal .trend-insight-row:hover,
+html[data-theme="dark"] .trend-modal-card .trend-insight-row:hover,
+html[data-theme="dark"] .trend-modal-list .trend-insight-row:hover,
+.dark-mode #categoryTrendsModal .trend-insight-row:hover,
+.dark-mode .trend-modal-card .trend-insight-row:hover,
+.dark-mode .trend-modal-list .trend-insight-row:hover {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.12), transparent 38%),
+    linear-gradient(145deg, rgba(30,41,59,0.98), rgba(15,23,42,0.98)) !important;
+  border-color: rgba(147,197,253,0.34) !important;
+  color: #f8fafc !important;
+  transform: none !important;
+  filter: none !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 24px rgba(0,0,0,0.28) !important;
+}
+
+/* Also cover the inline Overview trends list, but only in dark mode. */
+body.dark-mode .trends-card-inline .trend-insight-row:hover,
+html[data-theme="dark"] .trends-card-inline .trend-insight-row:hover,
+.dark-mode .trends-card-inline .trend-insight-row:hover {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.12), transparent 38%),
+    linear-gradient(145deg, rgba(30,41,59,0.98), rgba(15,23,42,0.98)) !important;
+  border-color: rgba(147,197,253,0.34) !important;
+  color: #f8fafc !important;
+}
+
+/* Metric boxes inside trend rows should not flash white on parent hover. */
+body.dark-mode #categoryTrendsModal .trend-insight-row:hover .trend-metric,
+body.dark-mode .trend-modal-card .trend-insight-row:hover .trend-metric,
+body.dark-mode .trend-modal-list .trend-insight-row:hover .trend-metric,
+html[data-theme="dark"] #categoryTrendsModal .trend-insight-row:hover .trend-metric,
+html[data-theme="dark"] .trend-modal-card .trend-insight-row:hover .trend-metric,
+html[data-theme="dark"] .trend-modal-list .trend-insight-row:hover .trend-metric,
+.dark-mode #categoryTrendsModal .trend-insight-row:hover .trend-metric,
+.dark-mode .trend-modal-card .trend-insight-row:hover .trend-metric,
+.dark-mode .trend-modal-list .trend-insight-row:hover .trend-metric {
+  background: rgba(15,23,42,0.88) !important;
+  border-color: rgba(148,163,184,0.28) !important;
+  color: #f8fafc !important;
+}
+
+/* Preserve readable text colors instead of inheriting dark-on-dark or light-on-light values. */
+body.dark-mode #categoryTrendsModal .trend-insight-row:hover .trend-name,
+body.dark-mode #categoryTrendsModal .trend-insight-row:hover .trend-metric strong,
+body.dark-mode #categoryTrendsModal .trend-insight-row:hover .trend-month-labels-inline,
+body.dark-mode .trend-modal-card .trend-insight-row:hover .trend-name,
+body.dark-mode .trend-modal-card .trend-insight-row:hover .trend-metric strong,
+body.dark-mode .trend-modal-card .trend-insight-row:hover .trend-month-labels-inline,
+html[data-theme="dark"] #categoryTrendsModal .trend-insight-row:hover .trend-name,
+html[data-theme="dark"] #categoryTrendsModal .trend-insight-row:hover .trend-metric strong,
+html[data-theme="dark"] #categoryTrendsModal .trend-insight-row:hover .trend-month-labels-inline,
+html[data-theme="dark"] .trend-modal-card .trend-insight-row:hover .trend-name,
+html[data-theme="dark"] .trend-modal-card .trend-insight-row:hover .trend-metric strong,
+html[data-theme="dark"] .trend-modal-card .trend-insight-row:hover .trend-month-labels-inline {
+  color: #f8fafc !important;
+}
+
+body.dark-mode #categoryTrendsModal .trend-insight-row:hover .trend-insight-note,
+body.dark-mode #categoryTrendsModal .trend-insight-row:hover .trend-metric-label,
+body.dark-mode .trend-modal-card .trend-insight-row:hover .trend-insight-note,
+body.dark-mode .trend-modal-card .trend-insight-row:hover .trend-metric-label,
+html[data-theme="dark"] #categoryTrendsModal .trend-insight-row:hover .trend-insight-note,
+html[data-theme="dark"] #categoryTrendsModal .trend-insight-row:hover .trend-metric-label,
+html[data-theme="dark"] .trend-modal-card .trend-insight-row:hover .trend-insight-note,
+html[data-theme="dark"] .trend-modal-card .trend-insight-row:hover .trend-metric-label {
+  color: #a8b6ca !important;
+}
+
+
+/* === v1367 Tools & Actions dark-mode hover fix ===
+   Prevents the sidebar Tools & actions button from flashing bright on hover. */
+
+body.dark-mode .sidebar-tools-btn,
+body.dark-mode .tools-actions-btn,
+body.dark-mode .tools-action-btn,
+body.dark-mode .sidebar-footer button,
+body.dark-mode [data-tools-actions],
+body.dark-mode [data-open-tools],
+html[data-theme="dark"] .sidebar-tools-btn,
+html[data-theme="dark"] .tools-actions-btn,
+html[data-theme="dark"] .tools-action-btn,
+html[data-theme="dark"] .sidebar-footer button,
+html[data-theme="dark"] [data-tools-actions],
+html[data-theme="dark"] [data-open-tools],
+.dark-mode .sidebar-tools-btn,
+.dark-mode .tools-actions-btn,
+.dark-mode .tools-action-btn,
+.dark-mode .sidebar-footer button,
+.dark-mode [data-tools-actions],
+.dark-mode [data-open-tools] {
+  background:
+    linear-gradient(145deg, rgba(30,41,59,0.96), rgba(15,23,42,0.98)) !important;
+  border: 1px solid rgba(148,163,184,0.30) !important;
+  color: #eaf1fb !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 8px 18px rgba(0,0,0,0.22) !important;
+  text-shadow: none !important;
+}
+
+body.dark-mode .sidebar-tools-btn:hover,
+body.dark-mode .tools-actions-btn:hover,
+body.dark-mode .tools-action-btn:hover,
+body.dark-mode .sidebar-footer button:hover,
+body.dark-mode [data-tools-actions]:hover,
+body.dark-mode [data-open-tools]:hover,
+html[data-theme="dark"] .sidebar-tools-btn:hover,
+html[data-theme="dark"] .tools-actions-btn:hover,
+html[data-theme="dark"] .tools-action-btn:hover,
+html[data-theme="dark"] .sidebar-footer button:hover,
+html[data-theme="dark"] [data-tools-actions]:hover,
+html[data-theme="dark"] [data-open-tools]:hover,
+.dark-mode .sidebar-tools-btn:hover,
+.dark-mode .tools-actions-btn:hover,
+.dark-mode .tools-action-btn:hover,
+.dark-mode .sidebar-footer button:hover,
+.dark-mode [data-tools-actions]:hover,
+.dark-mode [data-open-tools]:hover {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.12), transparent 38%),
+    linear-gradient(145deg, rgba(30,41,59,0.98), rgba(15,23,42,0.98)) !important;
+  border-color: rgba(147,197,253,0.38) !important;
+  color: #f8fafc !important;
+  transform: none !important;
+  filter: none !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 10px 22px rgba(0,0,0,0.28) !important;
+}
+
+body.dark-mode .sidebar-tools-btn *,
+body.dark-mode .tools-actions-btn *,
+body.dark-mode .tools-action-btn *,
+body.dark-mode .sidebar-footer button *,
+html[data-theme="dark"] .sidebar-tools-btn *,
+html[data-theme="dark"] .tools-actions-btn *,
+html[data-theme="dark"] .tools-action-btn *,
+html[data-theme="dark"] .sidebar-footer button *,
+.dark-mode .sidebar-tools-btn *,
+.dark-mode .tools-actions-btn *,
+.dark-mode .tools-action-btn *,
+.dark-mode .sidebar-footer button * {
+  color: inherit !important;
+}
+
+
+/* === v1368 ACTUAL Tools & actions button fix ===
+   The real sidebar button class is .tools-drawer-trigger. */
+
+body.dark-mode .tools-drawer-trigger,
+html[data-theme="dark"] .tools-drawer-trigger,
+.dark-mode .tools-drawer-trigger {
+  background:
+    linear-gradient(145deg, rgba(30,41,59,0.96), rgba(15,23,42,0.98)) !important;
+  border: 1px solid rgba(148,163,184,0.30) !important;
+  color: #eaf1fb !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 8px 18px rgba(0,0,0,0.22) !important;
+  text-shadow: none !important;
+  filter: none !important;
+}
+
+body.dark-mode .tools-drawer-trigger:hover,
+body.dark-mode .tools-drawer-trigger:focus,
+body.dark-mode .tools-drawer-trigger:focus-visible,
+html[data-theme="dark"] .tools-drawer-trigger:hover,
+html[data-theme="dark"] .tools-drawer-trigger:focus,
+html[data-theme="dark"] .tools-drawer-trigger:focus-visible,
+.dark-mode .tools-drawer-trigger:hover,
+.dark-mode .tools-drawer-trigger:focus,
+.dark-mode .tools-drawer-trigger:focus-visible {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.12), transparent 38%),
+    linear-gradient(145deg, rgba(30,41,59,0.98), rgba(15,23,42,0.98)) !important;
+  border-color: rgba(147,197,253,0.38) !important;
+  color: #f8fafc !important;
+  transform: none !important;
+  filter: none !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 10px 22px rgba(0,0,0,0.28) !important;
+}
+
+body.dark-mode .tools-drawer-trigger *,
+html[data-theme="dark"] .tools-drawer-trigger *,
+.dark-mode .tools-drawer-trigger * {
+  color: inherit !important;
+}
+
+
+/* === v1370 ACTUAL tooltip + Available Funds fix ===
+   Correct base: v1368.
+   Actual classes:
+   - tooltip/info icon: .inline-info-trigger (used by Smart Insights)
+   - older standalone icons: .category-info
+   - available funds amount: .available-funds-banner .value
+*/
+
+/* 1) Use the Smart Insights-style tooltip icon everywhere these old dots still appear */
+body.dark-mode .category-info,
+body.dark-mode .inline-info-trigger,
+body.dark-mode .available-funds-wrap .inline-info-trigger,
+html[data-theme="dark"] .category-info,
+html[data-theme="dark"] .inline-info-trigger,
+html[data-theme="dark"] .available-funds-wrap .inline-info-trigger,
+.dark-mode .category-info,
+.dark-mode .inline-info-trigger,
+.dark-mode .available-funds-wrap .inline-info-trigger {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  border-radius: 999px !important;
+  background:
+    radial-gradient(circle at 35% 28%, #ffffff 0%, #f1f5f9 46%, #cbd5e1 100%) !important;
+  border: 1px solid rgba(226,232,240,0.92) !important;
+  color: #334155 !important;
+  font-size: 0 !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    0 3px 10px rgba(0,0,0,0.30) !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+  cursor: help !important;
+  filter: none !important;
+}
+
+body.dark-mode .category-info::before,
+body.dark-mode .inline-info-trigger::before,
+html[data-theme="dark"] .category-info::before,
+html[data-theme="dark"] .inline-info-trigger::before,
+.dark-mode .category-info::before,
+.dark-mode .inline-info-trigger::before {
+  content: "i" !important;
+  color: #334155 !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}
+
+body.dark-mode .category-info:hover,
+body.dark-mode .inline-info-trigger:hover,
+html[data-theme="dark"] .category-info:hover,
+html[data-theme="dark"] .inline-info-trigger:hover,
+.dark-mode .category-info:hover,
+.dark-mode .inline-info-trigger:hover {
+  background:
+    radial-gradient(circle at 35% 28%, #ffffff 0%, #f8fafc 48%, #e2e8f0 100%) !important;
+  border-color: rgba(241,245,249,0.98) !important;
+  color: #1e293b !important;
+  transform: none !important;
+}
+
+/* Hide old text/icon content if the original element contains ? or i */
+body.dark-mode .category-info,
+body.dark-mode .inline-info-trigger,
+html[data-theme="dark"] .category-info,
+html[data-theme="dark"] .inline-info-trigger,
+.dark-mode .category-info,
+.dark-mode .inline-info-trigger {
+  overflow: hidden !important;
+}
+
+/* 2) Available Funds: actual classes are .available-funds-banner .label and .value */
+body.dark-mode .available-funds-banner,
+html[data-theme="dark"] .available-funds-banner,
+.dark-mode .available-funds-banner {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(110,231,183,0.24) 0%, rgba(16,185,129,0.13) 34%, transparent 58%),
+    linear-gradient(145deg, rgba(6,78,59,0.96) 0%, rgba(10,38,35,0.96) 42%, rgba(15,23,42,0.98) 100%) !important;
+  border: 1px solid rgba(110,231,183,0.44) !important;
+  box-shadow:
+    0 10px 24px rgba(16,185,129,0.12),
+    0 3px 8px rgba(0,0,0,0.26),
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    inset 0 -1px 0 rgba(16,185,129,0.18) !important;
+}
+
+body.dark-mode .available-funds-banner:hover,
+html[data-theme="dark"] .available-funds-banner:hover,
+.dark-mode .available-funds-banner:hover {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(134,239,172,0.28) 0%, rgba(16,185,129,0.16) 34%, transparent 58%),
+    linear-gradient(145deg, rgba(6,95,70,0.98) 0%, rgba(10,38,35,0.98) 42%, rgba(15,23,42,0.98) 100%) !important;
+  border-color: rgba(134,239,172,0.54) !important;
+}
+
+/* left label part */
+body.dark-mode .available-funds-banner .label,
+html[data-theme="dark"] .available-funds-banner .label,
+.dark-mode .available-funds-banner .label {
+  color: #bbf7d0 !important;
+  background: linear-gradient(180deg, rgba(6,95,70,0.36), rgba(6,78,59,0.28)) !important;
+  border-right: 1px solid rgba(110,231,183,0.20) !important;
+  font-weight: 850 !important;
+}
+
+/* right amount part — this is the actual EUR value element */
+body.dark-mode .available-funds-banner .value,
+html[data-theme="dark"] .available-funds-banner .value,
+.dark-mode .available-funds-banner .value {
+  color: #f0fdf4 !important;
+  background: rgba(7,11,20,0.22) !important;
+  font-size: 1.16rem !important;
+  font-weight: 950 !important;
+  letter-spacing: -0.02em !important;
+  font-variant-numeric: tabular-nums !important;
+  text-shadow:
+    0 1px 0 rgba(0,0,0,0.38),
+    0 0 16px rgba(16,185,129,0.22) !important;
+}
+
+/* also cover if the amount is wrapped in span/strong */
+body.dark-mode .available-funds-banner .value *,
+html[data-theme="dark"] .available-funds-banner .value *,
+.dark-mode .available-funds-banner .value * {
+  color: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  text-shadow: inherit !important;
+}
+
+
+/* === v1371: unify Available Funds EUR amount font size in light + dark mode === */
+
+body.dark-mode .available-funds-banner .value,
+body.dark-mode .available-funds-banner .value *,
+html[data-theme="dark"] .available-funds-banner .value,
+html[data-theme="dark"] .available-funds-banner .value *,
+.dark-mode .available-funds-banner .value,
+.dark-mode .available-funds-banner .value *{
+  font-size: 1.16rem !important;
+  font-weight: 950 !important;
+  letter-spacing: -0.02em !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+
+/* === v1373 EXACT REBUILD: category popups, no broad patches ===
+   Built from actual generated classes:
+   Expenses: .expense-modal-hero / .expense-hero-block / .expense-inline-entry-controls
+   Income & Savings: #cashflowModalRoot .row-item.compact-manual / .inline-entry-controls / .tx-list
+   No global selectors, no [style*=], no :has.
+*/
+
+/* Expenses category popup: top KPI hero strip */
+body.dark-mode .expense-group-modal-centered .expense-modal-hero,
+html[data-theme="dark"] .expense-group-modal-centered .expense-modal-hero,
+.dark-mode .expense-group-modal-centered .expense-modal-hero {
+  background: #0b1220 !important;
+  border-color: rgba(148,163,184,0.22) !important;
+  box-shadow: none !important;
+}
+
+body.dark-mode .expense-group-modal-centered .expense-hero-block,
+html[data-theme="dark"] .expense-group-modal-centered .expense-hero-block,
+.dark-mode .expense-group-modal-centered .expense-hero-block {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(96,165,250,0.08), transparent 38%),
+    linear-gradient(145deg, rgba(15,23,42,0.96), rgba(9,14,25,0.98)) !important;
+  border: 1px solid rgba(148,163,184,0.28) !important;
+  color: #eaf1fb !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 18px rgba(0,0,0,0.22) !important;
+}
+
+body.dark-mode .expense-group-modal-centered .expense-hero-label,
+html[data-theme="dark"] .expense-group-modal-centered .expense-hero-label,
+.dark-mode .expense-group-modal-centered .expense-hero-label {
+  color: #a8b6ca !important;
+  opacity: 1 !important;
+}
+
+body.dark-mode .expense-group-modal-centered .expense-hero-value,
+html[data-theme="dark"] .expense-group-modal-centered .expense-hero-value,
+.dark-mode .expense-group-modal-centered .expense-hero-value {
+  color: #f8fafc !important;
+  text-shadow: none !important;
+}
+
+/* Expenses category popup: selected add-entry wrapper */
+body.dark-mode .expense-selected-editor .expense-inline-entry-controls,
+html[data-theme="dark"] .expense-selected-editor .expense-inline-entry-controls,
+.dark-mode .expense-selected-editor .expense-inline-entry-controls {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(248,113,113,0.14), transparent 44%),
+    linear-gradient(145deg, rgba(69,10,10,0.26), rgba(15,23,42,0.96)) !important;
+  border: 1px solid rgba(248,113,113,0.34) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 18px rgba(0,0,0,0.22) !important;
+}
+
+body.dark-mode .expense-selected-editor .expense-inline-entry-controls::before,
+html[data-theme="dark"] .expense-selected-editor .expense-inline-entry-controls::before,
+.dark-mode .expense-selected-editor .expense-inline-entry-controls::before {
+  background: #111827 !important;
+  border-color: rgba(248,113,113,0.38) !important;
+  color: #fca5a5 !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22) !important;
+}
+
+body.dark-mode .expense-selected-editor .expense-inline-entry-controls input[data-input],
+body.dark-mode .expense-selected-editor .expense-inline-entry-controls input[data-note],
+html[data-theme="dark"] .expense-selected-editor .expense-inline-entry-controls input[data-input],
+html[data-theme="dark"] .expense-selected-editor .expense-inline-entry-controls input[data-note],
+.dark-mode .expense-selected-editor .expense-inline-entry-controls input[data-input],
+.dark-mode .expense-selected-editor .expense-inline-entry-controls input[data-note] {
+  background: #0f172a !important;
+  border: 1px solid rgba(248,113,113,0.34) !important;
+  color: #eaf1fb !important;
+  box-shadow: none !important;
+}
+
+body.dark-mode .expense-selected-editor .expense-inline-entry-controls input[data-input]::placeholder,
+body.dark-mode .expense-selected-editor .expense-inline-entry-controls input[data-note]::placeholder,
+html[data-theme="dark"] .expense-selected-editor .expense-inline-entry-controls input[data-input]::placeholder,
+html[data-theme="dark"] .expense-selected-editor .expense-inline-entry-controls input[data-note]::placeholder,
+.dark-mode .expense-selected-editor .expense-inline-entry-controls input[data-input]::placeholder,
+.dark-mode .expense-selected-editor .expense-inline-entry-controls input[data-note]::placeholder {
+  color: #fca5a5 !important;
+  opacity: 0.62 !important;
+}
+
+body.dark-mode .expense-selected-editor .expense-inline-cadence .filter-dropdown-summary,
+body.dark-mode .expense-selected-editor .expense-inline-add,
+html[data-theme="dark"] .expense-selected-editor .expense-inline-cadence .filter-dropdown-summary,
+html[data-theme="dark"] .expense-selected-editor .expense-inline-add,
+.dark-mode .expense-selected-editor .expense-inline-cadence .filter-dropdown-summary,
+.dark-mode .expense-selected-editor .expense-inline-add {
+  background: linear-gradient(145deg, rgba(30,41,59,0.96), rgba(15,23,42,0.98)) !important;
+  border-color: rgba(148,163,184,0.30) !important;
+  color: #f8fafc !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 12px rgba(0,0,0,0.20) !important;
+}
+
+/* Income & Savings popups: logged entries row cards */
+body.dark-mode #cashflowModalRoot .cashflow-group-modal-centered .row-item.compact-manual,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-group-modal-centered .row-item.compact-manual,
+.dark-mode #cashflowModalRoot .cashflow-group-modal-centered .row-item.compact-manual {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(16,185,129,0.075), transparent 38%),
+    linear-gradient(145deg, rgba(15,23,42,0.96), rgba(9,14,25,0.98)) !important;
+  border: 1px solid rgba(148,163,184,0.26) !important;
+  color: #eaf1fb !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 18px rgba(0,0,0,0.22) !important;
+}
+
+body.dark-mode #cashflowModalRoot .cashflow-group-modal-centered .row-top-inline,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-group-modal-centered .row-top-inline,
+.dark-mode #cashflowModalRoot .cashflow-group-modal-centered .row-top-inline {
+  background: transparent !important;
+}
+
+/* Income & Savings popups: add cash-flow wrapper */
+body.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls,
+body.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls,
+.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls,
+.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(16,185,129,0.16), transparent 44%),
+    linear-gradient(145deg, rgba(6,78,59,0.30), rgba(15,23,42,0.96)) !important;
+  border: 1px solid rgba(110,231,183,0.34) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 18px rgba(0,0,0,0.22) !important;
+}
+
+body.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls::before,
+body.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls::before,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls::before,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls::before,
+.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls::before,
+.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls::before {
+  background: #111827 !important;
+  border-color: rgba(110,231,183,0.38) !important;
+  color: #86efac !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22) !important;
+}
+
+body.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls input[data-input],
+body.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls input[data-note],
+body.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls input[data-input],
+body.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls input[data-note],
+html[data-theme="dark"] #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls input[data-input],
+html[data-theme="dark"] #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls input[data-note],
+html[data-theme="dark"] #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls input[data-input],
+html[data-theme="dark"] #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls input[data-note],
+.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls input[data-input],
+.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls input[data-note],
+.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls input[data-input],
+.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls input[data-note] {
+  background: #0f172a !important;
+  border: 1px solid rgba(110,231,183,0.34) !important;
+  color: #eaf1fb !important;
+  box-shadow: none !important;
+}
+
+body.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls input[data-input]::placeholder,
+body.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls input[data-note]::placeholder,
+body.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls input[data-input]::placeholder,
+body.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls input[data-note]::placeholder,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls input[data-input]::placeholder,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls input[data-note]::placeholder,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls input[data-input]::placeholder,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls input[data-note]::placeholder,
+.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls input[data-input]::placeholder,
+.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-income .inline-entry-controls input[data-note]::placeholder,
+.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls input[data-input]::placeholder,
+.dark-mode #cashflowModalRoot .cashflow-modal.cashflow-kind-savings .inline-entry-controls input[data-note]::placeholder {
+  color: #86efac !important;
+  opacity: 0.60 !important;
+}
+
+/* Income & Savings popups: logged transaction rows must not stay white */
+body.dark-mode #cashflowModalRoot .cashflow-group-modal-centered .tx-list,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-group-modal-centered .tx-list,
+.dark-mode #cashflowModalRoot .cashflow-group-modal-centered .tx-list {
+  background: transparent !important;
+}
+
+body.dark-mode #cashflowModalRoot .cashflow-group-modal-centered .tx-item,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-group-modal-centered .tx-item,
+.dark-mode #cashflowModalRoot .cashflow-group-modal-centered .tx-item {
+  background: rgba(15,23,42,0.82) !important;
+  border-color: rgba(148,163,184,0.22) !important;
+  color: #eaf1fb !important;
+}
+
+body.dark-mode #cashflowModalRoot .cashflow-group-modal-centered .tx-left small,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-group-modal-centered .tx-left small,
+.dark-mode #cashflowModalRoot .cashflow-group-modal-centered .tx-left small {
+  color: #a8b6ca !important;
+}
+
+body.dark-mode #cashflowModalRoot .cashflow-group-modal-centered .empty,
+html[data-theme="dark"] #cashflowModalRoot .cashflow-group-modal-centered .empty,
+.dark-mode #cashflowModalRoot .cashflow-group-modal-centered .empty {
+  background: transparent !important;
+  color: #a8b6ca !important;
+}
+
+
+
+/* === title-background-removal-both-modes-final ===
+   Remove title/header tile backgrounds for Current Budget Allocation,
+   Budget Allocation, and Category Trends in both light and dark mode.
+   This intentionally preserves spacing, typography, dividers, and card bodies. */
+html[data-theme="dark"] [data-view="overview"] .overview-chart-card .overview-card-headline,
+html[data-theme="dark"] [data-view="overview"] .overview-chart-card .overview-card-headline .focus-head,
+html[data-theme="dark"] .current-allocation-card .overview-card-headline,
+html[data-theme="dark"] .current-allocation-card .overview-card-headline .focus-head,
+html[data-theme="dark"] [data-view="overview"] .overview-allocation-card .allocation-section > .section-header,
+html[data-theme="dark"] [data-view="overview"] .overview-allocation-card .allocation-section > .section-header .focus-head,
+html[data-theme="dark"] .overview-allocation-card .allocation-section > .section-header,
+html[data-theme="dark"] .overview-allocation-card .allocation-section > .section-header .focus-head,
+html[data-theme="dark"] #categoryTrends.trends-card-inline .trends-head,
+html[data-theme="dark"] #categoryTrends.trends-card-inline .trends-head .focus-head,
+html[data-theme="dark"] .current-allocation-card .trends-card-inline .trends-head,
+html[data-theme="dark"] .current-allocation-card .trends-card-inline .trends-head .focus-head,
+body.dark-mode [data-view="overview"] .overview-chart-card .overview-card-headline,
+body.dark-mode [data-view="overview"] .overview-chart-card .overview-card-headline .focus-head,
+body.dark-mode .overview-allocation-card .allocation-section > .section-header,
+body.dark-mode .overview-allocation-card .allocation-section > .section-header .focus-head,
+body.dark-mode #categoryTrends.trends-card-inline .trends-head,
+body.dark-mode #categoryTrends.trends-card-inline .trends-head .focus-head{
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+/* Keep Category Trends header area visually open in light mode too. */
+#categoryTrends.trends-card-inline,
+.current-allocation-card .trends-card-inline{
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+
+/* === v1357 Surgical Debt Details + Simulation theme correction ===
+   The earlier v1352-v1355 emergency rules were intentionally dark, but were
+   not theme-scoped. These final overrides keep both popups fully readable in
+   dark mode while restoring their intended light-mode appearance. */
+
+/* LIGHT MODE */
+html:not([data-theme="dark"]) #debtDetailOverlay,
+html:not([data-theme="dark"]) #debtSimulationOverlay {
+  background: rgba(15, 23, 42, 0.38) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-detail-modal,
+html:not([data-theme="dark"]) #debtSimulationOverlay .debt-simulation-modal {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(15, 23, 42, 0.14) !important;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.24) !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .cbm-header,
+html:not([data-theme="dark"]) #debtDetailOverlay .cbm-footer,
+html:not([data-theme="dark"]) #debtSimulationOverlay .cbm-header,
+html:not([data-theme="dark"]) #debtSimulationOverlay .cbm-footer {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-detail-body,
+html:not([data-theme="dark"]) #debtSimulationOverlay .debt-simulation-body {
+  background: linear-gradient(180deg, #f7fbff 0%, #f8fafc 100%) !important;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  scrollbar-color: #cbd5e1 #f8fafc !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-readable-card,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-mock-card,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-detail-mini-card,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-detail-setup-summary,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-detail-extra-summary,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-detail-monthly-summary,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-extra-source-card,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-history-card,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-detail-status,
+html:not([data-theme="dark"]) #debtDetailOverlay section[class*="debt-detail"],
+html:not([data-theme="dark"]) #debtDetailOverlay section[class*="debt-readable"],
+html:not([data-theme="dark"]) #debtSimulationOverlay .debt-simulator-card {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: rgba(2, 132, 199, 0.16) !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07) !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-readable-tile,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-detail-activity-tiles > *,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-readable-grid > *,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-detail-row-list > div,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-detail-stat,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-detail-metric {
+  background: #f8fbff !important;
+  color: #0f172a !important;
+  border-color: rgba(2, 132, 199, 0.14) !important;
+  box-shadow: none !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay h1,
+html:not([data-theme="dark"]) #debtDetailOverlay h2,
+html:not([data-theme="dark"]) #debtDetailOverlay h3,
+html:not([data-theme="dark"]) #debtDetailOverlay h4,
+html:not([data-theme="dark"]) #debtDetailOverlay strong,
+html:not([data-theme="dark"]) #debtDetailOverlay .cbm-title,
+html:not([data-theme="dark"]) #debtSimulationOverlay h1,
+html:not([data-theme="dark"]) #debtSimulationOverlay h2,
+html:not([data-theme="dark"]) #debtSimulationOverlay h3,
+html:not([data-theme="dark"]) #debtSimulationOverlay h4,
+html:not([data-theme="dark"]) #debtSimulationOverlay strong,
+html:not([data-theme="dark"]) #debtSimulationOverlay .cbm-title {
+  color: #0f172a !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay p,
+html:not([data-theme="dark"]) #debtDetailOverlay span,
+html:not([data-theme="dark"]) #debtDetailOverlay small,
+html:not([data-theme="dark"]) #debtDetailOverlay label,
+html:not([data-theme="dark"]) #debtSimulationOverlay p,
+html:not([data-theme="dark"]) #debtSimulationOverlay span,
+html:not([data-theme="dark"]) #debtSimulationOverlay small,
+html:not([data-theme="dark"]) #debtSimulationOverlay label {
+  color: #52637a !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-readable-value,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-readable-title,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-card-title,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-detail-row-list > div strong {
+  color: #0f172a !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-detail-calc-details > summary,
+html:not([data-theme="dark"]) #debtDetailOverlay details summary {
+  background: #ffffff !important;
+  color: #075985 !important;
+  border-color: rgba(2, 132, 199, 0.22) !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06) !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .cbm-btn-ghost,
+html:not([data-theme="dark"]) #debtSimulationOverlay .cbm-btn-ghost,
+html:not([data-theme="dark"]) #debtDetailOverlay .feature-action-btn {
+  background: #ffffff !important;
+  color: #075985 !important;
+  border-color: rgba(2, 132, 199, 0.24) !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .cbm-btn-primary,
+html:not([data-theme="dark"]) #debtSimulationOverlay .cbm-btn-primary {
+  background: linear-gradient(145deg, #3b82f6, #2563eb) !important;
+  color: #ffffff !important;
+  border-color: #2563eb !important;
+}
+
+/* DARK MODE — explicit scope and complete contrast coverage. */
+html[data-theme="dark"] #debtDetailOverlay,
+html[data-theme="dark"] #debtSimulationOverlay {
+  background: rgba(2, 6, 23, 0.86) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+html[data-theme="dark"] #debtDetailOverlay input,
+html[data-theme="dark"] #debtDetailOverlay select,
+html[data-theme="dark"] #debtDetailOverlay textarea,
+html[data-theme="dark"] #debtSimulationOverlay input,
+html[data-theme="dark"] #debtSimulationOverlay select,
+html[data-theme="dark"] #debtSimulationOverlay textarea {
+  background: #111827 !important;
+  color: #f8fafc !important;
+  border-color: rgba(148, 163, 184, 0.34) !important;
+}
+
+html[data-theme="dark"] #debtDetailOverlay input::placeholder,
+html[data-theme="dark"] #debtSimulationOverlay input::placeholder {
+  color: #8493a8 !important;
+}
+
+html[data-theme="dark"] #debtDetailOverlay .cbm-close-btn,
+html[data-theme="dark"] #debtSimulationOverlay .cbm-close-btn {
+  background: rgba(30, 41, 59, 0.86) !important;
+  color: #f8fafc !important;
+  border-color: rgba(148, 163, 184, 0.28) !important;
+}
+
+html[data-theme="dark"] #debtSimulationOverlay .debt-simulator-card,
+html[data-theme="dark"] #debtSimulationOverlay .debt-simulator-card > *,
+html[data-theme="dark"] #debtSimulationOverlay [class*="debt-simulator"] {
+  color: #eaf1fb !important;
+}
+
+html[data-theme="dark"] #debtSimulationOverlay .debt-simulator-card p,
+html[data-theme="dark"] #debtSimulationOverlay .debt-simulator-card span,
+html[data-theme="dark"] #debtSimulationOverlay .debt-simulator-card small,
+html[data-theme="dark"] #debtSimulationOverlay .debt-simulator-card label {
+  color: #b8c5d8 !important;
+}
+
+html[data-theme="dark"] #debtSimulationOverlay .debt-simulator-card strong,
+html[data-theme="dark"] #debtSimulationOverlay .debt-simulator-card h3,
+html[data-theme="dark"] #debtSimulationOverlay .debt-simulator-card h4 {
+  color: #f8fafc !important;
+}
+
+/* === v1358 Surgical light-mode Debt Details residual contrast fix ===
+   Correct only the remaining Details-popup badges and repayment progress area
+   that inherited the older unscoped dark-mode emergency rules. */
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-phase-chip,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-health-status,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-status-neutral,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-status-warn,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-status-good,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-status-bad {
+  background: #f1f5f9 !important;
+  background-color: #f1f5f9 !important;
+  border-color: #d7e0eb !important;
+  color: #52637a !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-status-good {
+  background: #ecfdf5 !important;
+  background-color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+  color: #047857 !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-status-warn {
+  background: #fffbeb !important;
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+  color: #a16207 !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-status-bad {
+  background: #fff1f2 !important;
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+  color: #be123c !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-progress-block {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #52637a !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-progress-shell {
+  background: #e2e8f0 !important;
+  background-color: #e2e8f0 !important;
+  border-color: #d6dee8 !important;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08) !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-progress-fill {
+  background: linear-gradient(90deg, #38bdf8, #2563eb) !important;
+  background-color: #2563eb !important;
+}
+
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-progress-meta,
+html:not([data-theme="dark"]) #debtDetailOverlay .debt-progress-meta span {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #64748b !important;
+}
+
+/* Debt profile metrics — dark mode surgical correction.
+   Preserve each RATE / MONTHLY / EXTRA tile, while removing the accidental
+   individual borders/backgrounds applied to its label and value. Light mode
+   is deliberately untouched. */
+body.dark-mode [data-view="debt"] .phase4-debt-stat,
+html[data-theme="dark"] [data-view="debt"] .phase4-debt-stat,
+.dark-mode [data-view="debt"] .phase4-debt-stat {
+  padding: 8px 10px !important;
+  border: 1px solid rgba(148,163,184,0.22) !important;
+  border-radius: 10px !important;
+  background: rgba(15,23,42,0.82) !important;
+  box-shadow: none !important;
+}
+
+body.dark-mode [data-view="debt"] .phase4-debt-stat > .phase4-debt-stat-label,
+body.dark-mode [data-view="debt"] .phase4-debt-stat > .phase4-debt-stat-value,
+html[data-theme="dark"] [data-view="debt"] .phase4-debt-stat > .phase4-debt-stat-label,
+html[data-theme="dark"] [data-view="debt"] .phase4-debt-stat > .phase4-debt-stat-value,
+.dark-mode [data-view="debt"] .phase4-debt-stat > .phase4-debt-stat-label,
+.dark-mode [data-view="debt"] .phase4-debt-stat > .phase4-debt-stat-value {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
