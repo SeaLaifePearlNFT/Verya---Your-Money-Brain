@@ -377,7 +377,19 @@
       return Promise.resolve();
     }
     if (!window.VeyraGoogleSync || !window.VeyraGoogleSync.getAccessToken()) {
-      if (manual) showSyncToast('Not connected to Google right now — try signing in again.', 'warn');
+      if (manual) {
+        // A manual click is clear intent — rather than just reporting the
+        // failure, open the Google sign-in popup right now so one click
+        // actually fixes it. This is the self-healing path for the very
+        // common case where the browser's silent, invisible token refresh
+        // fails (Safari/Firefox/Brave block it by default; some Chrome
+        // users disable third-party cookies themselves) — Veyra has no
+        // backend, so there's no long-lived refresh token to fall back on;
+        // a quick, easy reconnect is the realistic alternative.
+        showSyncToast('Reconnecting to Google…', 'info');
+        try { sessionStorage.setItem('veyra_pending_manual_sync_toast', '1'); } catch (e) {}
+        if (window.VeyraGoogleSync.signIn) window.VeyraGoogleSync.signIn();
+      }
       return Promise.resolve();
     }
     if (syncInFlight) {
@@ -552,7 +564,14 @@
 
   function init() {
     if (!window.VeyraIdentity) return setTimeout(init, 30);
-    if (window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken()) performSyncCheck();
+    if (window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken()) {
+      var wasReconnecting = false;
+      try {
+        wasReconnecting = sessionStorage.getItem('veyra_pending_manual_sync_toast') === '1';
+        sessionStorage.removeItem('veyra_pending_manual_sync_toast');
+      } catch (e) {}
+      performSyncCheck(wasReconnecting ? { manual: true } : undefined);
+    }
     setInterval(autoSyncTick, AUTO_SYNC_INTERVAL_MS);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
