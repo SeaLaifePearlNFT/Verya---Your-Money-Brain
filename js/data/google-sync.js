@@ -278,15 +278,37 @@
   }
 
   function renderStatus() {
-    if (!window.VeyraIdentity) { setStatus('signedout'); return; }
+    if (!window.VeyraIdentity) { setStatus('signedout'); renderSessionIndicator(null); return; }
     if (window.VeyraIdentity.isDefault()) {
       setStatus(CLIENT_ID ? 'signedout' : 'unconfigured');
+      renderSessionIndicator(null);
       return;
     }
     var known = window.VeyraIdentity.listKnownIdentities();
     var current = null;
     known.forEach(function (item) { if (item && item.id === window.VeyraIdentity.getActiveId()) current = item; });
-    setStatus('connected', (current && (current.label || current.email)) || window.VeyraIdentity.getActiveId());
+    var displayName = (current && (current.label || current.email)) || window.VeyraIdentity.getActiveId();
+    setStatus('connected', displayName);
+    renderSessionIndicator(displayName);
+  }
+
+  // Small passive "Active session: Name" pill in the app's top bar (app.html
+  // only — the element simply doesn't exist on the landing page, so this is
+  // a harmless no-op there). Informational only, no click handler: sign-in
+  // and sign-out live exclusively on the landing page now.
+  function renderSessionIndicator(displayName) {
+    var el = document.getElementById('activeSessionIndicator');
+    var label = document.getElementById('activeSessionLabel');
+    if (!el || !label) return;
+    if (!displayName) { el.hidden = true; return; }
+    label.textContent = 'Active session: ' + firstNameOf(displayName);
+    el.hidden = false;
+  }
+
+  function firstNameOf(value) {
+    var trimmed = String(value || '').trim();
+    if (!trimmed) return trimmed;
+    return trimmed.split(/\s+/)[0];
   }
 
   // ---- popover open/close, same interaction pattern as the account switcher ----

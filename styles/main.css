@@ -17827,6 +17827,8 @@ body.cvp-modal-open { overflow: hidden; }
 .veyra-sidebar{background:var(--panel);color:var(--accent);border-right:1px solid var(--line);padding:16px 12px 12px;display:flex;flex-direction:column;gap:10px;position:sticky;top:0;height:100vh;overflow:visible;z-index:40;}
 .sidebar-brand{padding:0 6px 12px;border-bottom:1px solid var(--line);margin-bottom:0;display:block;}
 .sidebar-brand-logo .brand{padding:0;margin:0;border:0;background:transparent;box-shadow:none;display:block;}
+.brand-logo-link{display:block;text-decoration:none;color:inherit;border-radius:10px;transition:opacity .15s ease;}
+.brand-logo-link:hover,.brand-logo-link:focus-visible{opacity:.8;}
 .sidebar-brand-logo .veyra-brand-logo{width:148px;max-width:100%;display:block;}
 .sidebar-brand-logo .veyra-brand-svg{display:block;width:148px;height:auto;}
 .sidebar-month-block{position:relative;z-index:55;}
@@ -17891,6 +17893,10 @@ body.tools-drawer-open .tools-drawer{transform:translateX(0);opacity:1;pointer-e
 .context-bar-month{font-size:.92rem;font-weight:850;color:var(--accent);letter-spacing:-.02em;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .context-bar-divider{width:1px;height:18px;background:var(--line);}
 .context-bar-stat{font-size:.75rem;font-weight:700;color:var(--muted);white-space:nowrap;}
+.context-bar-session{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);font-size:.72rem;font-weight:700;color:#15803d;white-space:nowrap;margin:0 10px;}
+.context-bar-session-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;flex:0 0 auto;box-shadow:0 0 0 3px rgba(34,197,94,.18);}
+html[data-theme="dark"] .context-bar-session{background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.3);color:#4ade80;}
+@media (max-width: 780px){.context-bar-session{display:none}}
 .context-bar-right #monthProgress{margin:0;}
 .veyra-content{padding:20px 24px 44px;display:flex;flex-direction:column;gap:16px;overflow:visible;min-width:0;}
 .mobile-menu-btn{display:none;border:1px solid var(--line);background:var(--panel-2);border-radius:9px;padding:7px 9px;font:inherit;font-weight:800;color:var(--accent);cursor:pointer;}
