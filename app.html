@@ -89,7 +89,8 @@
      storage-namespacing layer before anything else touches localStorage. -->
 <script src="js/data/identity.js?v=20260808"></script>
 <script src="js/data/google-sync-config.js?v=20260809"></script>
-<script src="js/data/google-sync.js?v=20260809"></script>
+<script src="js/data/google-sync.js?v=20260810"></script>
+<script src="js/data/drive-sync.js?v=20260810"></script>
 <script src="js/data/brand-config.js"></script>
 
 
@@ -393,6 +394,9 @@
     <div class="context-bar-session" id="activeSessionIndicator" hidden>
       <span class="context-bar-session-dot" aria-hidden="true"></span>
       <span class="context-bar-session-label" id="activeSessionLabel"></span>
+      <span class="context-bar-session-sep" aria-hidden="true">·</span>
+      <span class="context-bar-sync-status" id="driveSyncStatus" data-state="synced"></span>
+      <button class="context-bar-sync-btn" id="driveSyncNowBtn" type="button" title="Sync now">⟳</button>
     </div>
     <div class="context-bar-right">
       <div id="monthProgress"></div>

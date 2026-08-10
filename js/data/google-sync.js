@@ -99,6 +99,8 @@
     return /(^|\/)app\.html(\?|#|$)/.test(window.location.pathname + window.location.search);
   }
 
+  var tokenReadyListeners = [];
+
   // ---- handling a token response (whether from an interactive sign-in or a silent refresh) ----
   function handleTokenResponse(response) {
     signInInFlight = false;
@@ -116,27 +118,59 @@
     }
     accessToken = response.access_token;
     accessTokenExpiresAt = Date.now() + (Number(response.expires_in || 3600) * 1000);
-    fetchUserInfo(function (info) {
-      if (!info || !info.email) {
-        setStatus('error', 'Signed in, but could not read your Google profile.');
-        return;
-      }
-      window.VeyraIdentity.switchTo(info.email, {
-        label: info.name || info.email,
-        email: info.email,
-        avatar: info.picture || ''
+    // Lets drive-sync.js (loaded separately, Stage 4) react the moment a
+    // usable token exists — from an interactive sign-in OR a silent refresh
+    // on page load. No listeners today means this is a harmless no-op.
+    try { window.dispatchEvent(new CustomEvent('veyra:google-token-ready')); } catch (e) {}
+
+    // If this token response is just a background refresh for the identity
+    // we're already signed in as (the common case: trySilentReauth() running
+    // quietly every so often to keep the session alive while someone's
+    // actively using the app), there's nothing to switch or navigate — just
+    // keep the fresh token and let Stage 4's sync code know it can proceed.
+    // Only a genuinely NEW identity (interactive sign-in, or switching to a
+    // different Google account) needs the userinfo lookup + redirect dance.
+    if (!window.VeyraIdentity.isDefault()) {
+      fetchUserInfo(function (info) {
+        if (info && info.email && info.email === window.VeyraIdentity.getActiveId()) {
+          renderStatus();
+          notifyTokenReady();
+          return;
+        }
+        completeSignIn(info);
       });
-      // Sign-in can be initiated from either the landing page or from inside
-      // the app (e.g. a future settings screen). If we're already on
-      // app.html, reload in place so it boots against the newly-active
-      // identity. If we're on the landing page, the whole point of signing
-      // in there is to go straight into the dashboard — no separate
-      // "welcome back, now click Continue" hop.
-      if (isAppPage()) {
-        window.location.reload();
-      } else {
-        window.location.href = 'app.html';
-      }
+      return;
+    }
+
+    fetchUserInfo(completeSignIn);
+  }
+
+  function completeSignIn(info) {
+    if (!info || !info.email) {
+      setStatus('error', 'Signed in, but could not read your Google profile.');
+      return;
+    }
+    window.VeyraIdentity.switchTo(info.email, {
+      label: info.name || info.email,
+      email: info.email,
+      avatar: info.picture || ''
+    });
+    // Sign-in can be initiated from either the landing page or from inside
+    // the app (e.g. a future settings screen). If we're already on
+    // app.html, reload in place so it boots against the newly-active
+    // identity. If we're on the landing page, the whole point of signing
+    // in there is to go straight into the dashboard — no separate
+    // "welcome back, now click Continue" hop.
+    if (isAppPage()) {
+      window.location.reload();
+    } else {
+      window.location.href = 'app.html';
+    }
+  }
+
+  function notifyTokenReady() {
+    tokenReadyListeners.forEach(function (fn) {
+      try { fn(getAccessToken()); } catch (e) {}
     });
   }
 
@@ -189,11 +223,16 @@
     return null;
   }
 
-  // ---- minimal Drive REST helpers (Stage 4 groundwork — unused for now) ----
-  function driveCreateFile(name, contentObject) {
+  // ---- minimal Drive REST helpers ----
+  // appProperties/parentFolderId let callers (see drive-sync.js, Stage 4)
+  // tag a file for later lookup and/or place it inside a specific folder.
+  // Both optional; omit either for a plain untagged, root-level file.
+  function driveCreateFile(name, contentObject, appProperties, parentFolderId) {
     var token = getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
     var metadata = { name: name, mimeType: 'application/json' };
+    if (appProperties) metadata.appProperties = appProperties;
+    if (parentFolderId) metadata.parents = [parentFolderId];
     var boundary = 'veyra-' + Date.now().toString(36);
     var body =
       '--' + boundary + '\r\n' +
@@ -210,6 +249,32 @@
     }).then(function (res) {
       if (!res.ok) throw new Error('Drive create failed: HTTP ' + res.status);
       return res.json();
+    });
+  }
+
+  // Finds a file this app previously created for the signed-in user, tagged
+  // with the given appProperties key/value (e.g. {veyraFileType: 'personal',
+  // veyraIdentity: 'alice@example.com'}). Works across devices/browsers for
+  // the same Google account, because drive.file access is recorded against
+  // the (Google user, file) pair by Google, not against this specific
+  // browser session. Returns the first match's {id, name} or null if none.
+  function driveFindFile(appProperties) {
+    var token = getAccessToken();
+    if (!token) return Promise.reject(new Error('Not signed in to Google.'));
+    var clauses = ["trashed = false"];
+    Object.keys(appProperties || {}).forEach(function (key) {
+      var value = String(appProperties[key]).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      clauses.push("appProperties has { key='" + key + "' and value='" + value + "' }");
+    });
+    var q = encodeURIComponent(clauses.join(' and '));
+    return fetch(DRIVE_FILES_URL + '?q=' + q + '&fields=files(id,name,modifiedTime)&spaces=drive&pageSize=1', {
+      headers: { Authorization: 'Bearer ' + token }
+    }).then(function (res) {
+      if (!res.ok) throw new Error('Drive search failed: HTTP ' + res.status);
+      return res.json();
+    }).then(function (json) {
+      var files = (json && json.files) || [];
+      return files.length ? files[0] : null;
     });
   }
 
@@ -349,7 +414,15 @@
     signIn: signIn,
     signOut: signOut,
     getAccessToken: getAccessToken,
+    // Fires with the fresh access token whenever one becomes available for
+    // the currently-active identity — after a successful interactive
+    // sign-in that didn't need to navigate away, and (the common case) after
+    // every successful silent background token refresh. Stage 4's drive-sync
+    // uses this to know exactly when it's safe to start talking to Drive,
+    // instead of polling getAccessToken() in a loop.
+    onTokenReady: function (fn) { if (typeof fn === 'function') tokenReadyListeners.push(fn); },
     driveCreateFile: driveCreateFile,
+    driveFindFile: driveFindFile,
     driveReadFile: driveReadFile,
     driveUpdateFile: driveUpdateFile
   };
