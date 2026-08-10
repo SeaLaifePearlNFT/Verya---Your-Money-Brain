@@ -368,28 +368,46 @@
 
   // ---- orchestrator: process every unit, one at a time ----
 
-  function performSyncCheck() {
-    if (!window.VeyraIdentity || window.VeyraIdentity.isDefault()) return Promise.resolve();
-    if (!window.VeyraGoogleSync || !window.VeyraGoogleSync.getAccessToken()) return Promise.resolve();
-    if (syncInFlight) return Promise.resolve();
+  function performSyncCheck(options) {
+    options = options || {};
+    var manual = !!options.manual;
+
+    if (!window.VeyraIdentity || window.VeyraIdentity.isDefault()) {
+      if (manual) showSyncToast('Sign in with Google first to enable backup.', 'warn');
+      return Promise.resolve();
+    }
+    if (!window.VeyraGoogleSync || !window.VeyraGoogleSync.getAccessToken()) {
+      if (manual) showSyncToast('Not connected to Google right now — try signing in again.', 'warn');
+      return Promise.resolve();
+    }
+    if (syncInFlight) {
+      if (manual) showSyncToast('Already syncing…', 'info');
+      return Promise.resolve();
+    }
     syncInFlight = true;
     setSyncStatus('syncing');
 
     var units = listSyncUnits();
     var needsReload = false;
+    var pushedOrPulledCount = 0;
 
     function processNext(index) {
       if (index >= units.length) {
         syncInFlight = false;
         setSyncStatus('synced');
+        if (manual) {
+          showSyncToast(pushedOrPulledCount > 0 ? '✓ Synced to Google Drive' : '✓ Already up to date', 'success');
+        }
         if (needsReload) window.location.reload();
         return Promise.resolve();
       }
       return syncOneUnit(units[index]).then(function (result) {
+        if (result.outcome === 'pushed' || result.outcome === 'pulled') pushedOrPulledCount++;
         if (result.outcome === 'pulled') needsReload = true;
         if (result.outcome === 'conflict') {
           syncInFlight = false;
           setSyncStatus('conflict');
+          if (manual) showSyncToast('Action needed — see the dialog to resolve a conflict.', 'warn');
           showConflictDialog(result);
           return; // stop this pass — remaining units get picked up on the next sync
         }
@@ -401,6 +419,7 @@
       console.error('Veyra Drive sync error:', err && err.stack || err);
       setSyncStatus('error');
       syncInFlight = false;
+      if (manual) showSyncToast('Sync failed — check your connection and try again.', 'error');
     });
   }
 
@@ -472,6 +491,30 @@
     el.setAttribute('data-state', state);
   }
 
+  var toastHideTimer = null;
+
+  // Small slide-in confirmation, shown only for MANUALLY triggered syncs
+  // (the "Sync now" button, or syncNow() called directly) — background/
+  // automatic syncs stay quiet on purpose, so this never becomes naggy.
+  function showSyncToast(message, kind) {
+    var el = document.getElementById('driveSyncToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'driveSyncToast';
+      el.className = 'drive-sync-toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = message;
+    el.setAttribute('data-kind', kind || 'info');
+    // restart the animation even if a toast is already showing
+    el.classList.remove('is-visible');
+    // eslint-disable-next-line no-unused-expressions
+    el.offsetHeight; // force reflow so removing+re-adding the class re-triggers the CSS transition
+    el.classList.add('is-visible');
+    if (toastHideTimer) clearTimeout(toastHideTimer);
+    toastHideTimer = setTimeout(function () { el.classList.remove('is-visible'); }, 3200);
+  }
+
   function scheduleDebouncedSync() {
     if (pendingDebounce) clearTimeout(pendingDebounce);
     pendingDebounce = setTimeout(function () {
@@ -500,7 +543,7 @@
   }
 
   document.addEventListener('click', function (e) {
-    if (e.target.closest('#driveSyncNowBtn')) performSyncCheck();
+    if (e.target.closest('#driveSyncNowBtn')) performSyncCheck({ manual: true });
   });
 
   window.addEventListener('veyra:google-token-ready', function () {
@@ -516,6 +559,6 @@
   else init();
 
   window.VeyraDriveSync = {
-    syncNow: function () { return performSyncCheck(); }
+    syncNow: function (options) { return performSyncCheck(Object.assign({ manual: true }, options || {})); }
   };
 }());
