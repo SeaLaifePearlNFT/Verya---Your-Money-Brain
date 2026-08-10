@@ -231,20 +231,29 @@ html[data-theme="dark"] .hero-logo {
 }
 
 .logout-link {
-  font-family: var(--font-mono);
-  font-weight: 300;
-  font-size: 12px;
-  color: var(--hint);
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font);
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--muted);
+  background: transparent;
   border: none;
-  padding: 0;
+  padding: 7px 14px;
+  border-radius: 999px;
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration: none;
+  transition: background 160ms ease, color 160ms ease;
 }
 
 .logout-link:hover {
-  color: var(--muted);
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.logout-link:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
 /* ─── Footer ───────────────────────────────────────────────── */
