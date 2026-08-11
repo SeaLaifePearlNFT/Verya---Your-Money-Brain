@@ -571,7 +571,16 @@
           setSyncStatus('synced');
           if (manual) showSyncToast(pushedOrPulledCount > 0 ? '✓ Synced to Google Drive' : '✓ Already up to date', 'success');
         }
-        if (needsReload) window.location.reload();
+        if (needsReload) {
+          // Carry the current token across this reload the same way
+          // google-sync.js already does for its own sign-in redirects —
+          // otherwise the reload silently drops it and the next thing
+          // touching Drive has to fall back to the less reliable silent
+          // reauth (or worse, sit there needing a manual reconnect the
+          // user never asked for).
+          if (window.VeyraGoogleSync.prepareForReload) window.VeyraGoogleSync.prepareForReload();
+          window.location.reload();
+        }
         return Promise.resolve();
       }
       return syncOneUnit(units[index]).then(function (result) {
@@ -650,6 +659,7 @@
       saveRejectedSnapshotAsBackup(conflict.localSnapshot, unitLabelFor(unit) + ' \u2014 this device\u2019s version (replaced ' + new Date().toLocaleString() + ')');
       setSyncMeta(unit.id, conflict.remoteHash, conflict.remoteModifiedTime);
       closeConflictDialog();
+      if (window.VeyraGoogleSync.prepareForReload) window.VeyraGoogleSync.prepareForReload();
       window.location.reload();
     }
   }

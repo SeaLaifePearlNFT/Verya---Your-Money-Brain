@@ -468,6 +468,13 @@
     signIn: signIn,
     signOut: signOut,
     getAccessToken: getAccessToken,
+    // Any code that's about to trigger window.location.reload() (drive-sync.js
+    // does this after applying a pulled snapshot or resolving a conflict in
+    // favor of Drive) should call this immediately beforehand — otherwise the
+    // reload throws away the in-memory access token exactly like a full page
+    // navigation does, forcing a reconnect that depends on the same
+    // unreliable silent-reauth path we already worked around for sign-in.
+    prepareForReload: stashTokenHandoff,
     // Fires with the fresh access token whenever one becomes available for
     // the currently-active identity — after a successful interactive
     // sign-in that didn't need to navigate away, and (the common case) after
