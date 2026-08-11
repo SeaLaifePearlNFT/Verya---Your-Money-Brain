@@ -113,16 +113,49 @@
   }
 
   // ---- understanding & rebuilding budget_dashboard_v12's structure ----
+  //
+  // budget_dashboard_v12 is stored LZ-string COMPRESSED by app.js (prefixed
+  // "LZ1:") whenever the LZString library is available — plain JSON.parse on
+  // it throws immediately. This exact mirroring of app.js's own
+  // encodeStateForStorage/decodeStoredState is required, not optional: it's
+  // the difference between this file actually reading real accounts and
+  // silently finding nothing (which is exactly what happened before this was
+  // fixed — every prior test used the uncompressed export file as a fixture,
+  // never the real on-disk compressed format, so this went uncaught).
+
+  function decodeMainBlobValue(raw) {
+    if (raw == null) return null;
+    if (typeof raw === 'string' && raw.indexOf('LZ1:') === 0) {
+      var dec = (window.LZString && typeof LZString.decompressFromUTF16 === 'function')
+        ? LZString.decompressFromUTF16(raw.slice(4)) : null;
+      if (!dec) throw new Error('drive-sync: could not decompress budget_dashboard_v12');
+      return JSON.parse(dec);
+    }
+    return JSON.parse(raw); // legacy uncompressed snapshot
+  }
+
+  function encodeMainBlobValue(blob) {
+    var json = JSON.stringify(blob);
+    try {
+      if (window.LZString && typeof LZString.compressToUTF16 === 'function') {
+        return 'LZ1:' + LZString.compressToUTF16(json);
+      }
+    } catch (e) {}
+    return json; // fallback: plain JSON (library missing) — matches app.js's own fallback
+  }
 
   function parseMainBlob() {
     try {
       var raw = localStorage.getItem(MAIN_BLOB_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) { return null; }
+      return raw ? decodeMainBlobValue(raw) : null;
+    } catch (e) {
+      console.error('Veyra Drive sync: failed to parse local budget data', e);
+      return null;
+    }
   }
 
   function writeMainBlob(blob) {
-    try { localStorage.setItem(MAIN_BLOB_KEY, JSON.stringify(blob)); } catch (e) {}
+    try { localStorage.setItem(MAIN_BLOB_KEY, encodeMainBlobValue(blob)); } catch (e) {}
   }
 
   function sanitizeFolderName(name) {
