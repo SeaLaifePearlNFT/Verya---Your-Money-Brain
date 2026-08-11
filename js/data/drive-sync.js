@@ -172,8 +172,11 @@
         if (!acc || !acc.id) return;
         units.push({ kind: 'account', id: 'account:' + acc.id, accountId: acc.id, label: acc.name || acc.id, folderName: sanitizeFolderName(acc.name) });
       });
+    } else {
+      console.warn('[Veyra Sync] listSyncUnits: could not read any accounts from local data (blob=' + (blob ? 'parsed but blob.accounts is not an array' : 'null/failed to parse') + ') — only settings will sync.');
     }
     units.push({ kind: 'settings', id: 'settings', label: 'Account settings' });
+    console.log('[Veyra Sync] units this pass:', units.map(function (u) { return u.id; }).join(', '));
     return units;
   }
 
@@ -328,15 +331,17 @@
   function ensureUnitFileId(unit) {
     var stored = null;
     try { stored = localStorage.getItem(fileIdKey(unit.id)); } catch (e) {}
-    if (stored) return Promise.resolve(stored);
+    if (stored) { console.log('[Veyra Sync] unit=' + unit.id + ' reusing cached fileId=' + stored); return Promise.resolve(stored); }
 
     var fileName = unit.kind === 'account' ? DATA_FILE_NAME : SETTINGS_FILE_NAME;
+    console.log('[Veyra Sync] unit=' + unit.id + ' no cached fileId — resolving folder + file in Drive now (first sync for this unit)');
     return ensureRootFolderId().then(function (rootFolderId) {
       if (unit.kind === 'settings') {
         return driveFindFileByName(fileName, rootFolderId).then(function (found) {
           if (found) { try { localStorage.setItem(fileIdKey(unit.id), found.id); } catch (e) {} return found.id; }
           return window.VeyraGoogleSync.driveCreateFile(fileName, {}, null, rootFolderId).then(function (created) {
             try { localStorage.setItem(fileIdKey(unit.id), created.id); } catch (e) {}
+            console.log('[Veyra Sync] unit=' + unit.id + ' created ' + fileName + ' in Drive root, fileId=' + created.id);
             return created.id;
           });
         });
@@ -346,10 +351,14 @@
           if (found) { try { localStorage.setItem(fileIdKey(unit.id), found.id); } catch (e) {} return found.id; }
           return window.VeyraGoogleSync.driveCreateFile(fileName, {}, null, accountFolderId).then(function (created) {
             try { localStorage.setItem(fileIdKey(unit.id), created.id); } catch (e) {}
+            console.log('[Veyra Sync] unit=' + unit.id + ' created folder "' + unit.folderName + '" + ' + fileName + ' in Drive, fileId=' + created.id);
             return created.id;
           });
         });
       });
+    }).catch(function (err) {
+      console.error('[Veyra Sync] unit=' + unit.id + ' FAILED to resolve/create its Drive file:', err && err.stack || err);
+      throw err;
     });
   }
 
@@ -374,11 +383,16 @@
       var localChanged = localHash !== meta_.lastSyncedHash;
       var remoteChanged = remoteHasContent && (remoteHash !== meta_.lastSyncedHash);
 
-      if (!localChanged && !remoteChanged) return { outcome: 'noop' };
+      console.log('[Veyra Sync] unit=' + unit.id + ' fileId=' + fileId +
+        ' localHash=' + localHash + ' remoteHash=' + remoteHash + ' lastSyncedHash=' + meta_.lastSyncedHash +
+        ' remoteHasContent=' + remoteHasContent + ' localChanged=' + localChanged + ' remoteChanged=' + remoteChanged);
+
+      if (!localChanged && !remoteChanged) { console.log('[Veyra Sync] unit=' + unit.id + ' -> noop (nothing changed on either side since last sync)'); return { outcome: 'noop' }; }
 
       if (localChanged && !remoteChanged) {
         return window.VeyraGoogleSync.driveUpdateFile(fileId, localSnapshot).then(function () {
           setSyncMeta(unit.id, localHash, new Date().toISOString());
+          console.log('[Veyra Sync] unit=' + unit.id + ' -> pushed to Drive');
           return { outcome: 'pushed' };
         });
       }
@@ -386,10 +400,12 @@
       if (!localChanged && remoteChanged) {
         applyUnitSnapshot(unit, remoteSnapshot);
         setSyncMeta(unit.id, remoteHash, meta.modifiedTime);
+        console.log('[Veyra Sync] unit=' + unit.id + ' -> pulled from Drive');
         return { outcome: 'pulled' };
       }
 
       // both changed — real conflict for this unit specifically
+      console.log('[Veyra Sync] unit=' + unit.id + ' -> CONFLICT (both sides changed since last sync)');
       return {
         outcome: 'conflict',
         unit: unit, fileId: fileId,
