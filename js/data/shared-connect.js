@@ -114,6 +114,13 @@
         .setOAuthToken(token)
         .setDeveloperKey(API_KEY)
         .setAppId(APP_ID)
+        // Explicitly declare the embedding page's own origin. Without this,
+        // the Picker falls back to auto-detecting it — which, diagnosed
+        // from a real failing request, resolved to the page's *favicon*
+        // URL instead of the actual page, causing Google's backend to
+        // reject the request outright (401) since the origin didn't
+        // validate. Setting it explicitly removes the guesswork entirely.
+        .setOrigin(window.location.protocol + '//' + window.location.host)
         .setTitle('Select the shared budget folder someone shared with you')
         .setCallback(pickerCallback)
         .build();
