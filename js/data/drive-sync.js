@@ -267,6 +267,26 @@
     });
   }
 
+  // Checking a file/folder still exists AND isn't trashed is the crucial
+  // second half — deleting something through Drive's normal UI moves it to
+  // Trash rather than destroying it. It keeps its ID and stays directly
+  // fetchable by that ID (200 OK), just excluded from search/listing — so a
+  // stale cached ID pointing at a trashed item looks perfectly healthy
+  // unless this is checked explicitly, and the app would silently keep
+  // reading/writing to something the user can no longer see.
+  function driveCheckIdStillValid(id) {
+    var token = window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken();
+    if (!token) return Promise.resolve(false);
+    return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?fields=id,trashed', {
+      headers: { Authorization: 'Bearer ' + token }
+    }).then(function (res) {
+      if (!res.ok) return false; // 404 (permanently deleted) or any other error -> treat as gone
+      return res.json();
+    }).then(function (json) {
+      return !!(json && json.id && !json.trashed);
+    }).catch(function () { return false; });
+  }
+
   function driveFindFolderByName(name, parentId) {
     var token = window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
@@ -299,10 +319,37 @@
     });
   }
 
+  function clearSyncMeta(unitId) {
+    try { localStorage.removeItem(syncMetaKey(unitId)); } catch (e) {}
+  }
+
+  // If the root "Veyra" folder itself was deleted, everything inside it went
+  // with it (Drive cascades trashing to descendants) — so every unit's
+  // cached IDs and "last synced" markers are now equally stale. Simplest
+  // reliable fix: reset ALL of this identity's sync bookkeeping at once
+  // rather than trying to individually detect every orphaned descendant.
+  function resetAllSyncBookkeeping() {
+    console.warn('[Veyra Sync] resetting all Drive sync bookkeeping for this identity — will rebuild folders/files from scratch on the next pass');
+    var keysToRemove = [];
+    var len = localStorage.length;
+    for (var i = 0; i < len; i++) {
+      var key = localStorage.key(i);
+      if (key && key.indexOf(BOOKKEEPING_PREFIX) === 0) keysToRemove.push(key);
+    }
+    keysToRemove.forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
+  }
+
   function ensureRootFolderId() {
     var stored = null;
     try { stored = localStorage.getItem(ROOT_FOLDER_ID_KEY); } catch (e) {}
-    if (stored) return Promise.resolve(stored);
+    if (stored) {
+      return driveCheckIdStillValid(stored).then(function (valid) {
+        if (valid) return stored;
+        console.warn('[Veyra Sync] cached "Veyra" root folder no longer exists (deleted/trashed) — recreating everything');
+        resetAllSyncBookkeeping();
+        return ensureRootFolderId();
+      });
+    }
     return driveFindFolderByName(ROOT_FOLDER_NAME).then(function (found) {
       if (found) { try { localStorage.setItem(ROOT_FOLDER_ID_KEY, found.id); } catch (e) {} return found.id; }
       return driveCreateFolder(ROOT_FOLDER_NAME).then(function (created) {
@@ -316,7 +363,16 @@
     var key = folderIdKey(unit.accountId);
     var stored = null;
     try { stored = localStorage.getItem(key); } catch (e) {}
-    if (stored) return Promise.resolve(stored);
+    if (stored) {
+      return driveCheckIdStillValid(stored).then(function (valid) {
+        if (valid) return stored;
+        console.warn('[Veyra Sync] cached folder for "' + unit.label + '" no longer exists (deleted/trashed) — recreating it');
+        try { localStorage.removeItem(key); } catch (e) {}
+        try { localStorage.removeItem(fileIdKey(unit.id)); } catch (e) {} // its data.json's cached ID is now orphaned too
+        clearSyncMeta(unit.id); // last-synced marker refers to the now-gone file — must not suppress the fresh push
+        return ensureAccountFolderId(unit, rootFolderId);
+      });
+    }
     return driveFindFolderByName(unit.folderName, rootFolderId).then(function (found) {
       if (found) { try { localStorage.setItem(key, found.id); } catch (e) {} return found.id; }
       return driveCreateFolder(unit.folderName, rootFolderId).then(function (created) {
@@ -331,10 +387,21 @@
   function ensureUnitFileId(unit) {
     var stored = null;
     try { stored = localStorage.getItem(fileIdKey(unit.id)); } catch (e) {}
-    if (stored) { console.log('[Veyra Sync] unit=' + unit.id + ' reusing cached fileId=' + stored); return Promise.resolve(stored); }
+    if (stored) {
+      return driveCheckIdStillValid(stored).then(function (valid) {
+        if (valid) { console.log('[Veyra Sync] unit=' + unit.id + ' reusing cached fileId=' + stored); return stored; }
+        console.warn('[Veyra Sync] unit=' + unit.id + ' cached file no longer exists (deleted/trashed) — recreating it');
+        try { localStorage.removeItem(fileIdKey(unit.id)); } catch (e) {}
+        clearSyncMeta(unit.id); // last-synced marker refers to the now-gone file — must not suppress the fresh push
+        return resolveUnitFileIdFresh(unit);
+      });
+    }
+    return resolveUnitFileIdFresh(unit);
+  }
 
+  function resolveUnitFileIdFresh(unit) {
     var fileName = unit.kind === 'account' ? DATA_FILE_NAME : SETTINGS_FILE_NAME;
-    console.log('[Veyra Sync] unit=' + unit.id + ' no cached fileId — resolving folder + file in Drive now (first sync for this unit)');
+    console.log('[Veyra Sync] unit=' + unit.id + ' resolving folder + file in Drive now');
     return ensureRootFolderId().then(function (rootFolderId) {
       if (unit.kind === 'settings') {
         return driveFindFileByName(fileName, rootFolderId).then(function (found) {
