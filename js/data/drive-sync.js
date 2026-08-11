@@ -493,6 +493,12 @@
       return Promise.resolve();
     }
     if (!window.VeyraGoogleSync || !window.VeyraGoogleSync.getAccessToken()) {
+      // Update the PERSISTENT status pill regardless of manual/automatic —
+      // silently doing nothing forever on a background check leaves no
+      // visible sign that anything needs attention, which is exactly what
+      // made this hard to notice before: reconnecting was only ever
+      // discoverable if you happened to click "Sync now" and catch a toast.
+      setSyncStatus('reconnect');
       if (manual) {
         // A manual click is clear intent — rather than just reporting the
         // failure, open the Google sign-in popup right now so one click
@@ -614,7 +620,7 @@
   function setSyncStatus(state) {
     var el = document.getElementById('driveSyncStatus');
     if (!el) return;
-    var label = { syncing: 'Syncing…', synced: 'Backed up', error: 'Sync error — will retry', conflict: 'Action needed' }[state] || '';
+    var label = { syncing: 'Syncing…', synced: 'Backed up', error: 'Sync error — will retry', conflict: 'Action needed', reconnect: 'Reconnect needed — click ⟳' }[state] || '';
     el.textContent = label;
     el.setAttribute('data-state', state);
   }

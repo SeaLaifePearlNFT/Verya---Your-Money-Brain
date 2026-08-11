@@ -17899,6 +17899,7 @@ body.tools-drawer-open .tools-drawer{transform:translateX(0);opacity:1;pointer-e
 .context-bar-sync-status{font-weight:600;opacity:.85;}
 .context-bar-sync-status[data-state="error"]{color:#dc2626;}
 .context-bar-sync-status[data-state="conflict"]{color:#b45309;}
+.context-bar-sync-status[data-state="reconnect"]{color:#b45309;font-weight:700;}
 .context-bar-sync-btn{border:none;background:transparent;color:inherit;cursor:pointer;font-size:.85rem;line-height:1;padding:2px 4px;border-radius:6px;opacity:.75;}
 .context-bar-sync-btn:hover{opacity:1;background:rgba(34,197,94,.15);}
 html[data-theme="dark"] .context-bar-session{background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.3);color:#4ade80;}

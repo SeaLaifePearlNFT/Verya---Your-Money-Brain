@@ -155,6 +155,13 @@
       email: info.email,
       avatar: info.picture || ''
     });
+    // A reload/navigation is about to happen either way below, and that's a
+    // fresh JS context — the in-memory accessToken we just got would
+    // otherwise be thrown away immediately, forcing a second sign-in right
+    // after the first. sessionStorage survives same-tab navigation (unlike
+    // our in-memory state), so hand the token across deliberately instead of
+    // relying on silent reauth to get a new one moments later.
+    stashTokenHandoff();
     // Sign-in can be initiated from either the landing page or from inside
     // the app (e.g. a future settings screen). If we're already on
     // app.html, reload in place so it boots against the newly-active
@@ -165,6 +172,36 @@
       window.location.reload();
     } else {
       window.location.href = 'app.html';
+    }
+  }
+
+  var TOKEN_HANDOFF_KEY = 'veyra_token_handoff_v1';
+
+  function stashTokenHandoff() {
+    try {
+      sessionStorage.setItem(TOKEN_HANDOFF_KEY, JSON.stringify({ access_token: accessToken, expires_at: accessTokenExpiresAt }));
+    } catch (e) {}
+  }
+
+  // Single-use: consumes and clears the handoff written by stashTokenHandoff()
+  // just before the reload/navigation that's about to lose in-memory state.
+  // Returns true if a still-valid token was adopted, so init() knows it can
+  // skip the (comparatively unreliable) silent-reauth attempt entirely.
+  function consumeTokenHandoff() {
+    try {
+      var raw = sessionStorage.getItem(TOKEN_HANDOFF_KEY);
+      if (!raw) return false;
+      sessionStorage.removeItem(TOKEN_HANDOFF_KEY);
+      var handoff = JSON.parse(raw);
+      if (!handoff || !handoff.access_token || !handoff.expires_at || handoff.expires_at <= Date.now()) return false;
+      accessToken = handoff.access_token;
+      accessTokenExpiresAt = handoff.expires_at;
+      renderStatus();
+      notifyTokenReady();
+      try { window.dispatchEvent(new CustomEvent('veyra:google-token-ready')); } catch (e) {}
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 
@@ -416,7 +453,13 @@
     // with their click. (Diagnosed from a real "Failed to open popup
     // window... Maybe blocked by the browser" console error.)
     if (CLIENT_ID) loadGisScript(function () {});
-    trySilentReauth();
+    // A handed-off token from the page we just navigated from (see
+    // stashTokenHandoff) means we already have a valid token right now —
+    // skip the silent-reauth attempt entirely rather than doing unnecessary
+    // (and less reliable) work to get something we already have.
+    if (!consumeTokenHandoff()) {
+      trySilentReauth();
+    }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
