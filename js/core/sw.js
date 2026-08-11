@@ -7,7 +7,7 @@
    control immediately (skipWaiting + clients.claim) — so every client picks
    up the new build on their next load with no manual hard-refresh.
    ────────────────────────────────────────────────────────────────────── */
-const SW_VERSION = 'v7';
+const SW_VERSION = 'v8';
 const CACHE_NAME = 'veyra-shell-' + SW_VERSION;
 
 const CORE_ASSETS = [
@@ -78,7 +78,9 @@ self.addEventListener('fetch', (event) => {
     url.hostname === 'www.googleapis.com' ||
     url.hostname === 'accounts.google.com' ||
     url.hostname === 'apis.google.com' ||
-    url.hostname === 'oauth2.googleapis.com'
+    url.hostname === 'oauth2.googleapis.com' ||
+    url.hostname === 'docs.google.com' ||
+    url.hostname === 'content.googleapis.com'
   ) {
     return;
   }
