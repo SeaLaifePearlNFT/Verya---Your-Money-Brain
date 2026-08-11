@@ -405,6 +405,17 @@
   function init() {
     if (!window.VeyraIdentity) return setTimeout(init, 30);
     renderStatus();
+    // Preload Google's sign-in script immediately on every page load,
+    // regardless of sign-in state — not lazily on first use. The script
+    // load itself is a network fetch (asynchronous); if it's still pending
+    // when someone clicks a sign-in/sync button, the eventual popup request
+    // happens *after* an async gap from their click, and browsers block
+    // popups that aren't tied to an immediate, synchronous user gesture.
+    // Preloading here means by the time anyone actually clicks something,
+    // the script is already loaded and the popup call stays synchronous
+    // with their click. (Diagnosed from a real "Failed to open popup
+    // window... Maybe blocked by the browser" console error.)
+    if (CLIENT_ID) loadGisScript(function () {});
     trySilentReauth();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
