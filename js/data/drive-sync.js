@@ -170,13 +170,20 @@
     if (blob && Array.isArray(blob.accounts)) {
       blob.accounts.forEach(function (acc) {
         if (!acc || !acc.id) return;
-        units.push({ kind: 'account', id: 'account:' + acc.id, accountId: acc.id, label: acc.name || acc.id, folderName: sanitizeFolderName(acc.name) });
+        // driveOrigin === 'joined' means this identity connected to someone
+        // ELSE's shared folder via the Picker (Stage 4c) rather than owning
+        // it — it can never be recreated by searching/creating under this
+        // identity's own "Veyra" root folder, only reconnected via its
+        // originally-picked folder ID. See ensureUnitFileId's owned/joined
+        // branch below.
+        var owned = acc.driveOrigin !== 'joined';
+        units.push({ kind: 'account', id: 'account:' + acc.id, accountId: acc.id, label: acc.name || acc.id, folderName: sanitizeFolderName(acc.name), owned: owned });
       });
     } else {
       console.warn('[Veyra Sync] listSyncUnits: could not read any accounts from local data (blob=' + (blob ? 'parsed but blob.accounts is not an array' : 'null/failed to parse') + ') — only settings will sync.');
     }
     units.push({ kind: 'settings', id: 'settings', label: 'Account settings' });
-    console.log('[Veyra Sync] units this pass:', units.map(function (u) { return u.id; }).join(', '));
+    console.log('[Veyra Sync] units this pass:', units.map(function (u) { return u.id + (u.owned === false ? ' (joined)' : ''); }).join(', '));
     return units;
   }
 
@@ -382,6 +389,8 @@
     });
   }
 
+  function joinedFolderIdKey(accountId) { return BOOKKEEPING_PREFIX + 'joined_folder_id_v1__' + accountId; }
+
   // Resolves (creating if needed) the Drive file ID for one sync unit, and
   // the folder it should be searched/created within.
   function ensureUnitFileId(unit) {
@@ -390,7 +399,7 @@
     if (stored) {
       return driveCheckIdStillValid(stored).then(function (valid) {
         if (valid) { console.log('[Veyra Sync] unit=' + unit.id + ' reusing cached fileId=' + stored); return stored; }
-        console.warn('[Veyra Sync] unit=' + unit.id + ' cached file no longer exists (deleted/trashed) — recreating it');
+        console.warn('[Veyra Sync] unit=' + unit.id + ' cached file no longer exists (deleted/trashed) — ' + (unit.owned === false ? 'looking for it again in the folder it was originally connected from' : 'recreating it'));
         try { localStorage.removeItem(fileIdKey(unit.id)); } catch (e) {}
         clearSyncMeta(unit.id); // last-synced marker refers to the now-gone file — must not suppress the fresh push
         return resolveUnitFileIdFresh(unit);
@@ -401,6 +410,32 @@
 
   function resolveUnitFileIdFresh(unit) {
     var fileName = unit.kind === 'account' ? DATA_FILE_NAME : SETTINGS_FILE_NAME;
+
+    // A JOINED account (connected via the Picker to someone else's shared
+    // folder — Stage 4c) can never be resolved by searching or creating
+    // under THIS identity's own "Veyra" root folder, because it doesn't
+    // live there — it lives whichever folder the owner shared. Its only
+    // known anchor is the folder ID captured at connect-time. If data.json
+    // isn't found there, that's a genuine "lost access" situation this
+    // identity cannot self-heal (only the owner can fix it), not something
+    // to paper over by creating a disconnected duplicate file.
+    if (unit.kind === 'account' && unit.owned === false) {
+      var joinedFolderId = null;
+      try { joinedFolderId = localStorage.getItem(joinedFolderIdKey(unit.accountId)); } catch (e) {}
+      if (!joinedFolderId) {
+        var err = new Error('No record of where "' + unit.label + '" was connected from — it may need to be reconnected via "Connect a shared budget".');
+        console.error('[Veyra Sync] unit=' + unit.id + ' ' + err.message);
+        return Promise.reject(err);
+      }
+      console.log('[Veyra Sync] unit=' + unit.id + ' (joined) looking for ' + fileName + ' in its originally-connected folder');
+      return driveFindFileByName(fileName, joinedFolderId).then(function (found) {
+        if (found) { try { localStorage.setItem(fileIdKey(unit.id), found.id); } catch (e) {} return found.id; }
+        var missingErr = new Error('Can\u2019t find the shared budget file for "' + unit.label + '" — it may have been deleted, or you may have lost access. Ask the person who shared it with you to check the folder.');
+        console.error('[Veyra Sync] unit=' + unit.id + ' ' + missingErr.message);
+        throw missingErr;
+      });
+    }
+
     console.log('[Veyra Sync] unit=' + unit.id + ' resolving folder + file in Drive now');
     return ensureRootFolderId().then(function (rootFolderId) {
       if (unit.kind === 'settings') {
@@ -524,13 +559,17 @@
     var units = listSyncUnits();
     var needsReload = false;
     var pushedOrPulledCount = 0;
+    var unitErrors = []; // one broken unit (e.g. a joined account that lost access) must not block the rest
 
     function processNext(index) {
       if (index >= units.length) {
         syncInFlight = false;
-        setSyncStatus('synced');
-        if (manual) {
-          showSyncToast(pushedOrPulledCount > 0 ? '✓ Synced to Google Drive' : '✓ Already up to date', 'success');
+        if (unitErrors.length > 0) {
+          setSyncStatus('error');
+          if (manual) showSyncToast(unitErrors[0].message || 'Sync failed for one item — check the console for details.', 'error');
+        } else {
+          setSyncStatus('synced');
+          if (manual) showSyncToast(pushedOrPulledCount > 0 ? '✓ Synced to Google Drive' : '✓ Already up to date', 'success');
         }
         if (needsReload) window.location.reload();
         return Promise.resolve();
@@ -545,6 +584,13 @@
           showConflictDialog(result);
           return; // stop this pass — remaining units get picked up on the next sync
         }
+        return processNext(index + 1);
+      }).catch(function (err) {
+        // A problem with THIS unit (most commonly: a joined account whose
+        // shared folder is no longer reachable) shouldn't stop every other
+        // unit from syncing — log it, remember it happened, keep going.
+        console.error('[Veyra Sync] unit=' + units[index].id + ' failed, continuing with remaining units:', err && err.message || err);
+        unitErrors.push(err);
         return processNext(index + 1);
       });
     }
@@ -699,7 +745,36 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
+  // Called by shared-connect.js (Stage 4c) once the user has picked a
+  // folder via the Google Picker and its data.json has been read and
+  // validated. Adds the account locally, marks it as joined (not owned —
+  // see listSyncUnits), and pre-seeds its sync bookkeeping so the very next
+  // sync sees it as already up to date rather than immediately pushing
+  // straight back what was just pulled.
+  function addJoinedAccount(accountMeta, budgetData, folderId, fileId) {
+    if (!accountMeta || !accountMeta.id) return { ok: false, reason: 'invalid-account' };
+    var blob = parseMainBlob() || { accounts: [], accountBudgets: {} };
+    blob.accounts = Array.isArray(blob.accounts) ? blob.accounts : [];
+    blob.accountBudgets = blob.accountBudgets || {};
+
+    var alreadyConnected = blob.accounts.some(function (a) { return a && a.id === accountMeta.id; });
+    if (alreadyConnected) return { ok: false, reason: 'already-connected' };
+
+    var joinedMeta = Object.assign({}, accountMeta, { driveOrigin: 'joined', visibility: 'shared' });
+    blob.accounts.push(joinedMeta);
+    blob.accountBudgets[accountMeta.id] = budgetData;
+    writeMainBlob(blob);
+
+    var unitId = 'account:' + accountMeta.id;
+    try { localStorage.setItem(joinedFolderIdKey(accountMeta.id), folderId); } catch (e) {}
+    try { localStorage.setItem(fileIdKey(unitId), fileId); } catch (e) {}
+    setSyncMeta(unitId, hashSnapshot({ account: joinedMeta, budget: budgetData }), new Date().toISOString());
+
+    return { ok: true, account: joinedMeta };
+  }
+
   window.VeyraDriveSync = {
-    syncNow: function (options) { return performSyncCheck(Object.assign({ manual: true }, options || {})); }
+    syncNow: function (options) { return performSyncCheck(Object.assign({ manual: true }, options || {})); },
+    addJoinedAccount: addJoinedAccount
   };
 }());

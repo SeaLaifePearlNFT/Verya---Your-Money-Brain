@@ -90,7 +90,8 @@
 <script src="js/data/identity.js?v=20260808"></script>
 <script src="js/data/google-sync-config.js?v=20260809"></script>
 <script src="js/data/google-sync.js?v=20260818"></script>
-<script src="js/data/drive-sync.js?v=20260818"></script>
+<script src="js/data/drive-sync.js?v=20260820"></script>
+<script src="js/data/shared-connect.js?v=20260820"></script>
 <script src="js/data/brand-config.js"></script>
 
 
@@ -903,7 +904,7 @@
   <section class="account-manager-dialog" role="dialog" aria-modal="true" aria-labelledby="accountManagerTitle">
     <header class="account-manager-head"><div><h2 id="accountManagerTitle">Manage accounts</h2><p>Create and organise the accounts you will budget with in Veyra.</p></div><button class="account-manager-close" id="accountManagerClose" type="button" aria-label="Close">×</button></header>
     <div class="account-manager-body">
-      <div class="account-manager-toolbar"><button class="account-add-btn" id="accountAddBtn" type="button">+ Add account</button></div>
+      <div class="account-manager-toolbar"><button class="account-add-btn" id="accountAddBtn" type="button">+ Add account</button><button class="account-connect-shared-btn" id="accountConnectSharedBtn" type="button" hidden>🔗 Connect a shared budget</button></div>
       <section class="account-editor" id="accountEditor" hidden><h3 id="accountEditorTitle">Add account</h3><div class="account-editor-grid"><div class="account-field"><label for="accountNameInput">Account name</label><input id="accountNameInput" maxlength="60" autocomplete="off"></div><div class="account-field"><label for="accountTypeInput">Type</label><select id="accountTypeInput"><option value="current">Current account</option><option value="savings">Savings account</option><option value="joint">Joint account</option><option value="cash">Cash account</option><option value="investment">Investment account</option><option value="other">Other</option></select></div><div class="account-field"><label for="accountCurrencyInput">Currency</label><select id="accountCurrencyInput"><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="USD">USD</option><option value="CHF">CHF</option></select></div><div class="account-field"><label for="accountVisibilityInput">Visibility</label><select id="accountVisibilityInput"><option value="private">Private (only me)</option><option value="shared">Shared (visible to whoever you sync this budget with)</option></select></div></div><div class="account-copy-options" id="accountCopyOptions">
   <div class="account-field"><label for="accountSetupModeInput">Initial budget</label><select id="accountSetupModeInput"><option value="blank">Blank structure</option><option value="copy-structure">Copy structure only</option><option value="copy-planned">Copy structure and planned amounts</option></select></div>
   <div class="account-field"><label for="accountSourceInput">Copy from</label><select id="accountSourceInput"></select></div>
