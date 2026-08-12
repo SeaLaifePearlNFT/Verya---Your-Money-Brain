@@ -100,7 +100,20 @@
       if (window.VeyraGoogleSync && window.VeyraGoogleSync.signIn) window.VeyraGoogleSync.signIn();
       return;
     }
+    closeAccountManagerModal();
     loadPickerApi(function () { showPicker(token); });
+  }
+
+  // Account Manager's modal renders at a very high z-index (it's meant to
+  // sit above everything else in the app) — high enough that it was also
+  // sitting on TOP of the Picker's own error dialogs, hiding them
+  // completely. Rather than trying to tune z-index values against a
+  // library we don't control, just close our modal before the Picker
+  // (or anything it shows, including its own errors) needs the screen.
+  function closeAccountManagerModal() {
+    var modal = document.getElementById('accountManagerModal');
+    if (modal) modal.hidden = true;
+    try { document.body.style.overflow = ''; } catch (e) {}
   }
 
   function showPicker(token) {
