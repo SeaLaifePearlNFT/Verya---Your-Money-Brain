@@ -641,8 +641,32 @@
     try { return new Date(iso).toLocaleString(); } catch (e) { return iso || 'unknown time'; }
   }
 
+  var CONFLICT_LOG_KEY = 'veyra_conflict_log_v1';
+  var CONFLICT_LOG_MAX = 30;
+
+  // Persistent (survives reload, no perfect timing needed) — every time a
+  // conflict is shown or resolved, a small record gets appended here.
+  // Whenever this loop happens again, the actual evidence is one command
+  // away instead of needing to be captured at exactly the right moment:
+  // VeyraDriveSync.getConflictLog()
+  function logConflictEvent(entry) {
+    try {
+      var raw = localStorage.getItem(CONFLICT_LOG_KEY);
+      var log = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(log)) log = [];
+      log.push(Object.assign({ at: new Date().toISOString() }, entry));
+      if (log.length > CONFLICT_LOG_MAX) log = log.slice(log.length - CONFLICT_LOG_MAX);
+      localStorage.setItem(CONFLICT_LOG_KEY, JSON.stringify(log));
+    } catch (e) {}
+  }
+
   function showConflictDialog(conflict) {
     closeConflictDialog();
+    logConflictEvent({
+      event: 'shown', unitId: conflict.unit.id,
+      localHash: conflict.localHash, remoteHash: conflict.remoteHash,
+      remoteModifiedTime: conflict.remoteModifiedTime
+    });
     var unitLabel = conflict.unit.kind === 'account' ? '"' + conflict.unit.label + '"' : 'your account settings';
     var overlay = document.createElement('div');
     overlay.id = 'driveConflictOverlay';
@@ -667,10 +691,12 @@
 
   function resolveConflict(conflict, choice) {
     var unit = conflict.unit;
+    logConflictEvent({ event: 'choice-clicked', unitId: unit.id, choice: choice });
     if (choice === 'local') {
       saveRejectedSnapshotAsBackup(conflict.remoteSnapshot, unitLabelFor(unit) + ' \u2014 Google Drive version (replaced ' + new Date().toLocaleString() + ')');
       window.VeyraGoogleSync.driveUpdateFile(conflict.fileId, conflict.localSnapshot).then(function () {
         setSyncMeta(unit.id, conflict.localHash, new Date().toISOString());
+        logConflictEvent({ event: 'resolved', unitId: unit.id, choice: choice, newLastSyncedHash: conflict.localHash });
         closeConflictDialog();
         performSyncCheck(); // resume with any remaining units
       }).catch(function (err) {
@@ -682,6 +708,7 @@
         // Drive, and this identity only has Viewer access there, not
         // Editor — a write like this one is expected to fail in that case.
         console.error('[Veyra Sync] failed to push "keep this device" choice for unit=' + unit.id + ':', err && err.message || err);
+        logConflictEvent({ event: 'resolve-failed', unitId: unit.id, choice: choice, error: String(err && err.message || err) });
         closeConflictDialog();
         setSyncStatus('error');
         showSyncToast('Couldn\u2019t save your changes to \u201c' + unitLabelFor(unit) + '\u201d \u2014 you may only have view access to this shared budget. Ask the person who shared it to give you edit access, or pick \u201cGoogle Drive\u201d instead next time.', 'error');
@@ -693,6 +720,7 @@
       applyUnitSnapshot(unit, conflict.remoteSnapshot);
       saveRejectedSnapshotAsBackup(conflict.localSnapshot, unitLabelFor(unit) + ' \u2014 this device\u2019s version (replaced ' + new Date().toLocaleString() + ')');
       setSyncMeta(unit.id, conflict.remoteHash, conflict.remoteModifiedTime);
+      logConflictEvent({ event: 'resolved', unitId: unit.id, choice: choice, newLastSyncedHash: conflict.remoteHash });
       closeConflictDialog();
       if (window.VeyraGoogleSync.prepareForReload) window.VeyraGoogleSync.prepareForReload();
       window.location.reload();
@@ -820,6 +848,29 @@
 
   window.VeyraDriveSync = {
     syncNow: function (options) { return performSyncCheck(Object.assign({ manual: true }, options || {})); },
-    addJoinedAccount: addJoinedAccount
+    addJoinedAccount: addJoinedAccount,
+    // Diagnostic — reads back every conflict shown/resolved/failed, with
+    // timestamps, no matter how long ago it happened. Run this any time
+    // AFTER something looked wrong, not only in the moment.
+    getConflictLog: function () {
+      try {
+        var raw = localStorage.getItem(CONFLICT_LOG_KEY);
+        var log = raw ? JSON.parse(raw) : [];
+        console.table && Array.isArray(log) && log.length ? console.table(log) : console.log(log);
+        return log;
+      } catch (e) { console.log([]); return []; }
+    },
+    // Diagnostic — the CURRENT hash state for every unit, computed fresh
+    // right now, without needing a live sync pass to have just happened.
+    getCurrentUnitState: function () {
+      var units = listSyncUnits();
+      var out = units.map(function (u) {
+        var snapshot = getUnitSnapshot(u);
+        var meta = getSyncMeta(u.id);
+        return { unit: u.id, localHash: hashSnapshot(snapshot), lastSyncedHash: meta.lastSyncedHash, lastSyncedAt: meta.lastSyncedAt };
+      });
+      console.table && out.length ? console.table(out) : console.log(out);
+      return out;
+    }
   };
 }());
