@@ -523,6 +523,18 @@
     options = options || {};
     var manual = !!options.manual;
 
+    // If a conflict dialog is already open and waiting on a decision, don't
+    // let a background tick (or another manual click) re-run the whole
+    // check underneath it — that was re-detecting the SAME unresolved
+    // conflict every few seconds and tearing down + recreating the dialog,
+    // which showed up as it visibly "popping up twice". A conflict already
+    // being shown is itself a complete, valid outcome for this pass; the
+    // next real check happens once the user actually resolves it.
+    if (document.getElementById('driveConflictOverlay')) {
+      if (manual) showSyncToast('Please resolve the pending conflict first.', 'info');
+      return Promise.resolve();
+    }
+
     if (!window.VeyraIdentity || window.VeyraIdentity.isDefault()) {
       if (manual) showSyncToast('Sign in with Google first to enable backup.', 'warn');
       return Promise.resolve();
