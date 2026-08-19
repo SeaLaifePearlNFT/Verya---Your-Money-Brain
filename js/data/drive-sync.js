@@ -253,7 +253,8 @@
     if (parentId) clauses.push("'" + parentId + "' in parents");
     var q = encodeURIComponent(clauses.join(' and '));
     return fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name,modifiedTime)&spaces=drive', {
-      headers: { Authorization: 'Bearer ' + token }
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store'
     }).then(function (res) {
       if (!res.ok) throw new Error('Drive search failed: HTTP ' + res.status);
       return res.json();
@@ -263,11 +264,18 @@
     });
   }
 
+  // cache: 'no-store' on every read below is load-bearing, not defensive
+  // boilerplate — confirmed via a real case that fetch() can silently
+  // return a stale cached response for a repeat read of the same file URL,
+  // even though the actual file on Drive has genuinely changed. Without
+  // this, a device can be stuck reading old content indefinitely,
+  // regardless of how many times sync is retried.
   function driveGetFileMetadata(fileId) {
     var token = window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
     return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?fields=id,name,modifiedTime', {
-      headers: { Authorization: 'Bearer ' + token }
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store'
     }).then(function (res) {
       if (!res.ok) throw new Error('Drive metadata fetch failed: HTTP ' + res.status);
       return res.json();
@@ -285,7 +293,8 @@
     var token = window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken();
     if (!token) return Promise.resolve(false);
     return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?fields=id,trashed', {
-      headers: { Authorization: 'Bearer ' + token }
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store'
     }).then(function (res) {
       if (!res.ok) return false; // 404 (permanently deleted) or any other error -> treat as gone
       return res.json();
@@ -301,7 +310,8 @@
     if (parentId) clauses.push("'" + parentId + "' in parents");
     var q = encodeURIComponent(clauses.join(' and '));
     return fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)&spaces=drive', {
-      headers: { Authorization: 'Bearer ' + token }
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store'
     }).then(function (res) {
       if (!res.ok) throw new Error('Drive folder search failed: HTTP ' + res.status);
       return res.json();
@@ -319,7 +329,8 @@
     return fetch('https://www.googleapis.com/drive/v3/files?fields=id,name', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify(metadata)
+      body: JSON.stringify(metadata),
+      cache: 'no-store'
     }).then(function (res) {
       if (!res.ok) throw new Error('Drive folder create failed: HTTP ' + res.status);
       return res.json();

@@ -192,7 +192,8 @@
     var token = window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
     return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?fields=id,parents', {
-      headers: { Authorization: 'Bearer ' + token }
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store'
     }).then(function (res) {
       if (!res.ok) throw new Error('Could not read file metadata: HTTP ' + res.status);
       return res.json();
