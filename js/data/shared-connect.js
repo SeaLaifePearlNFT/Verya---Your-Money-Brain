@@ -188,10 +188,12 @@
     });
   }
 
+  function cacheBuster() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
   function driveGetFileParent(fileId) {
     var token = window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
-    return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?fields=id,parents', {
+    return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?fields=id,parents&_cb=' + cacheBuster(), {
       headers: { Authorization: 'Bearer ' + token },
       cache: 'no-store'
     }).then(function (res) {

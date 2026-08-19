@@ -246,13 +246,15 @@
 
   // ---- Drive REST calls this file needs beyond what google-sync.js exposes ----
 
+  function cacheBuster() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
   function driveFindFileByName(name, parentId) {
     var token = window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
     var clauses = ["name='" + name.replace(/'/g, "\\'") + "'", 'trashed=false'];
     if (parentId) clauses.push("'" + parentId + "' in parents");
     var q = encodeURIComponent(clauses.join(' and '));
-    return fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name,modifiedTime)&spaces=drive', {
+    return fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name,modifiedTime)&spaces=drive&_cb=' + cacheBuster(), {
       headers: { Authorization: 'Bearer ' + token },
       cache: 'no-store'
     }).then(function (res) {
@@ -264,16 +266,17 @@
     });
   }
 
-  // cache: 'no-store' on every read below is load-bearing, not defensive
-  // boilerplate — confirmed via a real case that fetch() can silently
-  // return a stale cached response for a repeat read of the same file URL,
-  // even though the actual file on Drive has genuinely changed. Without
-  // this, a device can be stuck reading old content indefinitely,
-  // regardless of how many times sync is retried.
+  // A cache-busting query parameter (forcing a genuinely different URL on
+  // every call) is load-bearing here, not defensive boilerplate — confirmed
+  // from a real case where hashes on both sides agreed, yet the actual
+  // pulled content was still stale. cache: 'no-store' alone only controls
+  // the BROWSER's own cache; it does nothing about caching on Google's own
+  // servers/CDN for repeated requests to the identical URL, which is what
+  // this was actually up against.
   function driveGetFileMetadata(fileId) {
     var token = window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
-    return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?fields=id,name,modifiedTime', {
+    return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?fields=id,name,modifiedTime&_cb=' + cacheBuster(), {
       headers: { Authorization: 'Bearer ' + token },
       cache: 'no-store'
     }).then(function (res) {
@@ -292,7 +295,7 @@
   function driveCheckIdStillValid(id) {
     var token = window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken();
     if (!token) return Promise.resolve(false);
-    return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?fields=id,trashed', {
+    return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?fields=id,trashed&_cb=' + cacheBuster(), {
       headers: { Authorization: 'Bearer ' + token },
       cache: 'no-store'
     }).then(function (res) {
@@ -309,7 +312,7 @@
     var clauses = ["name='" + name.replace(/'/g, "\\'") + "'", "mimeType='application/vnd.google-apps.folder'", 'trashed=false'];
     if (parentId) clauses.push("'" + parentId + "' in parents");
     var q = encodeURIComponent(clauses.join(' and '));
-    return fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)&spaces=drive', {
+    return fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)&spaces=drive&_cb=' + cacheBuster(), {
       headers: { Authorization: 'Bearer ' + token },
       cache: 'no-store'
     }).then(function (res) {

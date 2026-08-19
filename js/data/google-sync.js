@@ -296,6 +296,8 @@
   // the same Google account, because drive.file access is recorded against
   // the (Google user, file) pair by Google, not against this specific
   // browser session. Returns the first match's {id, name} or null if none.
+  function cacheBuster() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
   function driveFindFile(appProperties) {
     var token = getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
@@ -305,7 +307,7 @@
       clauses.push("appProperties has { key='" + key + "' and value='" + value + "' }");
     });
     var q = encodeURIComponent(clauses.join(' and '));
-    return fetch(DRIVE_FILES_URL + '?q=' + q + '&fields=files(id,name,modifiedTime)&spaces=drive&pageSize=1', {
+    return fetch(DRIVE_FILES_URL + '?q=' + q + '&fields=files(id,name,modifiedTime)&spaces=drive&pageSize=1&_cb=' + cacheBuster(), {
       headers: { Authorization: 'Bearer ' + token },
       cache: 'no-store'
     }).then(function (res) {
@@ -325,10 +327,17 @@
   // recipient's repeated reads of that same file kept returning old
   // content regardless of how many times sync was retried — exactly what
   // browser-level response caching looks like from the outside.
+  // A cache-busting query parameter forces a genuinely different URL on
+  // every call — cache: 'no-store' alone only controls the BROWSER's own
+  // cache and does nothing about caching on Google's own servers/CDN for
+  // repeated requests to the identical URL. Confirmed necessary from a real
+  // case: hashes agreed on both sides, yet the actual pulled content was
+  // still stale — exactly what server-side caching looks like from here,
+  // since client-side cache settings can't reach that layer at all.
   function driveReadFile(fileId) {
     var token = getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
-    return fetch(DRIVE_FILES_URL + '/' + encodeURIComponent(fileId) + '?alt=media', {
+    return fetch(DRIVE_FILES_URL + '/' + encodeURIComponent(fileId) + '?alt=media&_cb=' + cacheBuster(), {
       headers: { Authorization: 'Bearer ' + token },
       cache: 'no-store'
     }).then(function (res) {
