@@ -897,6 +897,32 @@
     return { ok: true, account: joinedMeta };
   }
 
+  // Shared by both removal functions below. Reassigning activeAccountId
+  // alone is NOT enough when the removed account was the active one — the
+  // top-level "mirror" fields (months, subscriptions, etc.) that the app
+  // actually reads/writes as its live working copy still hold the REMOVED
+  // account's data at that point. Left uncorrected, the app's own
+  // capture-on-save logic would later persist those stale top-level fields
+  // into the NEWLY active account's bucket, silently overwriting its real
+  // data with the just-removed account's. Confirmed as a genuine, serious
+  // corruption path from a real case, not a theoretical one — the fix is
+  // to always re-mirror immediately after any activeAccountId reassignment.
+  function removeAccountAndBookkeeping(blob, accountId) {
+    blob.accounts = blob.accounts.filter(function (a) { return a.id !== accountId; });
+    if (blob.accountBudgets) delete blob.accountBudgets[accountId];
+    if (blob.activeAccountId === accountId) {
+      blob.activeAccountId = blob.accounts.length ? blob.accounts[0].id : null;
+      mirrorActiveAccount(blob);
+    }
+    writeMainBlob(blob);
+
+    var unitId = 'account:' + accountId;
+    try { localStorage.removeItem(fileIdKey(unitId)); } catch (e) {}
+    try { localStorage.removeItem(joinedFolderIdKey(accountId)); } catch (e) {}
+    try { localStorage.removeItem(folderIdKey(accountId)); } catch (e) {}
+    clearSyncMeta(unitId);
+  }
+
   // Fully removes a joined account and every trace of its sync bookkeeping
   // — the account entry itself, its budget data, its cached Drive file/
   // folder IDs, and its last-synced marker. Deliberately refuses to touch
@@ -914,18 +940,7 @@
     if (!account) return { ok: false, reason: 'not-found' };
     if (account.driveOrigin !== 'joined') return { ok: false, reason: 'not-a-joined-account' };
 
-    blob.accounts = blob.accounts.filter(function (a) { return a.id !== accountId; });
-    if (blob.accountBudgets) delete blob.accountBudgets[accountId];
-    if (blob.activeAccountId === accountId) {
-      blob.activeAccountId = blob.accounts.length ? blob.accounts[0].id : null;
-    }
-    writeMainBlob(blob);
-
-    var unitId = 'account:' + accountId;
-    try { localStorage.removeItem(fileIdKey(unitId)); } catch (e) {}
-    try { localStorage.removeItem(joinedFolderIdKey(accountId)); } catch (e) {}
-    clearSyncMeta(unitId);
-
+    removeAccountAndBookkeeping(blob, accountId);
     return { ok: true, removedAccountName: account.name };
   }
 
@@ -944,19 +959,7 @@
     for (var i = 0; i < blob.accounts.length; i++) { if (blob.accounts[i] && blob.accounts[i].id === accountId) { account = blob.accounts[i]; break; } }
     if (!account) return { ok: false, reason: 'not-found' };
 
-    blob.accounts = blob.accounts.filter(function (a) { return a.id !== accountId; });
-    if (blob.accountBudgets) delete blob.accountBudgets[accountId];
-    if (blob.activeAccountId === accountId) {
-      blob.activeAccountId = blob.accounts.length ? blob.accounts[0].id : null;
-    }
-    writeMainBlob(blob);
-
-    var unitId = 'account:' + accountId;
-    try { localStorage.removeItem(fileIdKey(unitId)); } catch (e) {}
-    try { localStorage.removeItem(joinedFolderIdKey(accountId)); } catch (e) {}
-    try { localStorage.removeItem(folderIdKey(accountId)); } catch (e) {} // in case it got treated as owned and created its own folder
-    clearSyncMeta(unitId);
-
+    removeAccountAndBookkeeping(blob, accountId);
     return { ok: true, removedAccountName: account.name };
   }
 
