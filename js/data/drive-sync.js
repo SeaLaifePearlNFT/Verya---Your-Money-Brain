@@ -849,9 +849,42 @@
     return { ok: true, account: joinedMeta };
   }
 
+  // Fully removes a joined account and every trace of its sync bookkeeping
+  // — the account entry itself, its budget data, its cached Drive file/
+  // folder IDs, and its last-synced marker. Deliberately refuses to touch
+  // an OWNED account (those go through the existing "delete account" flow
+  // in accounts-manager.js, which is a different, more involved operation).
+  // Exists both as a real feature (undoing a mistaken connect) and as a
+  // clean way to clear any stale bookkeeping accumulated from earlier,
+  // since-fixed sync bugs — reconnecting fresh after this pulls a genuinely
+  // new baseline rather than carrying old state forward indefinitely.
+  function disconnectJoinedAccount(accountId) {
+    var blob = parseMainBlob();
+    if (!blob || !Array.isArray(blob.accounts)) return { ok: false, reason: 'no-data' };
+    var account = null;
+    for (var i = 0; i < blob.accounts.length; i++) { if (blob.accounts[i] && blob.accounts[i].id === accountId) { account = blob.accounts[i]; break; } }
+    if (!account) return { ok: false, reason: 'not-found' };
+    if (account.driveOrigin !== 'joined') return { ok: false, reason: 'not-a-joined-account' };
+
+    blob.accounts = blob.accounts.filter(function (a) { return a.id !== accountId; });
+    if (blob.accountBudgets) delete blob.accountBudgets[accountId];
+    if (blob.activeAccountId === accountId) {
+      blob.activeAccountId = blob.accounts.length ? blob.accounts[0].id : null;
+    }
+    writeMainBlob(blob);
+
+    var unitId = 'account:' + accountId;
+    try { localStorage.removeItem(fileIdKey(unitId)); } catch (e) {}
+    try { localStorage.removeItem(joinedFolderIdKey(accountId)); } catch (e) {}
+    clearSyncMeta(unitId);
+
+    return { ok: true, removedAccountName: account.name };
+  }
+
   window.VeyraDriveSync = {
     syncNow: function (options) { return performSyncCheck(Object.assign({ manual: true }, options || {})); },
     addJoinedAccount: addJoinedAccount,
+    disconnectJoinedAccount: disconnectJoinedAccount,
     // Diagnostic — reads back every conflict shown/resolved/failed, with
     // timestamps, no matter how long ago it happened. Run this any time
     // AFTER something looked wrong, not only in the moment.
