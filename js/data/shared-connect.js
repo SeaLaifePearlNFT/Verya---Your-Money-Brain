@@ -33,6 +33,7 @@
   var API_KEY = CONFIG.apiKey || '';
   var APP_ID = CONFIG.appId || '';
   var PICKER_SRC = 'https://apis.google.com/js/api.js';
+  var DATA_FILE_NAME = 'data.json';
 
   var pickerApiRequested = false;
   var pickerInited = false;
@@ -99,55 +100,27 @@
       if (window.VeyraGoogleSync && window.VeyraGoogleSync.signIn) window.VeyraGoogleSync.signIn();
       return;
     }
-    closeAccountManagerModal();
     loadPickerApi(function () { showPicker(token); });
-  }
-
-  // Account Manager's modal renders at a very high z-index (it's meant to
-  // sit above everything else in the app) — high enough that it was also
-  // sitting on TOP of the Picker's own error dialogs, hiding them
-  // completely. Rather than trying to tune z-index values against a
-  // library we don't control, just close our modal before the Picker
-  // (or anything it shows, including its own errors) needs the screen.
-  function closeAccountManagerModal() {
-    var modal = document.getElementById('accountManagerModal');
-    if (modal) modal.hidden = true;
-    try { document.body.style.overflow = ''; } catch (e) {}
   }
 
   function showPicker(token) {
     try {
-      // Restricted to JSON files, with folder navigation enabled so the
-      // user can browse INTO the shared folder to reach the file — but
-      // folders themselves are not selectable. This is deliberate: picking
-      // a FOLDER through drive.file scope does not reliably grant access
-      // to what's inside it (confirmed against Google's own docs and real
-      // developer reports of the same gap) — only an explicitly selected
-      // FILE is guaranteed accessible. Filtering to JSON keeps the picker
-      // focused on the one file type that's actually relevant here.
-      var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+      var view = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+        .setSelectFolderEnabled(true)
         .setIncludeFolders(true)
-        .setSelectFolderEnabled(false)
-        .setMimeTypes('application/json');
+        .setMimeTypes('application/vnd.google-apps.folder');
       var picker = new google.picker.PickerBuilder()
         .addView(view)
         .setOAuthToken(token)
         .setDeveloperKey(API_KEY)
         .setAppId(APP_ID)
-        // Explicitly declare the embedding page's own origin. Without this,
-        // the Picker falls back to auto-detecting it — which, diagnosed
-        // from a real failing request, resolved to the page's *favicon*
-        // URL instead of the actual page, causing Google's backend to
-        // reject the request outright (401) since the origin didn't
-        // validate. Setting it explicitly removes the guesswork entirely.
-        .setOrigin(window.location.protocol + '//' + window.location.host)
-        .setTitle('Browse into the shared folder and select its data.json file')
+        .setTitle('Select the shared budget folder someone shared with you')
         .setCallback(pickerCallback)
         .build();
       picker.setVisible(true);
     } catch (err) {
       console.error('Veyra: failed to open the Google Picker', err);
-      showToast('Could not open the file picker — check your connection and try again.', 'error');
+      showToast('Could not open the folder picker — check your connection and try again.', 'error');
     }
   }
 
@@ -155,22 +128,22 @@
     if (!data || data.action !== google.picker.Action.PICKED) return; // CANCEL or anything else — silently do nothing
     var doc = data.docs && data.docs[0];
     if (!doc || !doc.id) return;
-    connectSharedFile(doc.id, doc.name || 'data.json');
+    connectFolder(doc.id, doc.name || 'that folder');
   }
 
-  function connectSharedFile(fileId, fileName) {
-    showToast('Reading \u201c' + fileName + '\u201d\u2026', 'info');
-    // Fetch the picked file's own metadata (rather than trusting whatever
-    // the Picker's return object happens to include) to reliably learn its
-    // parent folder — needed so drive-sync.js can look in the right place
-    // again later if this cached file ID ever goes stale.
-    driveGetFileParent(fileId).then(function (parentFolderId) {
-      return window.VeyraGoogleSync.driveReadFile(fileId).then(function (content) {
+  function connectFolder(folderId, folderName) {
+    showToast('Looking for a shared budget in \u201c' + folderName + '\u201d\u2026', 'info');
+    driveFindFileByName(DATA_FILE_NAME, folderId).then(function (found) {
+      if (!found) {
+        showToast('No shared budget file found in \u201c' + folderName + '\u201d \u2014 make sure you picked the right folder.', 'warn');
+        return;
+      }
+      return window.VeyraGoogleSync.driveReadFile(found.id).then(function (content) {
         if (!content || !content.account || !content.account.id || !content.budget) {
-          showToast('\u201c' + fileName + '\u201d doesn\u2019t look like a valid shared Veyra budget.', 'warn');
+          showToast('\u201c' + folderName + '\u201d doesn\u2019t look like a valid shared Veyra budget.', 'warn');
           return;
         }
-        var result = window.VeyraDriveSync.addJoinedAccount(content.account, content.budget, parentFolderId, fileId);
+        var result = window.VeyraDriveSync.addJoinedAccount(content.account, content.budget, folderId, found.id);
         if (!result.ok) {
           if (result.reason === 'already-connected') {
             showToast('You\u2019re already connected to \u201c' + (content.account.name || 'that account') + '\u201d.', 'info');
@@ -184,24 +157,28 @@
       });
     }).catch(function (err) {
       console.error('[Veyra] Connect shared budget failed:', err);
-      showToast('Could not read that file \u2014 check your connection and try again.', 'error');
+      showToast('Could not read that folder \u2014 check your connection and try again.', 'error');
     });
   }
 
-  function cacheBuster() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-
-  function driveGetFileParent(fileId) {
+  // Small, self-contained Drive lookup — deliberately not shared with
+  // drive-sync.js's private copy of the same logic (kept each file
+  // independently simple rather than adding cross-file API surface for one
+  // small function).
+  function driveFindFileByName(name, parentId) {
     var token = window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
-    return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?fields=id,parents&_cb=' + cacheBuster(), {
-      headers: { Authorization: 'Bearer ' + token },
-      cache: 'no-store'
+    var clauses = ["name='" + name.replace(/'/g, "\\'") + "'", 'trashed=false'];
+    if (parentId) clauses.push("'" + parentId + "' in parents");
+    var q = encodeURIComponent(clauses.join(' and '));
+    return fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)&spaces=drive', {
+      headers: { Authorization: 'Bearer ' + token }
     }).then(function (res) {
-      if (!res.ok) throw new Error('Could not read file metadata: HTTP ' + res.status);
+      if (!res.ok) throw new Error('Drive search failed: HTTP ' + res.status);
       return res.json();
     }).then(function (json) {
-      var parents = (json && json.parents) || [];
-      return parents.length ? parents[0] : null;
+      var files = (json && json.files) || [];
+      return files.length ? files[0] : null;
     });
   }
 

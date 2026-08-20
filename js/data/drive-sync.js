@@ -571,16 +571,7 @@
           setSyncStatus('synced');
           if (manual) showSyncToast(pushedOrPulledCount > 0 ? '✓ Synced to Google Drive' : '✓ Already up to date', 'success');
         }
-        if (needsReload) {
-          // Carry the current token across this reload the same way
-          // google-sync.js already does for its own sign-in redirects —
-          // otherwise the reload silently drops it and the next thing
-          // touching Drive has to fall back to the less reliable silent
-          // reauth (or worse, sit there needing a manual reconnect the
-          // user never asked for).
-          if (window.VeyraGoogleSync.prepareForReload) window.VeyraGoogleSync.prepareForReload();
-          window.location.reload();
-        }
+        if (needsReload) window.location.reload();
         return Promise.resolve();
       }
       return syncOneUnit(units[index]).then(function (result) {
@@ -650,18 +641,6 @@
         setSyncMeta(unit.id, conflict.localHash, new Date().toISOString());
         closeConflictDialog();
         performSyncCheck(); // resume with any remaining units
-      }).catch(function (err) {
-        // This previously failed completely silently — the dialog would
-        // just get torn down and immediately recreated by the next sync
-        // pass re-detecting the SAME unresolved conflict, forever, with no
-        // indication anything was wrong. The most likely real-world cause:
-        // this unit is a JOINED account (Stage 4c) living in someone else's
-        // Drive, and this identity only has Viewer access there, not
-        // Editor — a write like this one is expected to fail in that case.
-        console.error('[Veyra Sync] failed to push "keep this device" choice for unit=' + unit.id + ':', err && err.message || err);
-        closeConflictDialog();
-        setSyncStatus('error');
-        showSyncToast('Couldn\u2019t save your changes to \u201c' + unitLabelFor(unit) + '\u201d \u2014 you may only have view access to this shared budget. Ask the person who shared it to give you edit access, or pick \u201cGoogle Drive\u201d instead next time.', 'error');
       });
     } else {
       // Apply BEFORE saving the backup — applyUnitSnapshot merges surgically
@@ -671,7 +650,6 @@
       saveRejectedSnapshotAsBackup(conflict.localSnapshot, unitLabelFor(unit) + ' \u2014 this device\u2019s version (replaced ' + new Date().toLocaleString() + ')');
       setSyncMeta(unit.id, conflict.remoteHash, conflict.remoteModifiedTime);
       closeConflictDialog();
-      if (window.VeyraGoogleSync.prepareForReload) window.VeyraGoogleSync.prepareForReload();
       window.location.reload();
     }
   }
