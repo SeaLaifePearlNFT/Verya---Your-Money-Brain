@@ -76,8 +76,24 @@
     // localStorage-key shape). Caught by testing: string-concatenating a
     // nested object collapses to the useless literal "[object Object]"
     // regardless of what's actually inside it.
-    var keys = Object.keys(snapshot || {}).sort();
-    var parts = keys.map(function (k) { return k + '=' + JSON.stringify(snapshot[k]); });
+    //
+    // driveOrigin is deliberately excluded from the hashed representation
+    // of an account snapshot — it's a LOCAL-ONLY marker (owned vs joined)
+    // that never exists in what's actually written to Drive (an owner's
+    // own copy of their account never has it). Hashing it in means a
+    // joined account's local copy (which correctly carries the marker) can
+    // never hash-match a remote snapshot (which never has it) even when
+    // every real field is identical — producing a permanent, spurious
+    // "changed" reading that manifests as an endless, unresolvable
+    // conflict loop. Confirmed as a real mechanism, not a theoretical one.
+    var hashable = snapshot;
+    if (snapshot && snapshot.account && Object.prototype.hasOwnProperty.call(snapshot.account, 'driveOrigin')) {
+      var accountWithoutOrigin = Object.assign({}, snapshot.account);
+      delete accountWithoutOrigin.driveOrigin;
+      hashable = Object.assign({}, snapshot, { account: accountWithoutOrigin });
+    }
+    var keys = Object.keys(hashable || {}).sort();
+    var parts = keys.map(function (k) { return k + '=' + JSON.stringify(hashable[k]); });
     return hashString(parts.join('\u0001'));
   }
 
@@ -224,7 +240,26 @@
       blob.accountBudgets = blob.accountBudgets || {};
       var idx = -1;
       for (var i = 0; i < blob.accounts.length; i++) { if (blob.accounts[i] && blob.accounts[i].id === unit.accountId) { idx = i; break; } }
-      if (idx === -1) blob.accounts.push(data.account); else blob.accounts[idx] = data.account;
+      if (idx === -1) {
+        blob.accounts.push(data.account);
+      } else {
+        // driveOrigin is a LOCAL-ONLY marker of how THIS device came to
+        // have this account (owned vs joined via Stage 4c) — it is never
+        // part of what gets written to the account's own Drive file (an
+        // owner's copy of their own account metadata never has it, since
+        // from their side they genuinely own it). Blindly replacing the
+        // whole local entry with the incoming one — as this used to do —
+        // silently erased that marker on every single pull, which then
+        // made a joined account start being treated as owned, causing it
+        // to sync to a brand new, disconnected file in the joiner's own
+        // Drive instead of the real shared one. Confirmed as the actual
+        // root cause of a real, sustained data-divergence bug — preserve
+        // it explicitly instead of letting incoming metadata clobber it.
+        var existingDriveOrigin = blob.accounts[idx] && blob.accounts[idx].driveOrigin;
+        blob.accounts[idx] = existingDriveOrigin
+          ? Object.assign({}, data.account, { driveOrigin: existingDriveOrigin })
+          : data.account;
+      }
       blob.accountBudgets[unit.accountId] = data.budget;
       mirrorActiveAccount(blob);
       writeMainBlob(blob);
@@ -236,6 +271,19 @@
     var incomingBlob = data[MAIN_BLOB_KEY] ? JSON.parse(data[MAIN_BLOB_KEY]) : {};
     var currentBlob = parseMainBlob() || {};
     var merged = Object.assign({}, incomingBlob, { accountBudgets: currentBlob.accountBudgets || {} });
+    // Same reasoning as above: the incoming settings blob is a snapshot of
+    // THIS identity's own previously-pushed settings, so its own accounts
+    // list should be internally consistent already — but merge driveOrigin
+    // flags defensively anyway rather than assume, since this is exactly
+    // the kind of silent field loss that's expensive to notice later.
+    if (Array.isArray(merged.accounts) && Array.isArray(currentBlob.accounts)) {
+      var currentById = {};
+      currentBlob.accounts.forEach(function (a) { if (a && a.id) currentById[a.id] = a; });
+      merged.accounts = merged.accounts.map(function (a) {
+        var existing = a && a.id ? currentById[a.id] : null;
+        return existing && existing.driveOrigin ? Object.assign({}, a, { driveOrigin: existing.driveOrigin }) : a;
+      });
+    }
     mirrorActiveAccount(merged);
     writeMainBlob(merged);
     Object.keys(data).forEach(function (key) {
@@ -881,10 +929,42 @@
     return { ok: true, removedAccountName: account.name };
   }
 
+  // Recovery tool for exactly the corruption the driveOrigin bug above
+  // could cause on an already-affected device: forcibly wipes an account
+  // entry and ALL of its sync bookkeeping regardless of its current
+  // driveOrigin value (unlike disconnectJoinedAccount, which correctly
+  // refuses when that marker is already missing — which is precisely the
+  // broken state this exists to clean up). Only ever meant to be run
+  // manually, once, to clear a specific known-corrupted account before
+  // reconnecting fresh through the normal "Connect a shared budget" flow.
+  function forceRemoveAccountForRepair(accountId) {
+    var blob = parseMainBlob();
+    if (!blob || !Array.isArray(blob.accounts)) return { ok: false, reason: 'no-data' };
+    var account = null;
+    for (var i = 0; i < blob.accounts.length; i++) { if (blob.accounts[i] && blob.accounts[i].id === accountId) { account = blob.accounts[i]; break; } }
+    if (!account) return { ok: false, reason: 'not-found' };
+
+    blob.accounts = blob.accounts.filter(function (a) { return a.id !== accountId; });
+    if (blob.accountBudgets) delete blob.accountBudgets[accountId];
+    if (blob.activeAccountId === accountId) {
+      blob.activeAccountId = blob.accounts.length ? blob.accounts[0].id : null;
+    }
+    writeMainBlob(blob);
+
+    var unitId = 'account:' + accountId;
+    try { localStorage.removeItem(fileIdKey(unitId)); } catch (e) {}
+    try { localStorage.removeItem(joinedFolderIdKey(accountId)); } catch (e) {}
+    try { localStorage.removeItem(folderIdKey(accountId)); } catch (e) {} // in case it got treated as owned and created its own folder
+    clearSyncMeta(unitId);
+
+    return { ok: true, removedAccountName: account.name };
+  }
+
   window.VeyraDriveSync = {
     syncNow: function (options) { return performSyncCheck(Object.assign({ manual: true }, options || {})); },
     addJoinedAccount: addJoinedAccount,
     disconnectJoinedAccount: disconnectJoinedAccount,
+    forceRemoveAccountForRepair: forceRemoveAccountForRepair,
     // Diagnostic — reads back every conflict shown/resolved/failed, with
     // timestamps, no matter how long ago it happened. Run this any time
     // AFTER something looked wrong, not only in the moment.
