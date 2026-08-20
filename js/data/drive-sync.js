@@ -246,17 +246,14 @@
 
   // ---- Drive REST calls this file needs beyond what google-sync.js exposes ----
 
-  function cacheBuster() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-
   function driveFindFileByName(name, parentId) {
     var token = window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
     var clauses = ["name='" + name.replace(/'/g, "\\'") + "'", 'trashed=false'];
     if (parentId) clauses.push("'" + parentId + "' in parents");
     var q = encodeURIComponent(clauses.join(' and '));
-    return fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name,modifiedTime)&spaces=drive&_cb=' + cacheBuster(), {
-      headers: { Authorization: 'Bearer ' + token },
-      cache: 'no-store'
+    return fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name,modifiedTime)&spaces=drive', {
+      headers: { Authorization: 'Bearer ' + token }
     }).then(function (res) {
       if (!res.ok) throw new Error('Drive search failed: HTTP ' + res.status);
       return res.json();
@@ -266,19 +263,11 @@
     });
   }
 
-  // A cache-busting query parameter (forcing a genuinely different URL on
-  // every call) is load-bearing here, not defensive boilerplate — confirmed
-  // from a real case where hashes on both sides agreed, yet the actual
-  // pulled content was still stale. cache: 'no-store' alone only controls
-  // the BROWSER's own cache; it does nothing about caching on Google's own
-  // servers/CDN for repeated requests to the identical URL, which is what
-  // this was actually up against.
   function driveGetFileMetadata(fileId) {
     var token = window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
-    return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?fields=id,name,modifiedTime&_cb=' + cacheBuster(), {
-      headers: { Authorization: 'Bearer ' + token },
-      cache: 'no-store'
+    return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?fields=id,name,modifiedTime', {
+      headers: { Authorization: 'Bearer ' + token }
     }).then(function (res) {
       if (!res.ok) throw new Error('Drive metadata fetch failed: HTTP ' + res.status);
       return res.json();
@@ -295,9 +284,8 @@
   function driveCheckIdStillValid(id) {
     var token = window.VeyraGoogleSync && window.VeyraGoogleSync.getAccessToken();
     if (!token) return Promise.resolve(false);
-    return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?fields=id,trashed&_cb=' + cacheBuster(), {
-      headers: { Authorization: 'Bearer ' + token },
-      cache: 'no-store'
+    return fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?fields=id,trashed', {
+      headers: { Authorization: 'Bearer ' + token }
     }).then(function (res) {
       if (!res.ok) return false; // 404 (permanently deleted) or any other error -> treat as gone
       return res.json();
@@ -312,9 +300,8 @@
     var clauses = ["name='" + name.replace(/'/g, "\\'") + "'", "mimeType='application/vnd.google-apps.folder'", 'trashed=false'];
     if (parentId) clauses.push("'" + parentId + "' in parents");
     var q = encodeURIComponent(clauses.join(' and '));
-    return fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)&spaces=drive&_cb=' + cacheBuster(), {
-      headers: { Authorization: 'Bearer ' + token },
-      cache: 'no-store'
+    return fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)&spaces=drive', {
+      headers: { Authorization: 'Bearer ' + token }
     }).then(function (res) {
       if (!res.ok) throw new Error('Drive folder search failed: HTTP ' + res.status);
       return res.json();
@@ -332,8 +319,7 @@
     return fetch('https://www.googleapis.com/drive/v3/files?fields=id,name', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify(metadata),
-      cache: 'no-store'
+      body: JSON.stringify(metadata)
     }).then(function (res) {
       if (!res.ok) throw new Error('Drive folder create failed: HTTP ' + res.status);
       return res.json();
@@ -537,18 +523,6 @@
     options = options || {};
     var manual = !!options.manual;
 
-    // If a conflict dialog is already open and waiting on a decision, don't
-    // let a background tick (or another manual click) re-run the whole
-    // check underneath it — that was re-detecting the SAME unresolved
-    // conflict every few seconds and tearing down + recreating the dialog,
-    // which showed up as it visibly "popping up twice". A conflict already
-    // being shown is itself a complete, valid outcome for this pass; the
-    // next real check happens once the user actually resolves it.
-    if (document.getElementById('driveConflictOverlay')) {
-      if (manual) showSyncToast('Please resolve the pending conflict first.', 'info');
-      return Promise.resolve();
-    }
-
     if (!window.VeyraIdentity || window.VeyraIdentity.isDefault()) {
       if (manual) showSyncToast('Sign in with Google first to enable backup.', 'warn');
       return Promise.resolve();
@@ -644,32 +618,8 @@
     try { return new Date(iso).toLocaleString(); } catch (e) { return iso || 'unknown time'; }
   }
 
-  var CONFLICT_LOG_KEY = 'veyra_conflict_log_v1';
-  var CONFLICT_LOG_MAX = 30;
-
-  // Persistent (survives reload, no perfect timing needed) — every time a
-  // conflict is shown or resolved, a small record gets appended here.
-  // Whenever this loop happens again, the actual evidence is one command
-  // away instead of needing to be captured at exactly the right moment:
-  // VeyraDriveSync.getConflictLog()
-  function logConflictEvent(entry) {
-    try {
-      var raw = localStorage.getItem(CONFLICT_LOG_KEY);
-      var log = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(log)) log = [];
-      log.push(Object.assign({ at: new Date().toISOString() }, entry));
-      if (log.length > CONFLICT_LOG_MAX) log = log.slice(log.length - CONFLICT_LOG_MAX);
-      localStorage.setItem(CONFLICT_LOG_KEY, JSON.stringify(log));
-    } catch (e) {}
-  }
-
   function showConflictDialog(conflict) {
     closeConflictDialog();
-    logConflictEvent({
-      event: 'shown', unitId: conflict.unit.id,
-      localHash: conflict.localHash, remoteHash: conflict.remoteHash,
-      remoteModifiedTime: conflict.remoteModifiedTime
-    });
     var unitLabel = conflict.unit.kind === 'account' ? '"' + conflict.unit.label + '"' : 'your account settings';
     var overlay = document.createElement('div');
     overlay.id = 'driveConflictOverlay';
@@ -694,12 +644,10 @@
 
   function resolveConflict(conflict, choice) {
     var unit = conflict.unit;
-    logConflictEvent({ event: 'choice-clicked', unitId: unit.id, choice: choice });
     if (choice === 'local') {
       saveRejectedSnapshotAsBackup(conflict.remoteSnapshot, unitLabelFor(unit) + ' \u2014 Google Drive version (replaced ' + new Date().toLocaleString() + ')');
       window.VeyraGoogleSync.driveUpdateFile(conflict.fileId, conflict.localSnapshot).then(function () {
         setSyncMeta(unit.id, conflict.localHash, new Date().toISOString());
-        logConflictEvent({ event: 'resolved', unitId: unit.id, choice: choice, newLastSyncedHash: conflict.localHash });
         closeConflictDialog();
         performSyncCheck(); // resume with any remaining units
       }).catch(function (err) {
@@ -711,7 +659,6 @@
         // Drive, and this identity only has Viewer access there, not
         // Editor — a write like this one is expected to fail in that case.
         console.error('[Veyra Sync] failed to push "keep this device" choice for unit=' + unit.id + ':', err && err.message || err);
-        logConflictEvent({ event: 'resolve-failed', unitId: unit.id, choice: choice, error: String(err && err.message || err) });
         closeConflictDialog();
         setSyncStatus('error');
         showSyncToast('Couldn\u2019t save your changes to \u201c' + unitLabelFor(unit) + '\u201d \u2014 you may only have view access to this shared budget. Ask the person who shared it to give you edit access, or pick \u201cGoogle Drive\u201d instead next time.', 'error');
@@ -723,7 +670,6 @@
       applyUnitSnapshot(unit, conflict.remoteSnapshot);
       saveRejectedSnapshotAsBackup(conflict.localSnapshot, unitLabelFor(unit) + ' \u2014 this device\u2019s version (replaced ' + new Date().toLocaleString() + ')');
       setSyncMeta(unit.id, conflict.remoteHash, conflict.remoteModifiedTime);
-      logConflictEvent({ event: 'resolved', unitId: unit.id, choice: choice, newLastSyncedHash: conflict.remoteHash });
       closeConflictDialog();
       if (window.VeyraGoogleSync.prepareForReload) window.VeyraGoogleSync.prepareForReload();
       window.location.reload();
@@ -851,29 +797,6 @@
 
   window.VeyraDriveSync = {
     syncNow: function (options) { return performSyncCheck(Object.assign({ manual: true }, options || {})); },
-    addJoinedAccount: addJoinedAccount,
-    // Diagnostic — reads back every conflict shown/resolved/failed, with
-    // timestamps, no matter how long ago it happened. Run this any time
-    // AFTER something looked wrong, not only in the moment.
-    getConflictLog: function () {
-      try {
-        var raw = localStorage.getItem(CONFLICT_LOG_KEY);
-        var log = raw ? JSON.parse(raw) : [];
-        console.table && Array.isArray(log) && log.length ? console.table(log) : console.log(log);
-        return log;
-      } catch (e) { console.log([]); return []; }
-    },
-    // Diagnostic — the CURRENT hash state for every unit, computed fresh
-    // right now, without needing a live sync pass to have just happened.
-    getCurrentUnitState: function () {
-      var units = listSyncUnits();
-      var out = units.map(function (u) {
-        var snapshot = getUnitSnapshot(u);
-        var meta = getSyncMeta(u.id);
-        return { unit: u.id, localHash: hashSnapshot(snapshot), lastSyncedHash: meta.lastSyncedHash, lastSyncedAt: meta.lastSyncedAt };
-      });
-      console.table && out.length ? console.table(out) : console.log(out);
-      return out;
-    }
+    addJoinedAccount: addJoinedAccount
   };
 }());
