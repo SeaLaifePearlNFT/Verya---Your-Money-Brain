@@ -282,8 +282,7 @@
     return fetch(DRIVE_UPLOAD_URL + '?uploadType=multipart&fields=id,name', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'multipart/related; boundary=' + boundary },
-      body: body,
-      cache: 'no-store'
+      body: body
     }).then(function (res) {
       if (!res.ok) throw new Error('Drive create failed: HTTP ' + res.status);
       return res.json();
@@ -296,8 +295,6 @@
   // the same Google account, because drive.file access is recorded against
   // the (Google user, file) pair by Google, not against this specific
   // browser session. Returns the first match's {id, name} or null if none.
-  function cacheBuster() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-
   function driveFindFile(appProperties) {
     var token = getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
@@ -307,9 +304,8 @@
       clauses.push("appProperties has { key='" + key + "' and value='" + value + "' }");
     });
     var q = encodeURIComponent(clauses.join(' and '));
-    return fetch(DRIVE_FILES_URL + '?q=' + q + '&fields=files(id,name,modifiedTime)&spaces=drive&pageSize=1&_cb=' + cacheBuster(), {
-      headers: { Authorization: 'Bearer ' + token },
-      cache: 'no-store'
+    return fetch(DRIVE_FILES_URL + '?q=' + q + '&fields=files(id,name,modifiedTime)&spaces=drive&pageSize=1', {
+      headers: { Authorization: 'Bearer ' + token }
     }).then(function (res) {
       if (!res.ok) throw new Error('Drive search failed: HTTP ' + res.status);
       return res.json();
@@ -319,27 +315,11 @@
     });
   }
 
-  // cache: 'no-store' is not optional here — without it, fetch() follows
-  // normal browser HTTP caching, and a repeat read of the exact same file
-  // URL can silently return a stale cached response instead of actually
-  // hitting Google's servers again. Diagnosed from a real, confirmed case:
-  // the owner's push was correct and visible in Drive itself, but a
-  // recipient's repeated reads of that same file kept returning old
-  // content regardless of how many times sync was retried — exactly what
-  // browser-level response caching looks like from the outside.
-  // A cache-busting query parameter forces a genuinely different URL on
-  // every call — cache: 'no-store' alone only controls the BROWSER's own
-  // cache and does nothing about caching on Google's own servers/CDN for
-  // repeated requests to the identical URL. Confirmed necessary from a real
-  // case: hashes agreed on both sides, yet the actual pulled content was
-  // still stale — exactly what server-side caching looks like from here,
-  // since client-side cache settings can't reach that layer at all.
   function driveReadFile(fileId) {
     var token = getAccessToken();
     if (!token) return Promise.reject(new Error('Not signed in to Google.'));
-    return fetch(DRIVE_FILES_URL + '/' + encodeURIComponent(fileId) + '?alt=media&_cb=' + cacheBuster(), {
-      headers: { Authorization: 'Bearer ' + token },
-      cache: 'no-store'
+    return fetch(DRIVE_FILES_URL + '/' + encodeURIComponent(fileId) + '?alt=media', {
+      headers: { Authorization: 'Bearer ' + token }
     }).then(function (res) {
       if (!res.ok) throw new Error('Drive read failed: HTTP ' + res.status);
       return res.json();
@@ -352,8 +332,7 @@
     return fetch(DRIVE_UPLOAD_URL + '/' + encodeURIComponent(fileId) + '?uploadType=media', {
       method: 'PATCH',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify(contentObject),
-      cache: 'no-store'
+      body: JSON.stringify(contentObject)
     }).then(function (res) {
       if (!res.ok) throw new Error('Drive update failed: HTTP ' + res.status);
       return res.json();
