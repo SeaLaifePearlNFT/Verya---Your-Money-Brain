@@ -76,25 +76,8 @@
     // localStorage-key shape). Caught by testing: string-concatenating a
     // nested object collapses to the useless literal "[object Object]"
     // regardless of what's actually inside it.
-    //
-    // driveOrigin is deliberately excluded from the hashed representation
-    // of an account snapshot — it's a LOCAL-ONLY marker (owned vs joined)
-    // that never exists in what's actually written to Drive (an owner's
-    // own copy of their account never has it). Hashing it in means a
-    // joined account's local copy (which correctly carries the marker) can
-    // never hash-match a remote snapshot (which never has it) even when
-    // every real field is identical — producing a permanent, spurious
-    // "changed" reading that manifests as an endless, unresolvable
-    // conflict loop. Confirmed as a real mechanism via dedicated testing,
-    // not a theoretical one — this part of an earlier revert was a mistake.
-    var hashable = snapshot;
-    if (snapshot && snapshot.account && Object.prototype.hasOwnProperty.call(snapshot.account, 'driveOrigin')) {
-      var accountWithoutOrigin = Object.assign({}, snapshot.account);
-      delete accountWithoutOrigin.driveOrigin;
-      hashable = Object.assign({}, snapshot, { account: accountWithoutOrigin });
-    }
-    var keys = Object.keys(hashable || {}).sort();
-    var parts = keys.map(function (k) { return k + '=' + JSON.stringify(hashable[k]); });
+    var keys = Object.keys(snapshot || {}).sort();
+    var parts = keys.map(function (k) { return k + '=' + JSON.stringify(snapshot[k]); });
     return hashString(parts.join('\u0001'));
   }
 
@@ -241,26 +224,7 @@
       blob.accountBudgets = blob.accountBudgets || {};
       var idx = -1;
       for (var i = 0; i < blob.accounts.length; i++) { if (blob.accounts[i] && blob.accounts[i].id === unit.accountId) { idx = i; break; } }
-      if (idx === -1) {
-        blob.accounts.push(data.account);
-      } else {
-        // driveOrigin is a LOCAL-ONLY marker of how THIS device came to
-        // have this account (owned vs joined via Stage 4c) — it is never
-        // part of what gets written to the account's own Drive file (an
-        // owner's copy of their own account metadata never has it, since
-        // from their side they genuinely own it). Blindly replacing the
-        // whole local entry with the incoming one silently erases that
-        // marker on every single pull, which then makes a joined account
-        // start being treated as owned — causing it to sync to a brand
-        // new, empty, disconnected file in the joiner's own Drive instead
-        // of the real shared one, which is why subscriptions/transfers
-        // that are genuinely correct on the owner's side can still vanish
-        // on the recipient's after a sync. Preserve it explicitly.
-        var existingDriveOrigin = blob.accounts[idx] && blob.accounts[idx].driveOrigin;
-        blob.accounts[idx] = existingDriveOrigin
-          ? Object.assign({}, data.account, { driveOrigin: existingDriveOrigin })
-          : data.account;
-      }
+      if (idx === -1) blob.accounts.push(data.account); else blob.accounts[idx] = data.account;
       blob.accountBudgets[unit.accountId] = data.budget;
       mirrorActiveAccount(blob);
       writeMainBlob(blob);
