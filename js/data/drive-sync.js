@@ -307,11 +307,20 @@
       blob.accountTransfers = mergeAccountTransfersForUnit(blob.accountTransfers, incomingTransfers, unit.accountId);
       mirrorActiveAccount(blob);
       writeMainBlob(blob);
-      // The account's own transfer records just changed independently of
-      // budget/month content — make sure mirror transactions (in every
-      // affected account, not just this one) get rebuilt from the merged
-      // list rather than left stale until the next unrelated re-render.
-      if (window.VeyraAccountTransfers && typeof window.VeyraAccountTransfers.syncRecords === 'function') window.VeyraAccountTransfers.syncRecords();
+      // Do NOT touch window.state / VeyraAccountTransfers here: this module
+      // only ever reads and writes the persisted localStorage blob directly
+      // (parseMainBlob/writeMainBlob), never the live in-memory window.state
+      // the rest of the app runs on — those two fall out of sync the moment
+      // this function writes, which is exactly why any 'pulled' outcome
+      // already forces window.location.reload() below in performSyncCheck.
+      // A prior version of this fix called syncTransferRecords() here
+      // directly; it mutated the STALE pre-reload window.state, and the
+      // app's own autosave path then wrote that stale state back over the
+      // blob just written above — silently discarding the pulled data and
+      // making the localHash disagree with lastSyncedHash on the very next
+      // check, which is what caused the repeating Device/Drive conflict
+      // popup. The reload alone is sufficient and correct; nothing else
+      // should run here.
       return;
     }
     // settings: restore every key except budget_dashboard_v12 directly, and
