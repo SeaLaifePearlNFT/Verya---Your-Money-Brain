@@ -523,6 +523,18 @@
     options = options || {};
     var manual = !!options.manual;
 
+    // If a conflict dialog is already open and waiting on a decision, don't
+    // let a background tick (or another manual click) re-run the whole
+    // check underneath it — that was re-detecting the SAME unresolved
+    // conflict every few seconds and tearing down + recreating the dialog,
+    // which showed up as it visibly "popping up twice". A conflict already
+    // being shown is itself a complete, valid outcome for this pass; the
+    // next real check happens once the user actually resolves it.
+    if (document.getElementById('driveConflictOverlay')) {
+      if (manual) showSyncToast('Please resolve the pending conflict first.', 'info');
+      return Promise.resolve();
+    }
+
     if (!window.VeyraIdentity || window.VeyraIdentity.isDefault()) {
       if (manual) showSyncToast('Sign in with Google first to enable backup.', 'warn');
       return Promise.resolve();
@@ -650,6 +662,18 @@
         setSyncMeta(unit.id, conflict.localHash, new Date().toISOString());
         closeConflictDialog();
         performSyncCheck(); // resume with any remaining units
+      }).catch(function (err) {
+        // This previously failed completely silently — the dialog would
+        // just get torn down and immediately recreated by the next sync
+        // pass re-detecting the SAME unresolved conflict, forever, with no
+        // indication anything was wrong. The most likely real-world cause:
+        // this unit is a JOINED account (Stage 4c) living in someone else's
+        // Drive, and this identity only has Viewer access there, not
+        // Editor — a write like this one is expected to fail in that case.
+        console.error('[Veyra Sync] failed to push "keep this device" choice for unit=' + unit.id + ':', err && err.message || err);
+        closeConflictDialog();
+        setSyncStatus('error');
+        showSyncToast('Couldn\u2019t save your changes to \u201c' + unitLabelFor(unit) + '\u201d \u2014 you may only have view access to this shared budget. Ask the person who shared it to give you edit access, or pick \u201cGoogle Drive\u201d instead next time.', 'error');
       });
     } else {
       // Apply BEFORE saving the backup — applyUnitSnapshot merges surgically
