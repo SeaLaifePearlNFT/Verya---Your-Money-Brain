@@ -17,7 +17,7 @@
 // Both are public, client-side values, same as clientId.
 
 window.VeyraGoogleSyncConfig = {
-  clientId: '', // e.g. '123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com'
-  apiKey: '',   // e.g. 'AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ1234567'
-  appId: ''     // e.g. '123456789012'
+  clientId: '745502576644-bntpvfcnk9iha75sjavmo7ldgbeir3ej.apps.googleusercontent.com', // e.g. '123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com'
+  apiKey: 'AIzaSyAX1D47ASv0ZfFPHDVCHr2Zl1rLgwy8pbI',   // e.g. 'AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ1234567'
+  appId: '745502576644'     // e.g. '123456789012'
 };
