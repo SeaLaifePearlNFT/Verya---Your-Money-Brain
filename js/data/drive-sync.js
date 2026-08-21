@@ -719,6 +719,25 @@
         if (result.outcome === 'conflict') {
           syncInFlight = false;
           setSyncStatus('conflict');
+          // A unit earlier in THIS SAME pass may already have pulled fresh
+          // data into localStorage (setting needsReload above) before this
+          // later unit — very often "settings", since it's always processed
+          // last — hit a conflict. Returning here without checking
+          // needsReload silently dropped that pending reload: the pulled
+          // data was correctly on disk (this is exactly what the hash-match
+          // "noop" in the logs showed) but the running app's in-memory
+          // window.state never got refreshed to reflect it, since only a
+          // real reload does that. So if a reload is already owed, take it
+          // now instead of showing the dialog — the conflict itself doesn't
+          // go away, it's still sitting unresolved in Drive/localStorage,
+          // and the very next sync pass (immediately after this reload
+          // finishes booting the app fresh) will detect it again and show
+          // the dialog then, this time on top of fully up-to-date state.
+          if (needsReload) {
+            if (window.VeyraGoogleSync.prepareForReload) window.VeyraGoogleSync.prepareForReload();
+            window.location.reload();
+            return;
+          }
           if (manual) showSyncToast('Action needed — see the dialog to resolve a conflict.', 'warn');
           showConflictDialog(result);
           return; // stop this pass — remaining units get picked up on the next sync
