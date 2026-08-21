@@ -664,6 +664,28 @@
     syncInFlight = true;
     setSyncStatus('syncing');
 
+    // Expenses, Income, Subscriptions, and everything else in
+    // VeyraAccountBudgets.SCOPED_KEYS live in TWO places: a "live" top-level
+    // copy the rest of the app reads/writes directly (state.months,
+    // state.subscriptions, ...), and a per-account snapshot inside
+    // state.accountBudgets[accountId] — which is the ONLY copy this file
+    // ever reads when building what to push (see getUnitSnapshot below).
+    // Nothing keeps those two in sync automatically: the per-account copy is
+    // only refreshed by an explicit VeyraAccountBudgets.capture() call, and
+    // until now nothing on the sync path ever made that call. Normal editing
+    // (adding an expense, a subscription, anything) only ever touched the
+    // live top-level copy — so whether an edit actually reached Drive came
+    // down to unrelated timing (had the user happened to open Account
+    // Transfers or switch accounts since making it?), not the edit itself.
+    // Capturing the active account right here, immediately before any unit
+    // snapshot is built, closes that gap for every feature at once rather
+    // than one at a time.
+    if (window.VeyraAccountBudgets && typeof window.VeyraAccountBudgets.capture === 'function' &&
+        window.state && window.state.activeAccountId) {
+      window.VeyraAccountBudgets.capture(window.state.activeAccountId);
+      if (typeof window.saveState === 'function') window.saveState(window.state);
+    }
+
     var units = listSyncUnits();
     var needsReload = false;
     var pushedOrPulledCount = 0;
