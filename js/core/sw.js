@@ -7,7 +7,7 @@
    control immediately (skipWaiting + clients.claim) — so every client picks
    up the new build on their next load with no manual hard-refresh.
    ────────────────────────────────────────────────────────────────────── */
-const SW_VERSION = 'v8';
+const SW_VERSION = 'v7'; // account-transfers Drive-sync fix (js/data/drive-sync.js) — bumped per the deploy note above
 const CACHE_NAME = 'veyra-shell-' + SW_VERSION;
 
 const CORE_ASSETS = [
@@ -64,26 +64,6 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-
-  // Google's API/auth endpoints must NEVER be touched by this service
-  // worker — not cached, not intercepted, not even looked at. These are
-  // authenticated, time-sensitive calls (sign-in, Drive reads/writes,
-  // the Picker); caching a response here — even briefly, even a failed
-  // one — can serve stale or wrong data (or a stale ERROR) indefinitely,
-  // since the cross-origin branch below caches regardless of status code.
-  // Letting the fetch event pass through untouched (no respondWith call)
-  // means the browser handles it completely normally, exactly as if this
-  // service worker didn't exist for these requests.
-  if (
-    url.hostname === 'www.googleapis.com' ||
-    url.hostname === 'accounts.google.com' ||
-    url.hostname === 'apis.google.com' ||
-    url.hostname === 'oauth2.googleapis.com' ||
-    url.hostname === 'docs.google.com' ||
-    url.hostname === 'content.googleapis.com'
-  ) {
-    return;
-  }
 
   // Page navigations (app.html / index.html): network-first so the latest page
   // wins when online; fall back to cache when offline.
