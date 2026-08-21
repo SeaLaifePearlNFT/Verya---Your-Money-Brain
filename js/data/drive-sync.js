@@ -187,11 +187,36 @@
     return units;
   }
 
+  // Account Transfers are recorded as ONE global list (state.accountTransfers)
+  // rather than being owned by a single account, since every transfer
+  // inherently touches two accounts. That list previously synced only as
+  // part of the "settings" unit — which is never shared with a joined
+  // account's other party (each identity has its own private _settings.json).
+  // Result: a transfer's mirror transactions landed correctly in the shared
+  // account's data.json (they live inside accountBudgets[accountId].months),
+  // but the transfer's OWN record never reached the other person, and this
+  // module's own syncTransferRecords() (js/features/account-transfers.js)
+  // wipes and rebuilds every account's mirror transactions from the local
+  // accountTransfers list on every init/account-switch — so the recipient's
+  // next reload silently deleted the mirror rows that had just synced in.
+  //
+  // Fix: also embed, inside each account unit's own snapshot, the subset of
+  // accountTransfers that touch that account. That subset then travels
+  // through the exact same per-account shared-folder channel as the rest of
+  // that account's budget, so both parties to a shared account converge on
+  // the same transfer records for it.
+  function transfersTouchingAccount(list, accountId) {
+    return (Array.isArray(list) ? list : []).filter(function (t) {
+      return t && (t.fromAccountId === accountId || t.toAccountId === accountId);
+    });
+  }
+
   function getUnitSnapshot(unit) {
     if (unit.kind === 'account') {
       var blob = parseMainBlob() || {};
       var account = (blob.accounts || []).find(function (a) { return a && a.id === unit.accountId; });
-      var budget = (blob.accountBudgets || {})[unit.accountId] || {};
+      var budget = Object.assign({}, (blob.accountBudgets || {})[unit.accountId] || {});
+      budget.accountTransfers = transfersTouchingAccount(blob.accountTransfers, unit.accountId);
       return { account: account || { id: unit.accountId }, budget: budget };
     }
     // settings: every other localStorage key, plus budget_dashboard_v12
@@ -217,6 +242,56 @@
     MIRROR_KEYS.forEach(function (k) { blob[k] = active[k]; });
   }
 
+  // Reconciles this account's slice of the global accountTransfers list
+  // against what the account's own synced file says: entries touching this
+  // account are replaced wholesale by the incoming set (added, edited, or
+  // removed, matching whatever the shared file now contains); entries that
+  // don't touch this account are left completely alone, since this unit has
+  // no authority over them.
+  function mergeAccountTransfersForUnit(currentList, incomingForAccount, accountId) {
+    var incomingIds = {};
+    (incomingForAccount || []).forEach(function (t) { if (t && t.id) incomingIds[t.id] = true; });
+    var kept = (Array.isArray(currentList) ? currentList : []).filter(function (t) {
+      if (!t) return false;
+      var touchesThisAccount = t.fromAccountId === accountId || t.toAccountId === accountId;
+      // Drop stale local copies of THIS account's transfers that the synced
+      // file no longer has (edited/deleted elsewhere); never touch transfers
+      // that belong to other accounts.
+      return !touchesThisAccount || incomingIds[t.id];
+    });
+    var indexById = {};
+    kept.forEach(function (t, i) { if (t && t.id) indexById[t.id] = i; });
+    (incomingForAccount || []).forEach(function (t) {
+      if (!t || !t.id) return;
+      if (indexById.hasOwnProperty(t.id)) kept[indexById[t.id]] = t;
+      else kept.push(t);
+    });
+    return kept;
+  }
+
+  // Settings' own accountTransfers copy stays authoritative (full overwrite,
+  // same as before) for transfers between accounts this identity owns
+  // outright. Transfers touching a JOINED account (shared TO this identity
+  // by someone else) are excluded from that overwrite — those are managed
+  // exclusively by that account's own sync unit (see
+  // mergeAccountTransfersForUnit above), which runs earlier in the same
+  // pass; otherwise the settings unit (processed last, see listSyncUnits)
+  // would immediately stomp on what was just merged in for a joined account.
+  function reconcileGlobalTransfersForSettings(currentBlob, incomingBlob) {
+    var accounts = Array.isArray(currentBlob.accounts) ? currentBlob.accounts : [];
+    function isJoined(accountId) {
+      var acc = accounts.find(function (a) { return a && a.id === accountId; });
+      return !!(acc && acc.driveOrigin === 'joined');
+    }
+    var preserved = (currentBlob.accountTransfers || []).filter(function (t) {
+      return t && (isJoined(t.fromAccountId) || isJoined(t.toAccountId));
+    });
+    var incoming = (incomingBlob.accountTransfers || []).filter(function (t) {
+      return t && !(isJoined(t.fromAccountId) || isJoined(t.toAccountId));
+    });
+    return preserved.concat(incoming);
+  }
+
   function applyUnitSnapshot(unit, data) {
     if (unit.kind === 'account') {
       var blob = parseMainBlob() || { accounts: [], accountBudgets: {} };
@@ -225,9 +300,18 @@
       var idx = -1;
       for (var i = 0; i < blob.accounts.length; i++) { if (blob.accounts[i] && blob.accounts[i].id === unit.accountId) { idx = i; break; } }
       if (idx === -1) blob.accounts.push(data.account); else blob.accounts[idx] = data.account;
-      blob.accountBudgets[unit.accountId] = data.budget;
+      var incomingBudget = Object.assign({}, data.budget || {});
+      var incomingTransfers = Array.isArray(incomingBudget.accountTransfers) ? incomingBudget.accountTransfers : [];
+      delete incomingBudget.accountTransfers; // not a real budget field — keep accountBudgets clean, canonical copy lives only in blob.accountTransfers
+      blob.accountBudgets[unit.accountId] = incomingBudget;
+      blob.accountTransfers = mergeAccountTransfersForUnit(blob.accountTransfers, incomingTransfers, unit.accountId);
       mirrorActiveAccount(blob);
       writeMainBlob(blob);
+      // The account's own transfer records just changed independently of
+      // budget/month content — make sure mirror transactions (in every
+      // affected account, not just this one) get rebuilt from the merged
+      // list rather than left stale until the next unrelated re-render.
+      if (window.VeyraAccountTransfers && typeof window.VeyraAccountTransfers.syncRecords === 'function') window.VeyraAccountTransfers.syncRecords();
       return;
     }
     // settings: restore every key except budget_dashboard_v12 directly, and
@@ -235,7 +319,10 @@
     // locally so applying settings never wipes out account content.
     var incomingBlob = data[MAIN_BLOB_KEY] ? JSON.parse(data[MAIN_BLOB_KEY]) : {};
     var currentBlob = parseMainBlob() || {};
-    var merged = Object.assign({}, incomingBlob, { accountBudgets: currentBlob.accountBudgets || {} });
+    var merged = Object.assign({}, incomingBlob, {
+      accountBudgets: currentBlob.accountBudgets || {},
+      accountTransfers: reconcileGlobalTransfersForSettings(currentBlob, incomingBlob)
+    });
     mirrorActiveAccount(merged);
     writeMainBlob(merged);
     Object.keys(data).forEach(function (key) {
