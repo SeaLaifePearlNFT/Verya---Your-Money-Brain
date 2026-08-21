@@ -132,7 +132,17 @@ html[data-theme="dark"] .account-switcher,body.dark-mode .account-switcher,html[
   .all-account-card dl{margin:5px 0 0;gap:2px;font-size:.75rem}
   .all-account-net{padding-top:4px;margin-top:1px}
   .transfer-modal.is-overview-mode .transfer-list-head{margin-top:5px}
-  .transfer-editor{flex:1 1 auto;margin:10px 0 0;overflow:hidden}
+  /* The editor form (Month/Date/From/To/Amount/Status/Note, PLUS the
+     Outgoing/Incoming classification grid added later, PLUS the action
+     buttons) can be taller than whatever space is left after the toolbar
+     inside this fixed 840px-tall dialog. It previously had `overflow:hidden`
+     with no scroll mechanism at all, so any fields past that height were
+     simply unreachable — not hidden by a bug in the fields themselves, just
+     permanently clipped with no way to scroll to them. Scrolling the editor
+     internally (rather than the whole dialog) keeps the toolbar/list frame
+     fixed as designed while guaranteeing every field stays reachable
+     regardless of how tall the form grows in the future. */
+  .transfer-editor{flex:1 1 auto;margin:10px 0 0;overflow-y:auto;overflow-x:hidden}
   .transfer-modal.is-editor-mode .transfer-toolbar{opacity:.72}
 }
 
