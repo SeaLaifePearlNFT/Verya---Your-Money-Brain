@@ -162,15 +162,56 @@
     var existing = {};
     bucket.months.forEach(function(m){ if(m && m.name) existing[m.name]=true; });
     var firstIdx = bucket.months.length ? monthIndexByName(bucket.months[0].name) : null;
-    reference.months.forEach(function(refMonth){
+    // Backfill in chronological order (not the reference account's own
+    // array order) so that when several months are missing at once, each
+    // one clones forward from the one just added — carrying THIS account's
+    // own category/sub-category structure the whole way. Using
+    // neutralStarterMonth() here (a hardcoded generic template — Housing /
+    // Connectivity / Groceries / etc.) silently replaced whatever categories
+    // this account had actually been set up with, which is exactly what
+    // produced a differently-structured month the moment any other account
+    // (e.g. Main Account) got a new month first. Falls back to the generic
+    // template only when this account genuinely has no prior month of its
+    // own yet to clone from.
+    var refMonthsSorted = reference.months.slice().sort(function(a,b){ return (monthIndexByName(a.name)||0)-(monthIndexByName(b.name)||0); });
+    refMonthsSorted.forEach(function(refMonth){
       if (!refMonth || !refMonth.name || existing[refMonth.name]) return;
       var idx = monthIndexByName(refMonth.name);
       if (firstIdx != null && idx != null && idx < firstIdx) return;
-      var fresh = neutralStarterMonth(refMonth.name);
+      var priorMonth = bucket.months.length ? bucket.months[bucket.months.length - 1] : null;
+      var fresh = priorMonth ? sanitizeMonth(priorMonth, true) : neutralStarterMonth(refMonth.name);
+      fresh.name = refMonth.name;
       bucket.months.push(fresh);
+      bucket.months.sort(function(a,b){ return (monthIndexByName(a.name)||0)-(monthIndexByName(b.name)||0); });
       existing[refMonth.name]=true;
     });
+
     bucket.months.sort(function(a,b){ return (monthIndexByName(a.name)||0)-(monthIndexByName(b.name)||0); });
+  }
+
+  // Ensures a SPECIFIC named month exists for accountId (creating it —
+  // structure-preserving, same approach as ensureForwardMonths above — if
+  // it isn't there yet), and returns that month object. Used by places like
+  // account-transfers.js that need to write into a given account's given
+  // month on demand (e.g. a transfer dated in a month the destination
+  // account hasn't reached yet) rather than only catching up whenever the
+  // account itself is switched to.
+  function ensureMonthExists(accountId, monthName) {
+    var s = state();
+    if (!s || !accountId || !monthName) return null;
+    var bucket = ensureStore(s)[accountId];
+    if (!bucket) return null;
+    if (!Array.isArray(bucket.months)) bucket.months = [];
+    var found = bucket.months.find(function(m){ return m && m.name === monthName; });
+    if (found) return found;
+    var priorMonth = bucket.months.length
+      ? bucket.months.slice().sort(function(a,b){ return (monthIndexByName(a.name)||0)-(monthIndexByName(b.name)||0); })[bucket.months.length - 1]
+      : null;
+    var fresh = priorMonth ? sanitizeMonth(priorMonth, true) : neutralStarterMonth(monthName);
+    fresh.name = monthName;
+    bucket.months.push(fresh);
+    bucket.months.sort(function(a,b){ return (monthIndexByName(a.name)||0)-(monthIndexByName(b.name)||0); });
+    return fresh;
   }
 
   function retag(value, accountId) {
@@ -317,7 +358,8 @@
     createForAccount: createForAccount,
     switchAccount: switchAccount,
     removeAccount: removeAccount,
-    ensureForwardMonths: ensureForwardMonths
+    ensureForwardMonths: ensureForwardMonths,
+    ensureMonthExists: ensureMonthExists
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize);

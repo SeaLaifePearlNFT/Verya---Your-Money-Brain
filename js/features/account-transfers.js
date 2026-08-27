@@ -76,7 +76,7 @@
 
     transfers().forEach(function(t){
       if(!t||(t.status!=='planned'&&t.status!=='completed'))return;var monthName=transferMonth(t);if(!monthName)return;
-      [['out',t.fromAccountId],['in',t.toAccountId]].forEach(function(pair){var side=pair[0],accountId=pair[1],bucket=store[accountId],month=bucket&&Array.isArray(bucket.months)?bucket.months.find(function(m){return m&&m.name===monthName;}):null;if(!month)return;var c=classificationFor(t,side),row=ensureTargetRow(month,c),tx=transferRecord(t,account(accountId)||{id:accountId},c);tx.internalTransferMirror=true;row.transactions.push(tx);});
+      [['out',t.fromAccountId],['in',t.toAccountId]].forEach(function(pair){var side=pair[0],accountId=pair[1],bucket=store[accountId];if(!bucket)return;var month=Array.isArray(bucket.months)?bucket.months.find(function(m){return m&&m.name===monthName;}):null;if(!month&&window.VeyraAccountBudgets&&typeof window.VeyraAccountBudgets.ensureMonthExists==='function')month=window.VeyraAccountBudgets.ensureMonthExists(accountId,monthName);if(!month)return;var c=classificationFor(t,side),row=ensureTargetRow(month,c),tx=transferRecord(t,account(accountId)||{id:accountId},c);tx.internalTransferMirror=true;row.transactions.push(tx);});
     });
 
     if(window.VeyraAccountBudgets&&typeof window.VeyraAccountBudgets.load==='function'&&st.activeAccountId)window.VeyraAccountBudgets.load(st.activeAccountId);
