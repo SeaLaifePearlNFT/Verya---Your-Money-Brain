@@ -14186,6 +14186,10 @@ body.cashflow-modal-open {
 
 .debt-detail-modal { width:min(100%, 1080px); max-width:1080px; }
 .debt-detail-body { max-height:min(74vh, 820px); overflow-y:auto; display:grid; gap:12px; background:linear-gradient(180deg, rgba(234,246,255,0.44), rgba(255,255,255,0.94)); }
+/* Edit/Add Debt setup form (and Extra repayment source, which shares the same
+   modal shell) — the shell's grid rows already cap this to the space left
+   after the header/footer, so this only needs to scroll rather than clip. */
+.debt-setup-body { overflow-y:auto; }
 #debtDetailOverlay[data-view="debt"] .debt-readable-card,
 #debtDetailOverlay[data-view="debt"] .debt-simulator-card,
 #debtDetailOverlay[data-view="debt"] .debt-history-card { margin:0; }

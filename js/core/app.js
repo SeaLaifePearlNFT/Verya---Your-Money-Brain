@@ -3014,11 +3014,27 @@
       return row ? Math.max(0, Number(row.planned || 0)) : 0;
     }
 
+    // Converts a debt profile's entered annual interest rate into the
+    // effective monthly rate used for every amortization/interest
+    // calculation below. Two real-world conventions exist:
+    //   'nominal'   — monthlyRate = annualRate / 12 (simple division).
+    //                 Standard for most credit cards and US-style loans.
+    //                 This is the default for any profile that doesn't set
+    //                 rateConvention, so existing debts keep their numbers.
+    //   'actuarial' — monthlyRate = (1 + annualRate)^(1/12) - 1 (true
+    //                 compounded monthly rate). Many EU mortgages (quoted as
+    //                 an annual/TAEG rate that compounds monthly) use this —
+    //                 it's what reproduces the bank-stated periodic rate.
+    function debtMonthlyRateForProfile(profile) {
+      const annual = Math.max(0, Number(profile && profile.annualInterestRate || 0)) / 100;
+      if (profile && profile.rateConvention === 'actuarial') return Math.pow(1 + annual, 1/12) - 1;
+      return annual / 12;
+    }
+
     function debtScheduledPaymentEstimate(profile) {
       const original = Math.max(0, Number(profile && profile.originalAmount || 0));
       const termMonths = Math.max(0, Number(profile && profile.termMonths || 0));
-      const rate = Math.max(0, Number(profile && profile.annualInterestRate || 0)) / 100;
-      const monthlyRate = rate / 12;
+      const monthlyRate = debtMonthlyRateForProfile(profile);
       if (original <= 0 || termMonths <= 0) return 0;
       if (monthlyRate <= 0) return original / termMonths;
       const factor = Math.pow(1 + monthlyRate, termMonths);
@@ -3034,8 +3050,7 @@
 
     function debtCalculateProfileMetrics(profile, activeMonth) {
       const original = Number(profile && profile.originalAmount || 0);
-      const rate = Math.max(0, Number(profile && profile.annualInterestRate || 0)) / 100;
-      const monthlyRate = rate / 12;
+      const monthlyRate = debtMonthlyRateForProfile(profile);
       const termMonths = Math.max(0, Number(profile && profile.termMonths || 0));
       const activeIdx = debtMonthIndex(activeMonth);
       const startValue = debtStartDateValue(profile);
@@ -3258,8 +3273,7 @@
     }
 
     function debtCalculateFutureScenario(profile, metrics, simulator, amountOverride) {
-      const rate = Math.max(0, Number(profile && profile.annualInterestRate || 0)) / 100;
-      const monthlyRate = rate / 12;
+      const monthlyRate = debtMonthlyRateForProfile(profile);
       const payment = Math.max(0, Number(metrics && (metrics.projectedPayment || metrics.linkedPaidThisMonth || metrics.averageLinkedPayment || metrics.plannedLinkedPayment || metrics.scheduledPayment) || 0));
       const currentBalance = Math.max(0, Number(metrics && metrics.currentBalance || 0));
       if (metrics && metrics.active === false) {
@@ -3309,8 +3323,7 @@
     }
 
     function debtFindWorthwhileExtraThreshold(profile, metrics, simulator) {
-      const rate = Math.max(0, Number(profile && profile.annualInterestRate || 0)) / 100;
-      const monthlyRate = rate / 12;
+      const monthlyRate = debtMonthlyRateForProfile(profile);
       const payment = Math.max(0, Number(metrics && (metrics.projectedPayment || metrics.linkedPaidThisMonth || metrics.averageLinkedPayment || metrics.plannedLinkedPayment || metrics.scheduledPayment) || 0));
       const currentBalance = Math.max(0, Number(metrics && metrics.currentBalance || 0));
       const delayMonthsWanted = Math.round(Math.max(0, Number(simulator && simulator.extraDelayYears || 0)) * 12);
@@ -3426,8 +3439,7 @@
       const canProject = !!(profile && metrics && metrics.active !== false && Number(metrics.currentBalance || 0) > 0);
       let path = '';
       if (canProject) {
-        const rate = Math.max(0, Number(profile.annualInterestRate || 0)) / 100;
-        const monthlyRate = rate / 12;
+        const monthlyRate = debtMonthlyRateForProfile(profile);
         const payment = Math.max(0, Number(metrics.projectedPayment || metrics.linkedPaidThisMonth || metrics.averageLinkedPayment || metrics.plannedLinkedPayment || metrics.scheduledPayment || 0));
         const currentBalance = Math.max(0, Number(metrics.currentBalance || 0));
         const horizon = Math.max(12, Math.min(240, Number(metrics.payoffMonths || 120)));
@@ -3487,8 +3499,7 @@
       if (!scenario || !metrics || !profile) {
         return debtBalancePlaceholderChart(profile, metrics, 'Balance over time comparison', 'Awaiting scenario', 'Enter an extra repayment amount to compare the selected bank option against the baseline path.');
       }
-      const rate = Math.max(0, Number(profile.annualInterestRate || 0)) / 100;
-      const monthlyRate = rate / 12;
+      const monthlyRate = debtMonthlyRateForProfile(profile);
       const payment = Math.max(0, Number(metrics.projectedPayment || metrics.linkedPaidThisMonth || metrics.averageLinkedPayment || metrics.plannedLinkedPayment || metrics.scheduledPayment || 0));
       const currentBalance = Math.max(0, Number(metrics.currentBalance || 0));
       const selected = debtScenarioPrimarySummary(scenario);
@@ -3948,7 +3959,7 @@
       const empty = { rows: [], startBalance: 0, currentBalance: 0, totalRegularPaid: 0, totalExtraPaid: 0, totalPrincipal: 0, totalInterest: 0, baselineBalance: 0, active: false };
       if (!profile || !state || !Array.isArray(state.months)) return empty;
       const original = Math.max(0, Number(profile.originalAmount || 0));
-      const monthlyRate = Math.max(0, Number(profile.annualInterestRate || 0)) / 100 / 12;
+      const monthlyRate = debtMonthlyRateForProfile(profile);
       const activeIdx = debtMonthIndex(activeMonth);
       const startValue = debtStartDateValue(profile);
       const scheduledPayment = Math.max(0, debtScheduledPaymentEstimate(profile));
@@ -4406,7 +4417,7 @@
         const profile = row.profile;
         const metrics = row.metrics || debtCalculateProfileMetrics(profile, month);
         const rate = Math.max(0, Number(profile.annualInterestRate || 0));
-        const monthlyRate = rate / 100 / 12;
+        const monthlyRate = debtMonthlyRateForProfile(profile);
         const projected = debtPayoffProjection(metrics.currentBalance || 0, metrics.projectedPayment || 0, monthlyRate);
         const balance = Math.max(0, Number(metrics.currentBalance || 0));
         const monthly = Math.max(0, Number(metrics.projectedPayment || 0));
@@ -4928,7 +4939,7 @@
       overlay.innerHTML = '' +
         '<div class="cbm-modal custom-target-builder-modal" role="dialog" aria-modal="true" aria-labelledby="debtSetupTitle">' +
           '<div class="cbm-header"><div><div class="cbm-title" id="debtSetupTitle">' + (createNew ? 'Add debt' : 'Edit debt setup') + '</div><div class="cbm-sub">Each debt profile has its own regular repayment source, health view, simulator, and timeline.</div></div><button class="cbm-close-btn" type="button" data-debt-close>×</button></div>' +
-          '<div class="cbm-body custom-target-builder-body"><div class="debt-form-grid">' +
+          '<div class="cbm-body custom-target-builder-body debt-setup-body"><div class="debt-form-grid">' +
             '<div class="debt-form-field"><label for="debtNameInput">Debt name</label><input id="debtNameInput" type="text" value="' + debtEscape(profile.name || '') + '" placeholder="Mortgage, car loan, personal loan" /></div>' +
             '<div class="debt-form-field"><label for="debtTypeInput">Debt type</label><select id="debtTypeInput"><option value="mortgage"' + ((profile.type || 'mortgage') === 'mortgage' ? ' selected' : '') + '>Mortgage</option><option value="car"' + (profile.type === 'car' ? ' selected' : '') + '>Car loan</option><option value="personal"' + (profile.type === 'personal' ? ' selected' : '') + '>Personal loan</option><option value="other"' + (profile.type === 'other' ? ' selected' : '') + '>Other</option></select></div>' +
             '<div class="debt-form-field debt-full"><label for="debtSourceInput">Regular repayment Expense source</label><select id="debtSourceInput">' + sourceOptions + '</select></div>' +
@@ -4936,6 +4947,7 @@
             '<div class="debt-form-field"><label for="debtBalanceInput">Current balance override</label><input id="debtBalanceInput" type="number" min="0" step="0.01" value="' + debtEscape(profile.currentBalanceOverride === '' || profile.currentBalanceOverride == null ? '' : profile.currentBalanceOverride) + '" /></div>' +
             '<div class="debt-form-field"><label for="debtRateInput">Interest rate %</label><input id="debtRateInput" type="number" min="0" step="0.01" value="' + debtEscape(profile.annualInterestRate || '') + '" /></div>' +
             '<div class="debt-form-field"><label for="debtRateTypeInput">Rate type</label><select id="debtRateTypeInput"><option value="fixed"' + ((profile.rateType || 'fixed') === 'fixed' ? ' selected' : '') + '>Fixed</option><option value="variable"' + (profile.rateType === 'variable' ? ' selected' : '') + '>Variable</option></select></div>' +
+            '<div class="debt-form-field"><label for="debtRateConventionInput" class="label-with-inline-info"><span>Rate calculation</span>' + inlineInfoTriggerHtml('debtRateConventionTooltip', 'Most EU mortgages quoted with a "periodic" monthly rate use Actuarial. Credit cards and most other loans use Nominal.') + '</label><select id="debtRateConventionInput"><option value="nominal"' + ((profile.rateConvention || 'nominal') === 'nominal' ? ' selected' : '') + '>Nominal (÷ 12)</option><option value="actuarial"' + (profile.rateConvention === 'actuarial' ? ' selected' : '') + '>Actuarial / APR (compounds monthly)</option></select></div>' +
             '<div class="debt-form-field"><label for="debtStartInput">Start date</label><input id="debtStartInput" type="month" value="' + debtEscape(profile.startDate || '') + '" /></div>' +
             '<div class="debt-form-field"><label for="debtTermInput">Term in months</label><input id="debtTermInput" type="number" min="1" step="1" value="' + debtEscape(profile.termMonths || '') + '" /></div>' +
             '<div class="debt-early-conditions-block"><div class="debt-early-conditions-head"><div><div class="debt-early-conditions-title">Early repayment conditions</div></div><span class="debt-penalty-pill">Optional</span></div><div class="debt-early-conditions-grid"><div class="debt-form-field"><label for="debtPenaltyTypeInput">Penalty type</label><select id="debtPenaltyTypeInput"><option value="none"' + (normalizeDebtEarlyRepayment(profile).penaltyType === 'none' ? ' selected' : '') + '>No penalty</option><option value="fixed"' + (normalizeDebtEarlyRepayment(profile).penaltyType === 'fixed' ? ' selected' : '') + '>Fixed fee</option><option value="percentage"' + (normalizeDebtEarlyRepayment(profile).penaltyType === 'percentage' ? ' selected' : '') + '>Percentage of repayment</option><option value="months_interest"' + (normalizeDebtEarlyRepayment(profile).penaltyType === 'months_interest' ? ' selected' : '') + '>Months of interest</option></select></div><div class="debt-form-field"><label for="debtPenaltyValueInput">Penalty value</label><input id="debtPenaltyValueInput" type="number" min="0" step="0.01" value="' + debtEscape(normalizeDebtEarlyRepayment(profile).penaltyValue || '') + '" /></div></div><div class="debt-penalty-summary" id="debtPenaltySetupSummary">Saved rule: ' + debtEscape(debtPenaltySummary(profile)) + '</div></div>' +
@@ -4998,6 +5010,7 @@
         currentBalanceOverride: getVal('debtBalanceInput') === '' ? '' : Number(getVal('debtBalanceInput') || 0),
         annualInterestRate: rate,
         rateType: getVal('debtRateTypeInput') || 'fixed',
+        rateConvention: getVal('debtRateConventionInput') || 'nominal',
         startDate: getVal('debtStartInput') || '',
         termMonths: termMonths,
         repaymentFrequency: 'monthly',
@@ -13048,44 +13061,51 @@ function renderRows(targetId, rows, kind) {
       const allocationSubscriptionNote = paidSubscriptionAllocation > 0 || dueSubscriptionPressure > 0
         ? `<div class="alloc-subscription-note${dueSubscriptionPressure > 0 ? ' warn' : ''}">Recurring payments: <strong>${currency(paidSubscriptionAllocation)}</strong> paid and included in the Currently column${dueSubscriptionPressure > 0 ? ` · <strong>${currency(dueSubscriptionPressure)}</strong> still due and included in Allocation / Remaining until paid` : ''}.</div>`
         : '';
-      const allocationExpanded = document.body.classList.contains('alloc-focus-expanded');
-      const allocationRowsByRelevance = (allocation.rows || []).slice().sort(function(a, b) {
-        function rank(row) {
-          const actual = Number(row.actual || 0);
-          const alloc = Number(row.allocation || 0);
-          const rem = alloc - actual;
-          if (rem <= 0 && !isSavingsAllocationRow(row)) return 0;
-          if (alloc > 0 && (rem / alloc) < 0.2 && !isSavingsAllocationRow(row)) return 1;
-          return 2;
-        }
-        const ra = rank(a);
-        const rb = rank(b);
-        if (ra !== rb) return ra - rb;
-        return Number(b.allocation || 0) - Number(a.allocation || 0);
+      // Default order matches the Expenses tab's own category ranking
+      // (month.expenseCategoryOrder), with Savings/Investments always last.
+      // This used to be a "most urgent first" ranking (over-budget, then
+      // nearly-exhausted, then by allocation size), recomputed every render,
+      // paired with a "show top 3 only" collapse — the idea being to
+      // surface whichever categories most needed attention. In practice
+      // this meant the tiles reordered themselves (and which ones were even
+      // visible could change) every time actual spending crossed a
+      // threshold, which read as things randomly jumping around rather than
+      // as a helpful highlight. Removed entirely: order is now static, and
+      // all categories always show.
+      const allocationRowsByCategoryOrder = (allocation.rows || []).slice().sort(function(a, b) {
+        if (isSavingsAllocationRow(a) && !isSavingsAllocationRow(b)) return 1;
+        if (isSavingsAllocationRow(b) && !isSavingsAllocationRow(a)) return -1;
+        if (isSavingsAllocationRow(a) && isSavingsAllocationRow(b)) return 0;
+        const orderList = Array.isArray(month.expenseCategoryOrder) ? month.expenseCategoryOrder : [];
+        let ia = orderList.indexOf(a.label);
+        let ib = orderList.indexOf(b.label);
+        if (ia === -1) ia = orderList.length;
+        if (ib === -1) ib = orderList.length;
+        if (ia !== ib) return ia - ib;
+        return String(a.label || '').localeCompare(String(b.label || ''));
       });
-      // User-defined drag order (persisted) takes precedence over auto relevance
-      // ordering. Saved keys are placed first in their saved order; any rows not
-      // yet in the saved order (new categories) keep their relevance position and
-      // are appended afterwards.
+      // User-defined drag order (persisted) still takes precedence over the
+      // default category order above. Saved keys are placed first in their
+      // saved order; any rows not yet in the saved order (new categories)
+      // keep their default position and are appended afterwards.
       const allocationCustomOrder = loadAllocCardOrder();
       const allocationOrderedRows = (function() {
         if (!Array.isArray(allocationCustomOrder) || !allocationCustomOrder.length) {
-          return allocationRowsByRelevance;
+          return allocationRowsByCategoryOrder;
         }
-        const byKey = new Map(allocationRowsByRelevance.map(r => [String(r.key), r]));
+        const byKey = new Map(allocationRowsByCategoryOrder.map(r => [String(r.key), r]));
         const result = [];
         allocationCustomOrder.forEach(function(key) {
           const r = byKey.get(String(key));
           if (r) { result.push(r); byKey.delete(String(key)); }
         });
-        // Append any remaining rows in their existing relevance order
-        allocationRowsByRelevance.forEach(function(r) {
+        // Append any remaining rows in their existing default order
+        allocationRowsByCategoryOrder.forEach(function(r) {
           if (byKey.has(String(r.key))) result.push(r);
         });
         return result;
       })();
-      const allocationDisplayRows = allocationExpanded ? allocationOrderedRows : allocationOrderedRows.slice(0, 3);
-      const allocationHiddenCount = Math.max(0, allocationOrderedRows.length - allocationDisplayRows.length);
+      const allocationDisplayRows = allocationOrderedRows;
       // === UI v2: card-based budget allocation layout ===
       // Logic, math, and data sources are unchanged. Only the rendered structure differs.
       const carryForwardAmount = Number(carryForwardIncomeAmountForMonth(month) || 0);
@@ -13379,9 +13399,12 @@ function renderRows(targetId, rows, kind) {
                 <span class="alloc-v2-legend-item is-empty"><span class="alloc-v2-legend-dot"></span>No spend</span>
               </div>
 
-              ${allocationRowsByRelevance.length > 3
-                ? `<button class="alloc-v2-show-all-btn" type="button" data-alloc-focus-toggle>${allocationExpanded ? 'Show top 3 categories' : `Show all categories (${allocationHiddenCount} more)`}</button>`
-                : '<div class="alloc-v2-show-all-spacer" aria-hidden="true"></div>'}
+              <!-- The "Show top 3 / show all" toggle that lived here only
+                   existed to pair with the urgency ranking above — always
+                   showing every category now, so there's nothing to expand.
+                   Spacer kept unconditionally so the layout above it doesn't
+                   shift depending on category count. -->
+              <div class="alloc-v2-show-all-spacer" aria-hidden="true"></div>
             </div>
 
             <!-- Totals strip preserved (hidden visually, but kept for any downstream consumers) -->
@@ -13509,12 +13532,6 @@ function renderRows(targetId, rows, kind) {
       document.querySelectorAll('.current-allocation-card, .overview-allocation-card.alloc-list-card').forEach(card => {
         card.style.setProperty('--allocation-row-count', String(allocationRowCount));
         card.dataset.allocationRows = String(allocationRowCount);
-      });
-      document.querySelectorAll('[data-alloc-focus-toggle]').forEach(btn => {
-        btn.onclick = () => {
-          document.body.classList.toggle('alloc-focus-expanded');
-          render('overview');
-        };
       });
       document.querySelectorAll("[data-alloc-target]").forEach(input => {
         input.onchange = () => {

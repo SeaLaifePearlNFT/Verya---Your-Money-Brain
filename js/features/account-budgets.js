@@ -181,6 +181,25 @@
       var priorMonth = bucket.months.length ? bucket.months[bucket.months.length - 1] : null;
       var fresh = priorMonth ? sanitizeMonth(priorMonth, true) : neutralStarterMonth(refMonth.name);
       fresh.name = refMonth.name;
+      // Chain this month to the one it's continuing from, same as the manual
+      // "Rollover" flow (setLinkedRollover) does for the Main Account. Without
+      // this, months auto-created here (e.g. when switching into a shared
+      // account) never carry cash forward — sanitizeMonth() nulls rolloverLink
+      // by default because it's also used to seed a brand-new, unrelated
+      // account with no history to link to. propagateLinkedRollovers(), which
+      // already runs on every render, picks this link up and computes the
+      // actual carried amount once priorMonth is closed — identical logic to
+      // the Main Account, no duplicated math needed here.
+      // Rolling goals piggyback on the same rollover pass (applyLinkedRollover
+      // calls applyLinkedRollingGoals internally), gated by this separate
+      // goalRolloverLink flag — mirrors clone.goalRolloverLink on the Main
+      // Account's manual Rollover button. sanitizeMonth() already emptied
+      // fresh.goals; the render pass repopulates it from the source month's
+      // still-incomplete "rolling" goals each time, same as Main.
+      if (priorMonth) {
+        fresh.rolloverLink = { sourceMonthName: priorMonth.name };
+        fresh.goalRolloverLink = { sourceMonthName: priorMonth.name };
+      }
       bucket.months.push(fresh);
       bucket.months.sort(function(a,b){ return (monthIndexByName(a.name)||0)-(monthIndexByName(b.name)||0); });
       existing[refMonth.name]=true;
@@ -209,6 +228,11 @@
       : null;
     var fresh = priorMonth ? sanitizeMonth(priorMonth, true) : neutralStarterMonth(monthName);
     fresh.name = monthName;
+    // Same rollover + rolling-goal chaining as ensureForwardMonths above — see comment there.
+    if (priorMonth) {
+      fresh.rolloverLink = { sourceMonthName: priorMonth.name };
+      fresh.goalRolloverLink = { sourceMonthName: priorMonth.name };
+    }
     bucket.months.push(fresh);
     bucket.months.sort(function(a,b){ return (monthIndexByName(a.name)||0)-(monthIndexByName(b.name)||0); });
     return fresh;
@@ -302,6 +326,18 @@
     var owner = store[defaultId] || (store[defaultId] = {});
     var changed = false;
 
+    // Snapshot, BEFORE any backfilling below touches it, whether the active
+    // account's bucket already carried these fields. That's the one signal
+    // that tells a genuine first-time migration (field is truly new for this
+    // account) apart from every ordinary subsequent load (field already
+    // exists, just possibly stale) — see the comment further down where this
+    // is used.
+    var activeId = s.activeAccountId || defaultId;
+    var activeBucketBefore = store[activeId];
+    var activeHadUsageItems = !!activeBucketBefore && Object.prototype.hasOwnProperty.call(activeBucketBefore, 'usageItems');
+    var activeHadDebt = !!activeBucketBefore && Object.prototype.hasOwnProperty.call(activeBucketBefore, 'debt');
+    var activeHadFinancialGoalHistory = !!activeBucketBefore && Object.prototype.hasOwnProperty.call(activeBucketBefore, 'financialGoalHistory');
+
     // These features historically lived at root state and therefore appeared in
     // every account. Existing legacy records belong to the Main/default account.
     if (Array.isArray(s.usageItems) && !Object.prototype.hasOwnProperty.call(owner, 'usageItems')) {
@@ -329,15 +365,77 @@
       });
     });
 
-    // Re-apply the currently selected account after migration so root-state
-    // feature modules read only that account's operational records.
-    var activeId = s.activeAccountId || defaultId;
+    // Re-apply the currently selected account's copy of these fields ONLY if
+    // this is the moment it's genuinely being migrated for the first time
+    // for THIS account (per the snapshot taken above, before the backfill
+    // loop just above seeded empty defaults onto every bucket). This
+    // function runs on every single app load, not just once — and ordinary
+    // edits (adding a debt, logging usage, completing a goal) go through the
+    // normal save path, which updates root state but does NOT re-capture
+    // into accountBudgets (that only happens when switching accounts). So on
+    // every ordinary subsequent load, active.debt/usageItems/
+    // financialGoalHistory are just a stale snapshot from whenever the
+    // account was last switched into/out of. Unconditionally copying that
+    // stale snapshot back over root state — what this used to do every
+    // single load — silently erased any debt/usage/goal-history edits made
+    // since the last account switch, e.g. a debt added and then the page
+    // simply reloaded. Root state, just loaded fresh from the real saved
+    // snapshot, is already correct in the steady state, so it must only be
+    // overridden the one time a migration is actually filling the field in
+    // for this account, never after.
     var active = store[activeId];
     if (active) {
-      s.usageItems = clone(active.usageItems || []);
-      s.debt = clone(active.debt || emptyDebtStore());
-      s.financialGoalHistory = clone(active.financialGoalHistory || []);
+      if (!activeHadUsageItems) s.usageItems = clone(active.usageItems || []);
+      if (!activeHadDebt) s.debt = clone(active.debt || emptyDebtStore());
+      if (!activeHadFinancialGoalHistory) s.financialGoalHistory = clone(active.financialGoalHistory || []);
     }
+    return changed;
+  }
+
+  function chainMissingRolloverLinks(months) {
+    if (!Array.isArray(months) || months.length < 2) return false;
+    var changed = false;
+    var sorted = months.slice().sort(function(a,b){ return (monthIndexByName(a.name)||0)-(monthIndexByName(b.name)||0); });
+    for (var i = 1; i < sorted.length; i++) {
+      var month = sorted[i];
+      var prior = sorted[i - 1];
+      if (!month || !prior || !prior.name) continue;
+      if (!month.rolloverLink || !month.rolloverLink.sourceMonthName) {
+        month.rolloverLink = { sourceMonthName: prior.name };
+        changed = true;
+      }
+      if (!month.goalRolloverLink || !month.goalRolloverLink.sourceMonthName) {
+        month.goalRolloverLink = { sourceMonthName: prior.name };
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  // One-time backfill for data saved before ensureForwardMonths/ensureMonthExists
+  // set rolloverLink/goalRolloverLink on newly-created months (see those
+  // functions above). Any month created before that fix — most commonly every
+  // month in a shared/sub account, since those were always auto-created with
+  // no link at all — has been silently losing carried-forward cash and rolling
+  // goals ever since. Users shouldn't have to re-enter months to get this back,
+  // so this walks every account's month chain and fills in ONLY a link that is
+  // completely absent; it never overwrites a rolloverLink/goalRolloverLink that
+  // is already set, so it can't clobber a chain that's already correct (or,
+  // for that matter, one a user has deliberately altered).
+  function migrateMissingRolloverLinks() {
+    var s = state();
+    if (!s) return false;
+    var store = ensureStore(s);
+    var changed = false;
+    Object.keys(store).forEach(function(accountId) {
+      // The active account's live months live on top-level state (s.months),
+      // not in its store bucket (which is only refreshed on capture) — handled
+      // separately below so we always edit the copy that's actually in use.
+      if (accountId === s.activeAccountId) return;
+      var bucket = store[accountId];
+      if (bucket && chainMissingRolloverLinks(bucket.months)) changed = true;
+    });
+    if (chainMissingRolloverLinks(s.months)) changed = true;
     return changed;
   }
 
@@ -348,7 +446,14 @@
     if (!store[s.activeAccountId]) capture(s.activeAccountId);
     var cleaned = removeLegacyClonedSubscriptions();
     var migrated = migrateLegacyAccountOwnedData();
-    if ((cleaned || migrated) && typeof window.saveState === 'function') window.saveState(s);
+    var rolloverMigrated = migrateMissingRolloverLinks();
+    if ((cleaned || migrated || rolloverMigrated) && typeof window.saveState === 'function') window.saveState(s);
+    // app.js registers its own DOMContentLoaded listener (which does the very
+    // first render) before this file does, so that first paint can happen
+    // before the line above ever runs. Re-render if we changed anything so
+    // the corrected carry-forward numbers show up without waiting for the
+    // user to click into something.
+    if (rolloverMigrated && typeof window.render === 'function') window.render();
   }
 
   window.VeyraAccountBudgets = {
