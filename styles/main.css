@@ -8,7 +8,6 @@ body {
 
 
 .evolution-chart-sub,
-.behavior-hero-sub,
 .subscriptions-mini-support,
 .subscriptions-mini-foot,
 .achievements-section-sub {
@@ -1592,37 +1591,6 @@ body {
   border: 1px solid var(--line);
 }
 
-/* Spending growth chip in behavior card */
-.intel-growth-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 9px;
-  border-radius: 7px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  background: rgba(245,158,11,0.08);
-  border: 1px solid rgba(245,158,11,0.22);
-  color: var(--red-900);
-  margin-top: 6px;
-  width: fit-content;
-}
-.intel-growth-chip.good {
-  background: var(--tone-good-bg, #f0fdf4);
-  border-color: var(--tone-good-border, rgba(34,197,94,0.22));
-  color: var(--tone-good-text, #166534);
-}
-
-/* Behavioral insight kicker line */
-.intel-behavior-kicker {
-  font-size: 0.63rem;
-  color: var(--muted);
-  margin-top: 5px;
-  padding-top: 5px;
-  border-top: 1px solid var(--line);
-  line-height: 1.4;
-}
-
 /* ══════════════════════════════════════════════════════
    VALUE SCORE SYSTEM — v728
    ══════════════════════════════════════════════════════ */
@@ -2975,6 +2943,10 @@ body {
 }
 .expense-log-list .tx-item:last-child{
   border:1px solid var(--line);
+}
+.expense-log-list .tx-item-pattern{
+  display:inline-flex;
+  flex:0 0 auto;
 }
  
 .expense-log-list .tx-left{
@@ -6283,14 +6255,6 @@ html[data-theme="dark"] .theme-toggle-btn {
     min-width: min(320px, calc(100vw - 24px));
     max-width: min(360px, calc(100vw - 24px));
   }
-  .log-panel .expense-chip {
-    grid-template-columns: minmax(74px,auto) minmax(0,1fr) 20px;
-  }
-  .log-panel .expense-chip-pattern {
-    grid-column: 2;
-    justify-self: start;
-    margin-top: -2px;
-  }
 }
 .log-panel .chip-remove:hover {
   background: rgba(239,68,68,0.16);
@@ -6452,6 +6416,9 @@ html[data-theme="dark"] .theme-toggle-btn {
 }
 .chart-legend-item.chart-clickable{
   cursor:pointer;
+}
+.chart-legend-item.chart-legend-remaining{
+  cursor:default;
 }
 .temp-highlight{
   outline:2px solid var(--purple);
@@ -6822,100 +6789,50 @@ input[type="number"]{
   text-overflow:clip;
   max-width:none;
 }
-.behavior-hero-sub{
-  font-size:0.64rem;
-  color:var(--muted);
-}
-.behavior-guidance-grid{
-  display:grid;
-  grid-template-columns:repeat(3, minmax(0, 1fr));
-  gap:10px;
+.behavior-row-list{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
   margin-top:10px;
 }
-.behavior-guidance-tile{
-  display:grid;
+.behavior-row{
+  display:flex;
+  align-items:flex-start;
   gap:8px;
-  padding:12px 12px;
-  border-radius:12px;
-  border:1px solid rgba(73,95,117,0.14);
-  background:var(--panel);
-  min-height:156px;
-  align-content:start;
+  padding:8px 10px;
+  border-radius:10px;
+  background:var(--panel-2);
 }
-.behavior-guidance-tile .tile-label{
-  font-size:0.62rem;
+.behavior-row-icon{
+  flex:0 0 auto;
+  font-size:0.7rem;
+  line-height:1.4;
+  margin-top:1px;
+}
+.behavior-row.good .behavior-row-icon{ color:var(--green-900); }
+.behavior-row.warn .behavior-row-icon{ color:var(--amber-warn); }
+.behavior-row.bad .behavior-row-icon{ color:var(--red-700); }
+.behavior-row.neutral .behavior-row-icon{ color:var(--muted); }
+.behavior-row-text{
+  min-width:0;
+}
+.behavior-row-label{
+  display:block;
+  font-size:0.6rem;
   font-weight:800;
   letter-spacing:0.03em;
   text-transform:uppercase;
-  color:#6b7b8c;
+  color:var(--muted);
 }
-.behavior-guidance-tile .tile-copy{
-  font-size:0.7rem;
+.behavior-row.good .behavior-row-label{ color:var(--green-900); }
+.behavior-row.warn .behavior-row-label{ color:var(--amber-warn); }
+.behavior-row.bad .behavior-row-label{ color:var(--red-700); }
+.behavior-row-copy{
+  display:block;
+  font-size:0.72rem;
   line-height:1.4;
-  color:#2d3a47;
+  color:var(--text);
 }
-.behavior-guidance-tile.good{
-  background:rgba(239,249,243,0.72);
-  border-color:rgba(65,138,102,0.16);
-}
-.behavior-guidance-tile.warn{
-  background:rgba(255,249,240,0.82);
-  border-color:rgba(217,119,6,0.14);
-}
-.behavior-guidance-tile.bad{
-  background:rgba(254,242,242,0.82);
-  border-color:rgba(220,38,38,0.14);
-}
-.behavior-signal-strip{
-  display:flex;
-  align-items:center;
-  gap:6px;
-  flex-wrap:wrap;
-  margin-top:10px;
-}
-.behavior-signal-chip{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding:6px 10px;
-  border-radius:999px;
-  font-size:0.66rem;
-  font-weight:700;
-  line-height:1;
-  border:1px solid var(--tone-neutral-border);
-  background:var(--tone-neutral-bg);
-  color:var(--tone-neutral-text);
-}
-.behavior-signal-chip.good{
-  background:var(--tone-good-bg);
-  color:var(--tone-good-text);
-  border-color:var(--tone-good-border);
-}
-.behavior-signal-chip.warn{
-  background:var(--tone-warn-bg);
-  color:var(--tone-warn-text);
-  border-color:var(--tone-warn-border);
-}
-.behavior-signal-chip.bad{
-  background:var(--tone-bad-bg);
-  color:var(--tone-bad-text);
-  border-color:var(--tone-bad-border);
-}
-.behavior-signal-dot{
-  width:8px;
-  height:8px;
-  border-radius:999px;
-  background:currentColor;
-  opacity:0.9;
-}
-
-@media (max-width: 980px){
-  .behavior-guidance-grid{
-    grid-template-columns:1fr;
-  }
-}
-
-
 @media (max-width: 1150px){
   .insight-grid{
     grid-template-columns:1fr;
@@ -6978,139 +6895,152 @@ input[type="number"]{
 .forecast-risk.watch{ background:var(--surface-warn-soft); border-color:#fdba74; color:var(--amber-warn); }
 .forecast-risk.warn,
 .forecast-risk.bad{ background:var(--surface-error-soft); border-color:#fca5a5; color:var(--red-700); }
-.forecast-primary-grid{
-  display:grid;
-  grid-template-columns:repeat(3, minmax(0,1fr));
-  gap:6px;
-  margin-top:8px;
-  align-items:stretch;
-}
-.forecast-secondary-grid{
-  display:grid;
-  grid-template-columns:repeat(4, minmax(0,1fr));
-  gap:6px;
-  margin-top:8px;
-  align-items:stretch;
-}
-.forecast-metric{
-  border:1px solid var(--line);
-  border-radius:8px;
-  background:var(--surface-light);
-  padding:6px 7px;
+.forecast-status-row{
   display:flex;
-  flex-direction:column;
-  justify-content:space-between;
-  gap:4px;
-  min-height:118px;
-  height:100%;
-}
-.forecast-metric-label{
-  display:block;
-  min-height:2.4em;
-  font-size:0.6rem;
-  line-height:1.2;
-  color:var(--muted);
-}
-.forecast-metric strong{
-  display:block;
-  font-size:0.8rem;
-  line-height:1.2;
-  margin:2px 0 4px;
-}
-.forecast-metric small{
-  display:block;
-  min-height:3.6em;
-  font-size:0.6rem;
-  line-height:1.2;
-  color:var(--muted);
-}
-.forecast-metric.theme-status{ background:var(--forecast-tile-status-bg); border-color:var(--forecast-tile-status-border); }
-.forecast-metric.theme-status .forecast-metric-label{ color:var(--forecast-tile-status-text); }
-.forecast-metric.theme-live{ background:var(--forecast-tile-live-bg); border-color:var(--forecast-tile-live-border); }
-.forecast-metric.theme-live .forecast-metric-label{ color:var(--forecast-tile-live-text); }
-.forecast-metric.theme-plan{ background:var(--forecast-tile-plan-bg); border-color:var(--forecast-tile-plan-border); }
-.forecast-metric.theme-plan .forecast-metric-label{ color:var(--forecast-tile-plan-text); }
-.forecast-metric.theme-structure{ background:var(--forecast-tile-structure-bg); border-color:var(--forecast-tile-structure-border); }
-.forecast-metric.theme-structure .forecast-metric-label{ color:var(--forecast-tile-structure-text); }
-.forecast-metric.good strong{ color:var(--green-900); }
-.forecast-metric.bad strong{ color:var(--red-700); }
-.forecast-metric.warn strong{ color:var(--amber-warn); }
-
-@media (max-width: 1200px){
-  .forecast-primary-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); }
-  .forecast-secondary-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); }
-}
-@media (max-width: 720px){
-  .forecast-primary-grid,
-  .forecast-secondary-grid{ grid-template-columns:1fr; }
-}
-.forecast-driver-box{
-  margin-top:8px;
-  border:1px solid var(--line);
-  border-radius:8px;
-  background:var(--surface-light);
-  padding:6px 7px;
-}
-.forecast-driver-head{
-  font-size:0.62rem;
-  font-weight:700;
-  color:var(--muted);
-  margin-bottom:4px;
-}
-.forecast-driver-list{ display:grid; gap:4px; }
-
-.forecast-driver-row{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) 20ch;
   align-items:center;
-  column-gap:10px;
+  flex-wrap:wrap;
+  gap:6px;
+  margin: 2px 0 8px;
 }
-.forecast-driver-label{
-  color:var(--text);
-  min-width:0;
-}
-.forecast-driver-value{
-  display:grid;
-  grid-template-columns:9ch 4ch 6ch;
-  align-items:center;
-  justify-items:end;
-  column-gap:8px;
-  width:20ch;
-  font-weight:700;
-  font-variant-numeric:tabular-nums;
-}
-.forecast-driver-amount{
-  display:block;
-  width:9ch;
-  text-align:right;
-  font-variant-numeric:tabular-nums;
-}
-.forecast-driver-share{
-  display:block;
-  width:4ch;
-  text-align:right;
-  color:var(--muted);
-  font-size:0.58rem;
-  font-weight:600;
-  font-variant-numeric:tabular-nums;
-}
-.forecast-driver-badge{
+.forecast-status-row .forecast-risk{ margin:0; }
+.forecast-confidence-badge{
   display:inline-flex;
   align-items:center;
-  justify-content:center;
-  width:6ch;
-  min-width:6ch;
-  padding:1px 5px;
+  width:fit-content;
+  padding:3px 8px;
   border-radius:999px;
-  background:var(--slate-10);
-  color:var(--purple);
-  font-size:0.56rem;
+  font-size:0.64rem;
   font-weight:700;
+  border:1px solid var(--line);
+  background:var(--surface-light);
+  color:var(--muted);
+  cursor:help;
 }
-.forecast-driver-badge.is-empty{
-  visibility:hidden;
+.forecast-confidence-badge.good{ background:var(--surface-success-soft); border-color:#86efac; color:var(--green-900); }
+.forecast-confidence-badge.warn{ background:var(--surface-warn-soft); border-color:#fdba74; color:var(--amber-warn); }
+.forecast-confidence-badge.bad{ background:var(--surface-error-soft); border-color:#fca5a5; color:var(--red-700); }
+.forecast-lock-compare{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:6px;
+  padding-top:6px;
+  border-top:1px solid rgba(71,85,105,0.14);
+  font-size:0.64rem;
+  color:var(--muted);
+}
+.forecast-lock-compare strong{
+  font-family:var(--font-mono);
+  color:var(--text);
+  font-weight:800;
+}
+.forecast-lock-arrow{ color:var(--muted); }
+.forecast-summary-note.bad .forecast-lock-compare,
+.forecast-summary-note.good .forecast-lock-compare{
+  border-top-color:rgba(0,0,0,0.10);
+}
+.forecast-why{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:8px 0;
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid var(--line);
+  background:var(--surface-light);
+}
+.forecast-why-icon{
+  flex:0 0 auto;
+  width:20px;
+  height:20px;
+  border-radius:999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:0.62rem;
+  font-weight:800;
+  background:var(--surface-success-soft);
+  color:var(--green-900);
+}
+.forecast-why.warn .forecast-why-icon{ background:var(--surface-warn-soft); color:var(--amber-warn); }
+.forecast-why.bad .forecast-why-icon{ background:var(--surface-error-soft); color:var(--red-700); }
+.forecast-why-text{
+  flex:1 1 auto;
+  min-width:0;
+  font-size:0.76rem;
+  font-weight:650;
+  color:var(--text);
+}
+.forecast-why-buffer{
+  flex:0 0 auto;
+  font-family:var(--font-mono);
+  font-size:0.7rem;
+  font-weight:800;
+  padding:3px 8px;
+  border-radius:999px;
+  white-space:nowrap;
+}
+.forecast-why-buffer.good{ background:var(--surface-success-soft); color:var(--green-900); }
+.forecast-why-buffer.bad{ background:var(--surface-error-soft); color:var(--red-700); }
+
+.forecast-ring-row{
+  display:flex;
+  align-items:center;
+  gap:18px;
+  margin:10px 0 8px;
+}
+.forecast-ring-wrap{
+  flex:0 0 auto;
+}
+.forecast-ring-svg{ display:block; }
+.forecast-ring-value{
+  font-family:var(--font-mono);
+  font-size:1rem;
+  font-weight:800;
+}
+.forecast-ring-label{
+  font-size:0.56rem;
+  fill:var(--muted);
+  text-transform:uppercase;
+  letter-spacing:0.05em;
+}
+.forecast-ring-side{
+  flex:1 1 auto;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.forecast-ring-legend{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.forecast-ring-legend span{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:0.68rem;
+  color:var(--muted);
+}
+.forecast-ring-legend span.is-over{ color:var(--red-700); font-weight:650; }
+.forecast-ring-legend strong{
+  font-family:var(--font-mono);
+  color:var(--text);
+  font-weight:800;
+}
+.forecast-flow-dot{
+  width:7px;
+  height:7px;
+  border-radius:999px;
+  display:inline-block;
+  flex:0 0 auto;
 }
 
+@media (max-width: 560px){
+  .forecast-ring-row{ flex-direction:column; align-items:flex-start; gap:10px; }
+}
 
 .forecast-summary-note{
   margin-top:8px;
@@ -7127,6 +7057,18 @@ input[type="number"]{
   font-size:0.72rem;
   line-height:1.35;
 }
+.forecast-summary-note.bad{
+  border-color:rgba(185,28,28,0.20);
+  background:var(--surface-error-soft);
+  color:var(--red-700);
+}
+.forecast-summary-note.bad strong{ color:var(--red-700); }
+.forecast-summary-note.good{
+  border-color:rgba(20,83,45,0.18);
+  background:var(--surface-success-soft);
+  color:var(--green-900);
+}
+.forecast-summary-note.good strong{ color:var(--green-900); }
 
 
 /* Category trends */
@@ -7141,12 +7083,6 @@ input[type="number"]{
 .trends-card h3{
   margin:0;
   font-size:0.82rem;
-}
-.trends-sub{
-  font-size:0.66rem;
-  color:var(--muted);
-  margin:4px 0 8px;
-  line-height:1.35;
 }
 .trends-head{
   display:flex;
@@ -7183,159 +7119,6 @@ input[type="number"]{
   min-width:0;
   overflow-wrap:anywhere;
 }
-.trend-bars{
-  display:grid;
-  grid-template-columns:repeat(3, minmax(0,1fr));
-  gap:4px;
-  align-items:end;
-  height:28px;
-  min-width:0;
-}
-.trend-bar-wrap{
-  display:flex;
-  align-items:end;
-  height:28px;
-  min-width:0;
-}
-.trend-bar{
-  width:100%;
-  min-height:2px;
-  border-radius:4px 4px 2px 2px;
-  background:var(--purple);
-  opacity:0.9;
-}
-.trend-bar.prev{ opacity:0.7; }
-.trend-bar.old{ opacity:0.45; }
-
-
-.trend-month-labels-inline{
-  display:grid;
-  grid-template-columns:repeat(3, minmax(0,1fr));
-  gap:4px;
-}
-.trend-insight-row{
-  display:grid;
-  grid-template-columns:minmax(150px, 0.95fr) minmax(0, 1.55fr) minmax(112px, 0.8fr);
-  align-items:start;
-  gap:10px;
-  border:1px solid var(--line);
-  border-radius:9px;
-  background:var(--surface-light);
-  padding:9px 10px;
-  cursor:pointer;
-  transition:background 120ms ease, border-color 120ms ease, transform 120ms ease;
-}
-.trend-insight-row:hover{
-  background:#f3f6ff;
-  border-color:#e2e8f0;
-}
-.trend-insight-row.expanded{
-  padding:10px 11px;
-}
-.trend-insight-top{
-  display:grid;
-  gap:6px;
-  align-content:start;
-  min-width:0;
-}
-.trend-badge{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  width:fit-content;
-  max-width:100%;
-  padding:2px 8px;
-  border-radius:999px;
-  font-size:0.62rem;
-  font-weight:700;
-  white-space:nowrap;
-}
-.trend-badge.risk{ background:var(--surface-error-soft); color:var(--red-700); }
-.trend-badge.watch{ background:var(--surface-warn-soft); color:var(--amber-warn); }
-.trend-badge.improving{ background:var(--surface-success-soft); color:var(--green-900); }
-.trend-badge.stable{ background:#eef2ff; color:var(--purple); }
-.trend-insight-metrics{
-  display:grid;
-  grid-template-columns:repeat(3, minmax(92px,1fr));
-  gap:6px;
-  min-width:0;
-}
-.trend-metric{
-  padding:6px;
-  border-radius:7px;
-  background:var(--white);
-  border:1px solid #e5e7eb;
-  min-width:0;
-}
-.trend-metric-label{
-  display:block;
-  font-size:0.58rem;
-  color:var(--muted);
-  margin-bottom:2px;
-}
-.trend-metric strong{
-  font-size:0.72rem;
-  line-height:1.15;
-  overflow-wrap:anywhere;
-}
-.trend-chart-stack{
-  display:grid;
-  gap:4px;
-  align-content:end;
-  min-width:0;
-}
-.trend-insight-note{
-  grid-column:1 / -1;
-  font-size:0.64rem;
-  color:var(--muted);
-  line-height:1.35;
-}
-.trend-insight-note .good{ color:var(--green-900); font-weight:700; }
-.trend-insight-note .bad{ color:var(--red-700); font-weight:700; }
-.trend-insight-note .warn{ color:var(--amber-warn); font-weight:700; }
-.trend-bar-wrap.has-tooltip{
-  position:relative;
-  cursor:default;
-}
-.trend-bar-wrap.has-tooltip::after{
-  content:attr(data-tooltip);
-  position:absolute;
-  left:50%;
-  bottom:calc(100% + 8px);
-  transform:translateX(-50%);
-  background:rgba(15,23,42,0.96);
-  color:var(--white);
-  padding:6px 8px;
-  border-radius:8px;
-  font-size:0.58rem;
-  line-height:1.3;
-  white-space:normal;
-  width:max-content;
-  max-width:170px;
-  text-align:center;
-  box-shadow:0 8px 24px rgba(15,23,42,0.18);
-  opacity:0;
-  pointer-events:none;
-  transition:opacity 120ms ease, transform 120ms ease;
-  z-index:20;
-}
-.trend-bar-wrap.has-tooltip::before{
-  content:'';
-  position:absolute;
-  left:50%;
-  bottom:calc(100% + 2px);
-  transform:translateX(-50%);
-  border-left:5px solid transparent;
-  border-right:5px solid transparent;
-  border-top:6px solid rgba(15,23,42,0.96);
-  opacity:0;
-  transition:opacity 120ms ease;
-  pointer-events:none;
-  z-index:20;
-}
-.trend-bar-wrap.has-tooltip:hover::after,
-.trend-bar-wrap.has-tooltip:hover::before{ opacity:0.6; }
-.trend-bar-wrap.has-tooltip:hover::after{ transform:translateX(-50%) translateY(-1px); }
 .trend-modal-card,
 #categoryTrendsModal .chart-modal-card{
   width:min(820px, calc(100vw - 32px));
@@ -7359,137 +7142,19 @@ input[type="number"]{
 .trends-card-inline .trend-insight-list{
   gap:6px;
 }
-.trends-card-inline .trend-insight-row{
-  grid-template-columns:minmax(138px, 0.95fr) minmax(0, 1.5fr) minmax(108px, 0.72fr);
-  gap:8px;
-  padding:8px 9px;
-}
 .trends-card-inline .trend-name{
   font-size:0.67rem;
-}
-.trends-card-inline .trend-badge{
-  font-size:0.56rem;
-  padding:2px 6px;
-}
-.trends-card-inline .trend-insight-metrics{
-  grid-template-columns:repeat(3, minmax(84px,1fr));
-  gap:5px;
-}
-.trends-card-inline .trend-metric{
-  padding:5px 6px;
-  border-radius:6px;
-}
-.trends-card-inline .trend-metric-label{
-  font-size:0.54rem;
-  margin-bottom:1px;
-}
-.trends-card-inline .trend-metric strong{
-  font-size:0.64rem;
-}
-.trends-card-inline .trend-bars,
-.trends-card-inline .trend-bar-wrap{
-  height:22px;
-}
-.trends-card-inline .trend-month-labels-inline{
-  font-size:0.52rem;
-  gap:3px;
-}
-.trends-card-inline .trend-insight-note{
-  font-size:0.61rem;
-  line-height:1.28;
 }
 .trends-card-inline .trends-open-btn{
   padding:3px 8px;
   font-size:0.6rem;
 }
 
-@media (max-width: 1120px){
-  .trends-card-inline .trend-insight-row{
-    grid-template-columns:minmax(132px, 1fr) minmax(0, 1.4fr);
-  }
-  .trends-card-inline .trend-chart-stack{
-    grid-column:1 / -1;
-  }
-}
-
-@media (max-width: 920px){
-  .trends-card-inline .trend-insight-row,
-  .trend-insight-row{
-    grid-template-columns:1fr;
-  }
-  .trends-card-inline .trend-chart-stack,
-  .trend-chart-stack{
-    align-content:start;
-  }
-}
-
 @media (max-width: 700px){
-  .trend-insight-metrics,
-  .trends-card-inline .trend-insight-metrics{
-    grid-template-columns:1fr;
-  }
   .trends-head{
     flex-direction:column;
     align-items:flex-start;
   }
-}
-
-/* Match category trend colours to expense category group colours */
-
-.trend-insight-row[data-trend-group="Living Costs"] .trend-bar,
-.trend-insight-row[data-trend-group="Multimedia"] .trend-bar{
-  background:#8fb6ff;
-}
-
-.trend-insight-row[data-trend-group="Essentials"] .trend-bar,
-.trend-insight-row[data-trend-group="Transport"] .trend-bar{
-  background:#7fd39a;
-}
-
-.trend-insight-row[data-trend-group="Life-Upgrades"] .trend-bar,
-.trend-insight-row[data-trend-group="Leasure"] .trend-bar{
-  background:#f5b56b;
-}
-
-.trend-insight-row[data-trend-group="Fish and Chips Crypto"] .trend-bar{
-  background:#b69cff;
-}
-
-.trend-insight-row[data-trend-group="Financial"] .trend-bar{
-  background:#f4a3a3;
-}
-
-.trend-insight-row[data-trend-group]{
-  position:relative;
-  overflow:hidden;
-}
-.trend-insight-row[data-trend-group]::before{
-  content:"";
-  position:absolute;
-  left:0;
-  top:0;
-  bottom:0;
-  width:4px;
-  border-radius:9px 0 0 9px;
-  background:var(--planned-border);
-}
-.trend-insight-row[data-trend-group="Living Costs"]::before,
-.trend-insight-row[data-trend-group="Multimedia"]::before{
-  background:#8fb6ff;
-}
-.trend-insight-row[data-trend-group="Essentials"]::before,
-.trend-insight-row[data-trend-group="Transport"]::before{
-  background:#7fd39a;
-}
-.trend-insight-row[data-trend-group="Life-Upgrades"]::before,
-.trend-insight-row[data-trend-group="Leasure"]::before{
-  background:#f5b56b;
-}
-.trend-insight-row[data-trend-group="Fish and Chips Crypto"]::before{
-  background:#b69cff;
-}
-.trend-insight-row[data-trend-group="Financial"]::before{
-  background:#f4a3a3;
 }
 
 /* Align bottom insight cards with main grid */
@@ -7562,11 +7227,6 @@ input[type="number"]{
 }
 
 /* Internal content spacing */
-
-.trends-sub{
-  margin-top: var(--space-1);
-  margin-bottom: var(--space-2);
-}
 
 /* Operational page spacing */
 
@@ -8552,6 +8212,46 @@ input:hover{
 .guidance-tile .tile-copy{
   line-height:1.45;
   color:#2d3a47;
+}
+.guidance-tile-body{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+}
+.guidance-tile-icon{
+  flex:0 0 auto;
+  font-size:1.05rem;
+  line-height:1.1;
+}
+.guidance-tile-text{
+  min-width:0;
+}
+.guidance-tile-kicker{
+  font-size:0.62rem;
+  font-weight:700;
+  color:#5a6b7c;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.guidance-tile-value{
+  font-family:var(--font-mono);
+  font-size:1.05rem;
+  font-weight:850;
+  color:var(--text);
+  line-height:1.2;
+}
+.guidance-tile-unit{
+  font-family:var(--font-mono);
+  font-size:0.62rem;
+  font-weight:700;
+  color:#5a6b7c;
+  margin-left:2px;
+}
+.guidance-tile-caption{
+  font-size:0.64rem;
+  color:#5a6b7c;
+  line-height:1.3;
 }
 .guidance-tile.good{
   background:var(--tone-good-bg);
@@ -9656,8 +9356,6 @@ input:hover{
 }
 
 #insightGrid .insight-card,
-#insightGrid .forecast-driver-box,
-#insightGrid .forecast-metric,
 #insightGrid .advisor-item,
 #insightGrid .guidance-tile,
 #insightGrid .reallocation-top > *,
@@ -9786,35 +9484,6 @@ input:hover{
   gap:10px;
   margin-top:10px;
 }
-#insightGrid .burn-stat{
-  border:1px solid var(--line);
-  border-radius:10px;
-  background:var(--surface-light);
-  padding:9px 10px 8px;
-  display:grid;
-  gap:3px;
-  transition: transform 140ms ease, border-color 160ms ease, background-color 160ms ease;
-}
-#insightGrid .burn-stat:hover{
-  transform:translateY(-1px);
-  border-color:#cfd8e3;
-  background:#fbfcfe;
-}
-#insightGrid .burn-stat-label{
-  font-size:0.64rem;
-  color:#6b7787;
-}
-#insightGrid .burn-stat-value{
-  font-size:0.9rem;
-  font-weight:750;
-  line-height:1.1;
-  color:var(--text);
-}
-#insightGrid .burn-stat-sub{
-  font-size:0.62rem;
-  color:#8793a4;
-  line-height:1.3;
-}
 #insightGrid .burn-interpretation{
   margin-top:10px;
   border:1px solid rgba(71,85,105,0.16);
@@ -9864,7 +9533,6 @@ input:hover{
 }
 
 
-#insightGrid .forecast-driver-box .logic-kicker,
 #insightGrid .burn-state-copy .logic-kicker,
 #insightGrid .reallocation-top .logic-kicker{
   margin-bottom: 4px;
@@ -9956,8 +9624,7 @@ input:hover{
 
 /* ── Insight grid — eyebrow labels ─────────────────────────────────── */
 #insightGrid .logic-kicker,
-#insightGrid .guidance-track-label,
-#insightGrid .forecast-metric-label{
+#insightGrid .guidance-track-label{
   font-size: var(--t-eyebrow);
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -10013,7 +9680,6 @@ input:hover{
 }
 
 /* ── Insight grid — support / detail text ───────────────────────────── */
-#insightGrid .forecast-metric small,
 #insightGrid .guidance-track-note,
 #insightGrid .insight-detail{
   font-size: var(--t-support);
@@ -10109,21 +9775,11 @@ input:hover{
   }
 }
 
-#insightGrid .forecast-driver-row,
 #insightGrid .mix-row,
-#insightGrid .forecast-metric,
 #insightGrid .advisor-item{
   border-radius:10px;
 }
 
-
-#insightGrid .forecast-metric{
-  background:rgba(248,250,252,0.9);
-  border:1px solid var(--slate-18);
-  padding:8px 9px;
-}
-
-#insightGrid .forecast-driver-box,
 #insightGrid .guidance-track-card{
   background:var(--white-62);
   border:1px solid var(--slate-18);
@@ -10354,35 +10010,6 @@ input:hover{
   display:grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap:8px;
-}
-.subscription-burden-metric{
-  border:1px solid #e6ebf1;
-  border-radius:10px;
-  background:var(--white);
-  padding:8px;
-  min-width:0;
-}
-.subscription-burden-metric span{
-  display:block;
-  font-size:0.61rem;
-  font-weight:700;
-  letter-spacing:0.04em;
-  text-transform:uppercase;
-  color:var(--accent-text);
-  margin-bottom:4px;
-}
-.subscription-burden-metric strong{
-  display:block;
-  font-size:0.93rem;
-  line-height:1.15;
-  color:var(--text);
-}
-.subscription-burden-metric small{
-  display:block;
-  margin-top:4px;
-  font-size:0.65rem;
-  line-height:1.35;
-  color:#6b7787;
 }
 .subscription-burden-footer{
   margin-top:auto;
@@ -11877,8 +11504,7 @@ input:hover{
 }
 
 /* Keep internal data tiles elevated; exclude title and primary text rows. */
-#insightGrid > .ui-3d-insight .forecast-driver-box,
-#insightGrid > .ui-3d-insight .forecast-metric,
+#insightGrid > .ui-3d-insight .forecast-why,
 #insightGrid > .ui-3d-insight .guidance-tile,
 #insightGrid > .ui-3d-insight .guidance-track-card,
 #insightGrid > .ui-3d-insight .advisor-item,
@@ -12123,16 +11749,13 @@ input:hover{
 
 /* === subscription-burden-text-clean-v1021 === */
 #insightGrid .subscription-burden-card .subscription-burden-main,
-#insightGrid .subscription-burden-card .subscription-burden-metric strong,
-#insightGrid .subscription-burden-card .subscription-burden-metric span,
 #insightGrid .subscription-burden-card .subscription-burden-footer,
 #insightGrid .subscription-burden-card .subscription-burden-badge,
 #insightGrid .subscription-burden-card .subscription-burden-badge.state-stable,
 #insightGrid .subscription-burden-card .subscription-burden-badge.state-closed {
   color: var(--accent-text);
 }
-#insightGrid .subscription-burden-card .subscription-burden-sub,
-#insightGrid .subscription-burden-card .subscription-burden-metric small {
+#insightGrid .subscription-burden-card .subscription-burden-sub {
   color: var(--muted);
 }
 #insightGrid .subscription-burden-card .subscription-burden-badge.state-healthy {
@@ -13245,7 +12868,7 @@ body.cashflow-modal-open {
   color: var(--accent-text);
 }
 .expense-log-list .tx-item {
-  grid-template-columns: minmax(0,1fr) auto auto;
+  grid-template-columns: minmax(0,1fr) auto auto auto;
 }
 .log-panel .expense-chip {
   grid-template-columns: minmax(78px,auto) minmax(0,1fr) auto auto 20px;
@@ -13254,16 +12877,38 @@ body.cashflow-modal-open {
   grid-template-columns: minmax(0,1fr) auto auto;
 }
 @media (max-width: 720px) {
+  /* Explicit placement for every child — the previous version only pinned
+     the edit/remove buttons to columns 3–4 while leaving the pattern badge
+     on its old (different mobile rule's) column 2, the same cell as the
+     note text. They silently overlapped, which is why a correctly-saved
+     "One-off"/cadence badge could be invisible on narrow screens even
+     though the data and the rest of the markup were completely correct. */
   .log-panel .expense-chip {
-    grid-template-columns: minmax(74px,auto) minmax(0,1fr) auto 20px;
+    grid-template-columns: minmax(74px,auto) minmax(0,1fr) 20px;
+    grid-template-rows: auto auto;
+    row-gap: 4px;
   }
-  .log-panel .expense-chip .chip-edit-note {
-    grid-column: 3;
+  .log-panel .expense-chip strong {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .log-panel .expense-chip-note {
+    grid-column: 2;
     grid-row: 1;
   }
   .log-panel .expense-chip .chip-remove {
-    grid-column: 4;
+    grid-column: 3;
     grid-row: 1;
+  }
+  .log-panel .expense-chip-pattern {
+    grid-column: 1 / span 2;
+    grid-row: 2;
+    justify-self: start;
+  }
+  .log-panel .expense-chip .chip-edit-note {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
   }
 }
 
@@ -14315,136 +13960,6 @@ body.cashflow-modal-open {
 
 
 /* === smart-insights-content-cleanup-v1310 === */
-.smart-insights-card-body #insightGrid .forecast-driver-box {
-  margin-top:10px;
-  padding:9px 10px;
-  border-radius:12px;
-  background:rgba(255,255,255,0.68);
-  border:1px solid var(--slate-22);
-}
-
-.smart-insights-card-body #insightGrid .forecast-driver-head {
-  margin-bottom:6px;
-  font-family:var(--font, inherit);
-  font-size:0.62rem;
-  font-weight:800;
-  color:var(--muted);
-  text-transform:uppercase;
-  letter-spacing:0.055em;
-}
-
-.smart-insights-card-body #insightGrid .forecast-driver-list {
-  display:grid;
-  gap:5px;
-}
-
-.smart-insights-card-body #insightGrid .forecast-driver-row {
-  display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(92px,auto) 44px 44px;
-  column-gap:10px;
-  align-items:center;
-  min-height:24px;
-  font-family:var(--font, inherit);
-}
-
-.smart-insights-card-body #insightGrid .forecast-driver-label {
-  min-width:0;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-  color:var(--accent-text);
-  font-size:0.72rem;
-  font-weight:600;
-}
-
-.smart-insights-card-body #insightGrid .forecast-driver-value {
-  display:contents;
-  width:auto;
-  font-family:var(--font-mono, monospace);
-  font-variant-numeric:tabular-nums;
-}
-
-.smart-insights-card-body #insightGrid .forecast-driver-amount {
-  width:auto;
-  justify-self:end;
-  text-align:right;
-  color:var(--accent-text);
-  font-size:0.72rem;
-  font-weight:800;
-  font-family:var(--font-mono, monospace);
-}
-
-.smart-insights-card-body #insightGrid .forecast-driver-share {
-  width:auto;
-  justify-self:end;
-  text-align:right;
-  color:var(--muted);
-  font-size:0.62rem;
-  font-weight:700;
-  font-family:var(--font-mono, monospace);
-}
-
-.smart-insights-card-body #insightGrid .forecast-driver-badge {
-  width:auto;
-  min-width:38px;
-  justify-self:end;
-  padding:2px 7px;
-  border-radius:999px;
-  background:rgba(99,102,241,0.10);
-  border:1px solid rgba(99,102,241,0.18);
-  color:var(--indigo-600);
-  font-size:0.55rem;
-  font-weight:800;
-  line-height:1.1;
-}
-
-.smart-insights-card-body #insightGrid .forecast-driver-badge.is-empty {
-  visibility:hidden;
-}
-
-/* The four lower forecast metrics now read as a stable 2x2 block instead of a cramped row. */
-.smart-insights-card-body #insightGrid .forecast-secondary-grid {
-  grid-template-columns:repeat(2, minmax(0,1fr));
-  gap:8px;
-}
-
-.smart-insights-card-body #insightGrid .forecast-metric {
-  min-height:86px;
-  padding:8px 9px;
-  border-radius:10px;
-  justify-content:flex-start;
-  gap:4px;
-}
-
-.smart-insights-card-body #insightGrid .forecast-secondary-grid .forecast-metric {
-  min-height:92px;
-}
-
-.smart-insights-card-body #insightGrid .forecast-metric-label {
-  min-height:0;
-  font-family:var(--font, inherit);
-  font-size:0.58rem;
-  line-height:1.12;
-  letter-spacing:0.045em;
-  text-transform:uppercase;
-  font-weight:800;
-}
-
-.smart-insights-card-body #insightGrid .forecast-metric strong {
-  margin:2px 0;
-  font-size:0.82rem;
-  line-height:1.1;
-  font-weight:850;
-  font-family:var(--font-mono, monospace);
-}
-
-.smart-insights-card-body #insightGrid .forecast-metric small {
-  min-height:0;
-  font-family:var(--font, inherit);
-  font-size:0.62rem;
-  line-height:1.25;
-  color:var(--muted);
-}
 
 /* Smart Budget Guidance: less prose, more scannable. */
 .smart-insights-card-body #insightGrid .guidance-tile-grid {
@@ -14484,13 +13999,8 @@ body.cashflow-modal-open {
 }
 
 @media (max-width:980px) {
-  .smart-insights-card-body #insightGrid .guidance-tile-grid,
-  .smart-insights-card-body #insightGrid .forecast-secondary-grid {
+  .smart-insights-card-body #insightGrid .guidance-tile-grid {
     grid-template-columns:1fr;
-  }
-
-  .smart-insights-card-body #insightGrid .forecast-driver-row {
-    grid-template-columns:minmax(0,1fr) minmax(84px,auto) 38px 38px;
   }
 }
 
@@ -14541,36 +14051,6 @@ body.cashflow-modal-open {
 
 [data-view="overview"] .overview-chart-card .distribution-stage{
   padding:0 16px 14px;
-}
-
-/* === smart-insights-border-cleanup-v1310 === */
-
-
-/* Forecast Why rows: border-only alignment polish, preserving their existing background. */
-.smart-insights-card-body #insightGrid .forecast-driver-row{
-  border:1px solid var(--slate-22);
-  border-radius:10px;
-}
-
-/* Keep the Main pill border visually consistent without changing its fill. */
-.smart-insights-card-body #insightGrid .forecast-driver-badge{
-  border:1px solid rgba(99,102,241,0.20);
-  border-radius:999px;
-}
-
-/* === smart-insights-text-fit-cleanup-v1310 === */
-/* Monthly Forecast / Why / Live Drivers: give each row breathing room from the left border. */
-.smart-insights-card-body #insightGrid .forecast-driver-list{
-  gap:6px;
-}
-
-.smart-insights-card-body #insightGrid .forecast-driver-row{
-  padding:6px 9px 6px 12px;
-  box-sizing:border-box;
-}
-
-.smart-insights-card-body #insightGrid .forecast-driver-label{
-  padding-left:2px;
 }
 
 /* Smart Budget Guidance: never clip the guidance copy. 
@@ -18419,90 +17899,6 @@ html[data-theme="dark"] .context-bar-session{background:rgba(34,197,94,.14);bord
   overflow:visible !important;
 }
 
-.current-allocation-card .trends-card-inline .trend-insight-row{
-  display:grid !important;
-  grid-template-columns:minmax(116px, .75fr) minmax(250px, 1.45fr) minmax(110px, .65fr) minmax(180px, .9fr) !important;
-  align-items:center !important;
-  column-gap:10px !important;
-  row-gap:6px !important;
-  min-height:74px !important;
-  height:auto !important;
-  padding:9px 10px !important;
-  border:1px solid var(--line) !important;
-  border-radius:10px !important;
-  background:var(--panel-2) !important;
-  overflow:hidden !important;
-  box-sizing:border-box !important;
-}
-
-.current-allocation-card .trends-card-inline .trend-insight-row > *{
-  min-width:0 !important;
-  max-width:100% !important;
-  box-sizing:border-box !important;
-}
-
-
-.current-allocation-card .trends-card-inline .trend-insight-metrics{
-  grid-column:2 !important;
-  display:grid !important;
-  grid-template-columns:repeat(3, minmax(72px, 1fr)) !important;
-  gap:6px !important;
-  min-width:0 !important;
-}
-
-
-.current-allocation-card .trends-card-inline .trend-insight-note{
-  display:block !important;
-  max-width:100% !important;
-  color:var(--muted) !important;
-  font-size:.64rem !important;
-  line-height:1.32 !important;
-  white-space:normal !important;
-  overflow-wrap:anywhere !important;
-  word-break:normal !important;
-  -webkit-line-clamp:unset !important;
-}
-
-.current-allocation-card .trends-card-inline .trend-insight-note strong{
-  color:var(--green-900);
-  font-weight:850;
-}
-
-.current-allocation-card .trends-card-inline .trend-metric{
-  min-width:0 !important;
-  padding:7px 8px !important;
-  border-radius:7px !important;
-}
-
-
-@media (max-width: 1500px){
-  .current-allocation-card .trends-card-inline .trend-insight-row{
-    grid-template-columns:minmax(102px, .7fr) minmax(230px, 1.45fr) minmax(96px, .55fr) minmax(150px, .75fr) !important;
-    column-gap:8px !important;
-    padding:9px 8px !important;
-  }
-  .current-allocation-card .trends-card-inline .trend-insight-note{
-    font-size:.60rem !important;
-  }
-}
-
-@media (max-width: 1250px){
-  .current-allocation-card .trends-card-inline .trend-insight-row{
-    grid-template-columns:minmax(100px, .8fr) minmax(220px, 1.6fr) minmax(130px, .9fr) !important;
-  }
-  
-}
-
-@media (max-width: 760px){
-  .current-allocation-card .trends-card-inline .trend-insight-row{
-    grid-template-columns:1fr !important;
-  }
-  
-  .current-allocation-card .trends-card-inline .trend-insight-metrics{
-    grid-column:auto !important;
-  }
-}
-
 /* Budget Allocation list */
 .overview-allocation-card .allocation-section,
 .overview-allocation-card #budgetOverview,
@@ -21780,32 +21176,14 @@ html[data-theme="dark"] #categoryTrends .trends-open-btn:hover{
   background:rgba(129,140,248,0.22) !important;
   border-color:rgba(129,140,248,0.42) !important;
 }
-html[data-theme="dark"] #categoryTrends .trend-insight-row,
-html[data-theme="dark"] .current-allocation-card .trends-card-inline .trend-insight-row,
-html[data-theme="dark"] #categoryTrends .trend-metric{
-  background:rgba(26,34,54,0.78) !important;
-  border-color:rgba(255,255,255,0.10) !important;
+html[data-theme="dark"] #categoryTrends .trend-name{
   color:var(--accent-text) !important;
 }
-html[data-theme="dark"] #categoryTrends .trend-name,
-html[data-theme="dark"] #categoryTrends .trend-metric-value,
-html[data-theme="dark"] #categoryTrends .trend-insight-note strong{
-  color:var(--accent-text) !important;
-}
-html[data-theme="dark"] #categoryTrends .trend-insight-note,
-html[data-theme="dark"] #categoryTrends .trend-metric-label,
-html[data-theme="dark"] #categoryTrends .trends-sub{
-  color:var(--muted) !important;
-}
-html[data-theme="dark"] #categoryTrends .inline-info-tooltip,
-html[data-theme="dark"] .trend-bar-wrap.has-tooltip::after{
+html[data-theme="dark"] #categoryTrends .inline-info-tooltip{
   background:rgba(15,23,42,0.98) !important;
   color:#dbeafe !important;
   border-color:rgba(148,163,184,0.28) !important;
   box-shadow:0 18px 42px rgba(0,0,0,0.48) !important;
-}
-html[data-theme="dark"] .trend-bar-wrap.has-tooltip::before{
-  border-top-color:rgba(15,23,42,0.98) !important;
 }
 
 /* Budget Allocation main card and controls. */
@@ -24402,76 +23780,10 @@ html[data-theme="dark"] .alloc-v2-card-footer-value{
   display:grid !important;
   gap:10px !important;
 }
-.current-allocation-card .trends-card-inline .trend-insight-row{
-  display:grid !important;
-  grid-template-columns:minmax(130px,0.95fr) minmax(0,1.35fr) minmax(150px,0.75fr) !important;
-  align-items:center !important;
-  gap:12px !important;
-  min-height:0 !important;
-  padding:13px !important;
-  border:1px solid rgba(15,23,42,0.075) !important;
-  border-radius:16px !important;
-  background:rgba(255,255,255,0.70) !important;
-  box-shadow:0 1px 0 rgba(255,255,255,0.72), 0 6px 16px rgba(30,64,120,0.035) !important;
-  overflow:hidden !important;
-}
-.current-allocation-card .trends-card-inline .trend-insight-top{ min-width:0 !important; }
 .current-allocation-card .trends-card-inline .trend-name{
   color:var(--accent-text) !important;
   font-size:0.78rem !important;
   font-weight:900 !important;
-}
-.current-allocation-card .trends-card-inline .trend-badge{
-  margin-top:5px !important;
-  border-radius:999px !important;
-  padding:3px 8px !important;
-  font-size:0.61rem !important;
-  font-weight:850 !important;
-}
-.current-allocation-card .trends-card-inline .trend-insight-metrics{
-  grid-column:auto !important;
-  display:grid !important;
-  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-  gap:7px !important;
-}
-.current-allocation-card .trends-card-inline .trend-metric{
-  min-width:0 !important;
-  padding:8px !important;
-  border-radius:11px !important;
-  border:1px solid rgba(15,23,42,0.055) !important;
-  background:rgba(248,250,252,0.88) !important;
-}
-.current-allocation-card .trends-card-inline .trend-metric-label{
-  display:block !important;
-  color:var(--muted) !important;
-  font-size:0.56rem !important;
-  font-weight:850 !important;
-  letter-spacing:0.045em !important;
-  text-transform:uppercase !important;
-}
-.current-allocation-card .trends-card-inline .trend-metric strong{
-  font-family:var(--font-mono) !important;
-  font-size:0.68rem !important;
-  font-weight:850 !important;
-}
-.current-allocation-card .trends-card-inline .trend-chart-stack{
-  min-width:0 !important;
-}
-.current-allocation-card .trends-card-inline .trend-bars{
-  height:42px !important;
-  display:grid !important;
-  grid-template-columns:repeat(3,1fr) !important;
-  gap:6px !important;
-  align-items:end !important;
-  padding:0 4px !important;
-}
-.current-allocation-card .trends-card-inline .trend-insight-note{
-  grid-column:1 / -1 !important;
-  color:var(--muted) !important;
-  font-size:0.66rem !important;
-  line-height:1.35 !important;
-  white-space:normal !important;
-  overflow-wrap:anywhere !important;
 }
 .category-trends-modal-modern .chart-modal-card,
 #categoryTrendsModal .trend-modal-card,
@@ -24543,21 +23855,6 @@ html[data-theme="dark"] .alloc-v2-card-footer-value{
   max-height:calc(min(82vh, 760px) - 108px) !important;
   overflow:auto !important;
 }
-#categoryTrendsModal .trend-insight-row.expanded,
-#categoryTrendsModal .trend-insight-row{
-  display:grid !important;
-  grid-template-columns:minmax(145px,0.90fr) minmax(0,1.20fr) minmax(165px,0.80fr) !important;
-  gap:12px !important;
-  align-items:center !important;
-  padding:13px !important;
-  border:1px solid rgba(15,23,42,0.075) !important;
-  border-radius:16px !important;
-  background:rgba(255,255,255,0.72) !important;
-  box-shadow:0 1px 0 rgba(255,255,255,0.74), 0 6px 16px rgba(30,64,120,0.04) !important;
-}
-#categoryTrendsModal .trend-insight-row .trend-insight-note{
-  grid-column:1 / -1 !important;
-}
 html[data-theme="dark"] .current-allocation-card.overview-chart-card{
   --cba-card-border:rgba(129,140,248,0.26);
   background:
@@ -24573,16 +23870,13 @@ html[data-theme="dark"] .current-allocation-card .distribution-chart-tile{
   background:linear-gradient(145deg, rgba(15,23,42,0.62), rgba(30,41,59,0.38)) !important;
   border-color:rgba(148,163,184,0.16) !important;
 }
-html[data-theme="dark"] .current-allocation-card #spendingLegend.distribution-legend-tile .chart-legend-item,
-html[data-theme="dark"] .current-allocation-card .trends-card-inline .trend-insight-row,
-html[data-theme="dark"] #categoryTrendsModal .trend-insight-row{
+html[data-theme="dark"] .current-allocation-card #spendingLegend.distribution-legend-tile .chart-legend-item{
   background:rgba(15,23,42,0.74) !important;
   border-color:rgba(148,163,184,0.18) !important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,0.035), 0 8px 20px rgba(0,0,0,0.20) !important;
 }
 html[data-theme="dark"] .current-allocation-card #spendingLegend.distribution-legend-tile .chart-legend-item:hover,
-html[data-theme="dark"] .current-allocation-card #spendingLegend.distribution-legend-tile .chart-legend-item.is-active,
-html[data-theme="dark"] #categoryTrendsModal .trend-insight-row:hover{
+html[data-theme="dark"] .current-allocation-card #spendingLegend.distribution-legend-tile .chart-legend-item.is-active{
   background:rgba(30,41,59,0.86) !important;
   border-color:rgba(147,197,253,0.30) !important;
 }
@@ -24596,11 +23890,6 @@ html[data-theme="dark"] #categoryTrends .trends-open-btn-modern{
   background:rgba(129,140,248,0.14) !important;
   border-color:rgba(129,140,248,0.30) !important;
   color:#c7d2fe !important;
-}
-html[data-theme="dark"] .current-allocation-card .trends-card-inline .trend-metric,
-html[data-theme="dark"] #categoryTrendsModal .trend-metric{
-  background:rgba(15,23,42,0.76) !important;
-  border-color:rgba(148,163,184,0.18) !important;
 }
 html[data-theme="dark"] #categoryTrendsModal .chart-modal-card,
 html[data-theme="dark"] #categoryTrendsModal .trend-modal-card{
@@ -24628,15 +23917,6 @@ html[data-theme="dark"] #categoryTrendsModal #categoryTrendsCloseBtn{
   }
   .current-allocation-card .distribution-chart-tile{ min-height:260px !important; height:260px !important; }
   .current-allocation-card #spendingLegend.distribution-legend-tile{ padding-top:0 !important; }
-  .current-allocation-card .trends-card-inline .trend-insight-row,
-  #categoryTrendsModal .trend-insight-row.expanded,
-  #categoryTrendsModal .trend-insight-row{
-    grid-template-columns:1fr !important;
-  }
-  .current-allocation-card .trends-card-inline .trend-insight-metrics,
-  #categoryTrendsModal .trend-insight-metrics{
-    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-  }
 }
 @media (max-width: 560px){
   .current-allocation-card .overview-card-headline,
@@ -24651,8 +23931,6 @@ html[data-theme="dark"] #categoryTrendsModal #categoryTrendsCloseBtn{
   #categoryTrends.trends-card-inline .trends-head-modern{ flex-direction:column !important; align-items:stretch !important; }
   .current-allocation-card #categoryTrends .trends-open-btn-modern,
   #categoryTrends .trends-open-btn-modern{ width:max-content !important; }
-  .current-allocation-card .trends-card-inline .trend-insight-metrics,
-  #categoryTrendsModal .trend-insight-metrics{ grid-template-columns:1fr !important; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -25020,16 +24298,6 @@ html[data-theme="dark"] .grid-overview > .alloc-list-card.ui-3d-panel{
   box-shadow: 0 1px 0 rgba(255,255,255,0.7), 0 8px 18px rgba(30,64,120,0.07);
 }
 /* Category Trends rows */
-.grid-overview > .current-allocation-card .trends-card-inline .trend-insight-row{
-  background: rgba(255,255,255,0.50) !important;
-  border-color: rgba(56,189,248,0.16) !important;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.40), 0 6px 16px rgba(30,64,120,0.04) !important;
-}
-/* ACTUAL / TARGET / PROJECTED metric boxes inside trend rows */
-.grid-overview > .current-allocation-card .trend-metric{
-  background: rgba(255,255,255,0.56);
-  border-color: rgba(56,189,248,0.16);
-}
 
 /* ---------- DARK MODE — translucent so each card's glow shows through ---------- */
 html[data-theme="dark"] .grid-overview > .alloc-list-card .alloc-v2{
@@ -25052,18 +24320,275 @@ html[data-theme="dark"] .grid-overview > .current-allocation-card .distribution-
   border-color: rgba(56,189,248,0.18) !important;
   box-shadow: none !important;
 }
-html[data-theme="dark"] .grid-overview > .current-allocation-card .trends-card-inline .trend-insight-row{
-  background: rgba(22,34,58,0.50) !important;
-  border-color: rgba(56,189,248,0.16) !important;
-  box-shadow: none !important;
-}
-html[data-theme="dark"] .grid-overview > .current-allocation-card .trend-metric{
-  background: rgba(22,34,58,0.55) !important;
-  border-color: rgba(56,189,248,0.16) !important;
-}
 /* ── end v757 inner surface harmonisation ── */
 
 /* Traceable finance calculations */
 .explain-number-btn{appearance:none;border:1px solid rgba(148,163,184,.45);background:rgba(255,255,255,.12);color:inherit;border-radius:999px;padding:2px 7px;margin-left:6px;font:inherit;font-size:10px;font-weight:800;cursor:pointer;vertical-align:middle}
 .explain-number-btn:hover{background:rgba(255,255,255,.22)}
 .explain-number-modal[hidden]{display:none!important}.explain-number-modal{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:20px}.explain-number-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.58);backdrop-filter:blur(4px)}.explain-number-dialog{position:relative;width:min(520px,calc(100vw - 32px));max-height:min(680px,calc(100vh - 40px));overflow:auto;background:var(--surface,#fff);color:var(--text,#0f172a);border:1px solid rgba(148,163,184,.3);border-radius:22px;box-shadow:0 24px 80px rgba(15,23,42,.28);padding:26px}.explain-number-close{position:absolute;right:14px;top:12px;border:0;background:transparent;color:inherit;font-size:26px;cursor:pointer}.explain-number-kicker{text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:900;opacity:.55}.explain-number-dialog h3{margin:5px 36px 5px 0;font-size:23px}.explain-number-dialog p{margin:0 0 18px;opacity:.7;line-height:1.45}.explain-number-rows{display:grid;gap:8px}.explain-number-row,.explain-number-total{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:11px 12px;border-radius:12px;background:rgba(148,163,184,.1)}.explain-number-row strong,.explain-number-total strong{font-variant-numeric:tabular-nums;white-space:nowrap}.explain-number-row strong.is-negative{color:#dc2626}.explain-number-row strong.is-positive{color:#059669}.explain-number-total{margin-top:12px;border-top:1px solid rgba(148,163,184,.25);font-size:17px;font-weight:900;background:rgba(16,185,129,.08)}
+
+/* ============================================================
+   Current Budget Allocation — hero redesign (v1)
+   Scoped tightly to .current-allocation-card so the sibling
+   .overview-allocation-card (per-category list) is untouched.
+   Written last and with matching/exceeding specificity to the
+   older .overview-chart-card rules earlier in this file, since
+   those win ties on specificity even though they appear first.
+   ============================================================ */
+
+/* -- Card shell: give this one card a hero treatment the rest
+   of the grid doesn't get, since it's the first thing people
+   read about their money. -- */
+.current-allocation-card.chart-card.ui-3d-panel{
+  position:relative;
+  border:1px solid rgba(94,23,235,0.10);
+  border-radius:22px;
+  background:
+    radial-gradient(140% 160% at 100% -10%, rgba(94,23,235,0.05), transparent 55%),
+    radial-gradient(120% 140% at 0% 100%, rgba(2,132,199,0.035), transparent 60%),
+    var(--panel);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.7) inset,
+    0 18px 40px -22px rgba(94,23,235,0.22),
+    0 2px 8px rgba(15,23,42,0.05);
+  overflow:hidden;
+}
+.allocation-accent-bar{
+  position:absolute;
+  top:0; left:0; right:0;
+  height:3px;
+  background:linear-gradient(90deg, #5e17eb 0%, #0284c7 55%, rgba(2,132,199,0) 100%);
+  border-radius:22px 22px 0 0;
+}
+
+/* -- Header: give the title real weight, turn the meta text
+   into a small pill instead of a bare muted string. -- */
+.current-allocation-card .allocation-title{
+  font-size:1.18rem;
+  font-weight:900;
+  letter-spacing:-0.022em;
+  color:var(--accent);
+}
+.current-allocation-card .allocation-head-info{
+  padding:5px 11px;
+  border-radius:999px;
+  background:rgba(94,23,235,0.07);
+  color:#5e17eb;
+  font-size:0.7rem;
+  font-weight:750;
+}
+
+/* -- Chart + legend proportions: a little more presence for
+   the donut, more breathing room overall. -- */
+.current-allocation-card.chart-card .chart-wrap.compact-below{
+  grid-template-columns:320px minmax(0,1fr) !important;
+  gap:30px !important;
+}
+.current-allocation-card.chart-card .distribution-chart-tile{
+  width:320px !important;
+  min-width:320px !important;
+  height:320px !important;
+}
+.current-allocation-card.chart-card #spendingPie{
+  width:320px !important;
+  height:320px !important;
+  max-width:320px !important;
+  max-height:320px !important;
+  filter:drop-shadow(0 20px 30px rgba(15,23,42,0.10));
+}
+
+/* One deliberate motion moment: the chart area settles in on
+   first paint rather than popping in unstyled. Respects
+   prefers-reduced-motion further down. */
+.current-allocation-card.chart-card .distribution-stage{
+  animation:allocationStageReveal 480ms cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes allocationStageReveal{
+  from{ opacity:0; transform:translateY(6px) scale(0.985); }
+  to{ opacity:1; transform:none; }
+}
+
+/* -- Legend: two-line rows — the existing label/amount/percent
+   line, plus a proportional mini-bar underneath so proportion
+   is felt (color + length), not just read as a number. -- */
+.current-allocation-card.chart-card .chart-legend.distribution-legend-tile .chart-legend-item{
+  display:grid !important;
+  grid-template-columns:7px minmax(0,1fr) auto !important;
+  grid-template-areas:"swatch label value" "bar bar bar" !important;
+  row-gap:6px !important;
+  padding:9px 10px !important;
+  border-radius:12px !important;
+  border:1px solid rgba(15,23,42,0.06) !important;
+  background:rgba(255,255,255,0.7) !important;
+  box-shadow:0 1px 0 rgba(255,255,255,0.8), 0 6px 14px rgba(15,23,42,0.03) !important;
+  transition:transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+.current-allocation-card.chart-card .chart-legend.distribution-legend-tile .chart-legend-item:hover,
+.current-allocation-card.chart-card .chart-legend.distribution-legend-tile .chart-legend-item.is-active{
+  border-color:rgba(94,23,235,0.22) !important;
+  box-shadow:0 1px 0 rgba(255,255,255,0.85), 0 10px 20px rgba(94,23,235,0.09) !important;
+  transform:translateX(1px);
+}
+.current-allocation-card.chart-card .chart-legend.distribution-legend-tile .chart-legend-label{
+  font-size:0.74rem !important;
+  font-weight:800 !important;
+}
+.current-allocation-card.chart-card .chart-legend.distribution-legend-tile .amount{
+  font-size:0.74rem !important;
+  font-weight:850 !important;
+}
+.current-allocation-card.chart-card .chart-legend.distribution-legend-tile .percent{
+  font-size:0.64rem !important;
+}
+.chart-legend-bar-track{
+  grid-area:bar;
+  height:4px;
+  border-radius:999px;
+  background:rgba(15,23,42,0.07);
+  overflow:hidden;
+}
+.chart-legend-bar-fill{
+  height:100%;
+  border-radius:999px;
+  transition:width 420ms cubic-bezier(.2,.8,.2,1);
+}
+
+html[data-theme="dark"] .current-allocation-card.chart-card.ui-3d-panel{
+  border-color:rgba(167,139,250,0.16);
+  background:
+    radial-gradient(140% 160% at 100% -10%, rgba(167,139,250,0.08), transparent 55%),
+    radial-gradient(120% 140% at 0% 100%, rgba(56,189,248,0.05), transparent 60%),
+    var(--panel);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.04) inset,
+    0 18px 40px -22px rgba(167,139,250,0.28),
+    0 2px 8px rgba(0,0,0,0.24);
+}
+html[data-theme="dark"] .current-allocation-card .allocation-head-info{
+  background:rgba(167,139,250,0.14) !important;
+  color:#c4b5fd !important;
+}
+html[data-theme="dark"] .current-allocation-card.chart-card .chart-legend.distribution-legend-tile .chart-legend-item{
+  background:rgba(15,23,42,0.55) !important;
+  border-color:rgba(148,163,184,0.14) !important;
+}
+html[data-theme="dark"] .chart-legend-bar-track{ background:rgba(148,163,184,0.16); }
+
+@media (prefers-reduced-motion: reduce){
+  .current-allocation-card.chart-card .distribution-stage{ animation:none; }
+}
+
+@media (max-width: 900px){
+  .current-allocation-card.chart-card .chart-wrap.compact-below{
+    grid-template-columns:1fr !important;
+  }
+  .current-allocation-card.chart-card .distribution-chart-tile,
+  .current-allocation-card.chart-card #spendingPie{
+    width:min(320px, 78vw) !important;
+    height:min(320px, 78vw) !important;
+    min-width:0 !important;
+  }
+}
+
+/* ============================================================
+   Category Trends — compact rows (Option A: sparkline rows)
+   Used for both the in-card view and the "View all" modal — the
+   older dense "expanded" row (badge, 3 stat tiles, bar chart) has
+   been removed entirely along with its CSS, since nothing renders
+   it anymore. Appended last + high specificity, for the same
+   cascade reasons noted in the allocation-card redesign block above.
+   ============================================================ */
+.current-allocation-card .trends-card-inline .trend-insight-list{
+  display:flex !important;
+  flex-direction:column !important;
+  gap:8px !important;
+}
+/* Row styling is class-based, not container-based — it must look identical
+   in the compact card AND in the "View all" modal (#categoryTrendsModal),
+   which is a completely separate part of the DOM. Scoping this to
+   ".current-allocation-card ..." (as an earlier pass did) meant the modal's
+   rows got none of it and fell back to unstyled block layout. */
+.trend-insight-row-compact{
+  display:grid;
+  grid-template-columns:minmax(84px, 0.6fr) 56px 44px minmax(0,1fr);
+  align-items:center;
+  column-gap:12px;
+  min-height:0;
+  height:auto;
+  padding:9px 12px;
+  border:1px solid rgba(15,23,42,0.06);
+  border-radius:12px;
+  background:rgba(255,255,255,0.7);
+  box-shadow:0 1px 0 rgba(255,255,255,0.8), 0 6px 14px rgba(15,23,42,0.03);
+  transition:border-color 160ms ease, box-shadow 160ms ease;
+}
+.trend-insight-row-compact:hover{
+  border-color:rgba(94,23,235,0.20);
+  box-shadow:0 1px 0 rgba(255,255,255,0.85), 0 10px 20px rgba(94,23,235,0.08);
+}
+.trend-insight-row-compact .trend-name{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  font-size:0.8rem;
+  font-weight:800;
+  color:var(--accent);
+}
+.trend-insight-row-compact .trend-name-swatch{
+  flex:0 0 auto;
+  width:8px;
+  height:8px;
+  border-radius:999px;
+  border:1px solid rgba(15,23,42,0.10);
+}
+.trend-insight-row-compact .trend-name-text{
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.trend-insight-row-compact .trend-sparkline{
+  display:block;
+  overflow:visible;
+}
+.trend-insight-row-compact .trend-change{
+  font-family:var(--font-mono);
+  font-size:0.76rem;
+  font-weight:800;
+  white-space:nowrap;
+}
+.trend-insight-row-compact .trend-insight-note-compact{
+  min-width:0;
+  font-size:0.72rem;
+  color:var(--muted);
+  line-height:1.3;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+html[data-theme="dark"] .trend-insight-row-compact{
+  background:rgba(15,23,42,0.55);
+  border-color:rgba(148,163,184,0.14);
+}
+html[data-theme="dark"] .trend-insight-row-compact .trend-name{
+  color:var(--accent);
+}
+html[data-theme="dark"] .trend-insight-row-compact .trend-name-swatch{
+  border-color:rgba(255,255,255,0.16);
+}
+
+@media (max-width: 900px){
+  .trend-insight-row-compact{
+    grid-template-columns:minmax(70px, 0.5fr) 48px 40px minmax(0,1fr);
+    column-gap:8px;
+  }
+  .trend-insight-row-compact .trend-insight-note-compact{
+    white-space:normal;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+}

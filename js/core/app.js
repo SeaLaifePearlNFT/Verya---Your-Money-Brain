@@ -5224,7 +5224,12 @@
     }
 
     function formatCurrency(value) {
-      return new Intl.NumberFormat("en-BE", { style: "currency", currency: "EUR" }).format(Number(value || 0));
+      // Snap near-zero values (e.g. -0.0004 from float math) to exactly 0
+      // before formatting — otherwise Intl renders a confusing "-€0.00"
+      // negative-zero artifact for what is, at 2 decimal places, just €0.00.
+      let n = Number(value || 0);
+      if (Math.abs(n) < 0.005) n = 0;
+      return new Intl.NumberFormat("en-BE", { style: "currency", currency: "EUR" }).format(n);
     }
     const currency = formatCurrency;
     function todayStamp() {
@@ -8049,8 +8054,8 @@ function renderBehaviorInsightsCard(month, behaviorItems, behaviorIntelInsights)
       const monthClosed = isClosedMonth(month);
       const behaviorTitle = monthClosed ? 'Month Review' : 'What Stands Out';
       const tooltipCopy = monthClosed
-        ? 'Three signals from the closed month. Use them to shape the next reset.'
-        : 'Three signals that help you see what needs attention now and what matters next month.';
+        ? 'Signals from the closed month. Use them to shape the next reset.'
+        : 'Signals that help you see what needs attention now and what matters next month.';
       const state = behaviorStateMeta(behaviorItems, monthClosed);
       const fallbackLabels = monthClosed ? ['Review', 'Carry forward', 'Next month'] : ['Do now', 'Watch', 'Next month'];
       const sourceItems = (behaviorItems || []).filter(function(it) { return it && (it.copy || it.message); }).slice(0, 3);
@@ -8067,27 +8072,34 @@ function renderBehaviorInsightsCard(month, behaviorItems, behaviorIntelInsights)
         rawItems.push({ label: monthClosed ? 'Review' : 'Steady', tone: 'good', fullCopy: 'Nothing notable stood out this month.', copy: 'Nothing notable stood out this month.' });
       }
       const heroText = summarizeBehaviorHero(month, rawItems, state, monthClosed);
-      const heroSub = monthClosed
-        ? 'Closing observations.'
-        : 'Live observations.';
-      const signalStripHtml = rawItems.map(function(item) {
-        return `<div class="behavior-signal-chip ${item.tone}">
-          <span class="behavior-signal-dot"></span>
-          <span>${item.label}</span>
-        </div>`;
-      }).join('');
-      const tilesHtml = rawItems.map(function(item) {
-        return `<div class="behavior-guidance-tile ${item.tone}">
-          <div class="tile-label">${item.label}</div>
-          <div class="tile-copy">${item.copy}</div>
-        </div>`;
-      }).join('');
 
-      // Intelligence layer: spending growth + behavioral insights
+      // One unified list of compact rows instead of a signal-chip strip that
+      // repeated the same tag already shown on the tile below it, plus a
+      // separate intel-chip row disconnected from everything above it. Each
+      // insight — whichever of the two sources it came from — gets exactly
+      // one row: an icon carrying tone, a short label, one line of copy.
+      const rowIcon = function(tone) {
+        return tone === 'bad' ? '▼' : tone === 'warn' ? '▲' : tone === 'good' ? '✓' : '•';
+      };
+      const intelLabel = function(type) {
+        if (type === 'overspend') return 'Main driver';
+        if (type === 'growth') return 'Growth';
+        if (type === 'subshare') return 'Subscriptions';
+        return 'Signal';
+      };
       const intelInsights = Array.isArray(behaviorIntelInsights) ? behaviorIntelInsights : [];
-      const intelHtml = intelInsights.length ? intelInsights.map(function(ins) {
-        return `<span class="intel-growth-chip${ins.tone === 'good' ? ' good' : ''}">${ins.text}</span>`;
-      }).join('') : '';
+      const rows = rawItems.map(function(item) {
+        return { tone: item.tone, icon: rowIcon(item.tone), label: item.label, text: item.copy };
+      }).concat(intelInsights.map(function(ins) {
+        const tone = ins.tone === 'warn' ? 'warn' : ins.tone === 'good' ? 'good' : 'neutral';
+        return { tone: tone, icon: rowIcon(tone), label: intelLabel(ins.type), text: ins.text };
+      }));
+      const rowsHtml = rows.map(function(row) {
+        return `<div class="behavior-row ${row.tone}">
+          <span class="behavior-row-icon">${row.icon}</span>
+          <div class="behavior-row-text"><span class="behavior-row-label">${row.label}</span><span class="behavior-row-copy">${row.text}</span></div>
+        </div>`;
+      }).join('');
 
       return `${renderUnifiedCardHeader({ title: behaviorTitle, tooltipId: 'behaviorInsightsTooltip', tooltipHtml: tooltipCopy })}
         <div class="behavior-hero">
@@ -8096,11 +8108,8 @@ function renderBehaviorInsightsCard(month, behaviorItems, behaviorIntelInsights)
             <div class="behavior-state-badge tone-chip ${state.tone}">${state.label}</div>
           </div>
           <div class="behavior-hero-main">${heroText}</div>
-          <div class="behavior-hero-sub">${heroSub}</div>
-          <div class="behavior-signal-strip">${signalStripHtml}</div>
         </div>
-        <div class="behavior-guidance-grid">${tilesHtml}</div>
-        ${intelHtml ? `<div class="intel-behavior-kicker">${intelHtml}</div>` : ''}`;
+        <div class="behavior-row-list">${rowsHtml}</div>`;
     }
 
 function renderBudgetAdjustmentAdvisorCard(reallocation) {
@@ -8173,9 +8182,14 @@ function renderSubscriptionBurdenContent(subscriptionBurden) {
         ? `${Number(subscriptionBurden.unpaidShareOfAvailablePct || 0).toFixed(1)}%`
         : `${Number(subscriptionBurden.plannedShareOfAvailablePct || 0).toFixed(1)}%`);
       const shareSub = card.shareSub || (subscriptionBurden.unpaidTotal > 0 ? 'of budget reserved' : 'of budget planned');
+      const shareRaw = Number(subscriptionBurden.unpaidTotal > 0 ? subscriptionBurden.unpaidShareOfAvailablePct : subscriptionBurden.plannedShareOfAvailablePct) || 0;
       const supportCopy = card.supportCopy || (subscriptionBurden.activeCount > 0
         ? ''
         : 'No subscription pressure.');
+      const burdenTile = { icon: subscriptionBurden.unpaidTotal > 0 ? '▲' : '✓', value: currency(currentBurden), caption: currentBurdenSub };
+      const shareTile = { icon: shareRaw > 25 ? '▲' : '✓', value: shareLabel, caption: shareSub };
+      const protectedTile = { icon: '🔒', value: `${subscriptionBurden.protectedSharePct.toFixed(1)}%`, caption: 'of commitments' };
+      const burdenTone = subscriptionBurden.unpaidTotal > 0 ? 'bad' : 'good';
       return `${renderUnifiedCardHeader({ title: 'Subscription Burden', tooltipId: 'subscriptionBurdenTooltip', tooltipHtml: 'How much of available budget is reserved or already consumed by recurring payments, and how much flexibility they remove from the rest of the plan.' })}
         <div class="subscription-burden-top">
           <div class="subscriptions-mini-kicker">This month</div>
@@ -8186,21 +8200,9 @@ function renderSubscriptionBurdenContent(subscriptionBurden) {
           <div class="subscription-burden-main">${subscriptionBurden.headline}</div>
           ${supportCopy ? '<div class="subscription-burden-sub">' + supportCopy + '</div>' : ''}
           <div class="subscription-burden-metrics">
-            <div class="subscription-burden-metric">
-              <span>${currentBurdenLabel}</span>
-              <strong class="${subscriptionBurden.unpaidTotal > 0 ? 'value-negative' : 'income-positive'}">${currency(currentBurden)}</strong>
-              <small>${currentBurdenSub}</small>
-            </div>
-            <div class="subscription-burden-metric">
-              <span>Budget share</span>
-              <strong>${shareLabel}</strong>
-              <small>${shareSub}</small>
-            </div>
-            <div class="subscription-burden-metric">
-              <span>Protected load</span>
-              <strong>${subscriptionBurden.protectedSharePct.toFixed(1)}%</strong>
-              <small>of commitments</small>
-            </div>
+            <div class="guidance-tile ${burdenTone}">${renderGuidanceTile(burdenTile, currentBurdenLabel)}</div>
+            <div class="guidance-tile ${shareRaw > 25 ? 'warn' : 'good'}">${renderGuidanceTile(shareTile, 'Budget share')}</div>
+            <div class="guidance-tile good">${renderGuidanceTile(protectedTile, 'Protected load')}</div>
           </div>
         </div>
         <div class="subscription-burden-footer">${subscriptionBurden.planningNote}</div>`;
@@ -8330,7 +8332,27 @@ function evolutionChartModel(activeMonth) {
       };
     }
 
-function stackedAreaChartModel(config) {
+function smoothPathFromPoints(points) {
+      // Catmull-Rom → cubic Bezier (standard 1/6 tension) — smooth curve
+      // through every real data point, not an approximation that misses them.
+      if (!points.length) return '';
+      if (points.length === 1) return 'M ' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2);
+      let d = 'M ' + points[0].x.toFixed(2) + ' ' + points[0].y.toFixed(2);
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i === 0 ? i : i - 1];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+        d += ' C ' + cp1x.toFixed(2) + ' ' + cp1y.toFixed(2) + ', ' + cp2x.toFixed(2) + ' ' + cp2y.toFixed(2) + ', ' + p2.x.toFixed(2) + ' ' + p2.y.toFixed(2);
+      }
+      return d;
+    }
+
+function evolutionAreaChartModel(config) {
       const labels = Array.isArray(config.labels) ? config.labels : [];
       const seriesList = Array.isArray(config.series) ? config.series : [];
       const width = 760;
@@ -8341,10 +8363,12 @@ function stackedAreaChartModel(config) {
       const padBottom = 30;
       const chartWidth = Math.max(1, width - padLeft - padRight);
       const chartHeight = Math.max(1, height - padTop - padBottom);
-      const totals = labels.map(function(_, index) {
-        return seriesList.reduce(function(sum, series) { return sum + Number(series.values[index] || 0); }, 0);
-      });
-      const maxValue = Math.max(1, Math.max.apply(null, totals.concat([0])));
+      // Independent series, not stacked — each category's own trajectory is
+      // directly comparable and readable on its own, instead of composing a
+      // total where an upper band's shape is distorted by the ones under it.
+      const allValues = [];
+      seriesList.forEach(function(item) { (item.values || []).forEach(function(v) { allValues.push(Number(v || 0)); }); });
+      const maxValue = Math.max(1, Math.max.apply(null, allValues.concat([0])));
       const xForIndex = function(index) {
         if (labels.length <= 1) return padLeft + (chartWidth / 2);
         return padLeft + (chartWidth * index / (labels.length - 1));
@@ -8352,38 +8376,26 @@ function stackedAreaChartModel(config) {
       const yForValue = function(value) {
         return padTop + chartHeight - ((Number(value || 0) / maxValue) * chartHeight);
       };
+      const yBase = yForValue(0);
       const gridValues = [0.25, 0.5, 0.75].map(function(step) {
         return { y: yForValue(maxValue * step) };
       });
-      const runningBase = new Array(labels.length).fill(0);
       const series = seriesList.map(function(item) {
         const topPoints = labels.map(function(label, index) {
-          const value = Number(item.values[index] || 0);
-          const base = runningBase[index];
-          const top = base + value;
-          const point = {
-            label: label,
-            value: value,
-            x: xForIndex(index),
-            yTop: yForValue(top),
-            yBase: yForValue(base)
-          };
-          runningBase[index] = top;
-          return point;
+          const value = Number((item.values || [])[index] || 0);
+          return { label: label, value: value, x: xForIndex(index), y: yForValue(value) };
         });
-        const topPath = topPoints.map(function(point, index) {
-          return (index === 0 ? 'M ' : 'L ') + point.x.toFixed(2) + ' ' + point.yTop.toFixed(2);
-        }).join(' ');
-        const basePath = topPoints.slice().reverse().map(function(point) {
-          return 'L ' + point.x.toFixed(2) + ' ' + point.yBase.toFixed(2);
-        }).join(' ');
+        const linePath = smoothPathFromPoints(topPoints);
+        const areaPath = topPoints.length
+          ? linePath + ' L ' + topPoints[topPoints.length - 1].x.toFixed(2) + ' ' + yBase.toFixed(2) + ' L ' + topPoints[0].x.toFixed(2) + ' ' + yBase.toFixed(2) + ' Z'
+          : '';
         return {
           label: item.label,
           color: item.color,
           values: item.values,
-          points: topPoints,
-          areaPath: topPath + ' ' + basePath + ' Z',
-          linePath: topPath
+          points: topPoints.map(function(point) { return { label: point.label, value: point.value, x: point.x, yTop: point.y }; }),
+          areaPath: areaPath,
+          linePath: linePath
         };
       });
       return {
@@ -8403,7 +8415,7 @@ function renderEvolutionChartSvg(seriesList, labels, ariaLabel) {
       if (!seriesList || !seriesList.length || !labels.length) {
         return '<div class="evolution-empty">No monthly history is available yet for this chart.</div>';
       }
-      const chart = stackedAreaChartModel({ labels: labels, series: seriesList });
+      const chart = evolutionAreaChartModel({ labels: labels, series: seriesList });
       const gradientPrefix = String(ariaLabel || 'monthly evolution chart').toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const payload = {
         width: chart.width,
@@ -9105,36 +9117,20 @@ function renderBurnContent(burnDisplay, burn, monthClosed, monthEndOutcome, burn
       const closedMeta = normalizedStateMeta('closed');
       const burnStateLabel = burnCard.stateLabel || (monthClosed ? 'Closed Month' : burnState.label);
       const burnStateClass = burnCard.stateClass || (monthClosed ? closedMeta.className : burnState.className);
-      const burnHint = burnCard.hint || (monthClosed
-        ? burnDisplay.forecastEndPct > 100 ? "The month closed above its ideal available-funds pace."
-          : burnDisplay.forecastEndPct >= 95 ? "The month closed close to its ideal available-funds pace."
-          : "The month closed with pace under control."
-        : burnState.key === "critical" ? "Pace is now actively threatening the month."
-          : burnState.key === "pressure" ? "Pace is above target and needs attention."
-          : burnState.key === "watch" ? "Close to the edge — keep an eye on pace."
-          : burnState.key === "stable" ? "Pace is close to plan with limited drift."
-          : "Controlled pace with room to spare.");
-      const burnBody = burnCard.body || (monthClosed
-        ? "This is now a retrospective read. The pace signal is no longer live, but it still shows how spending tracked against the month timeline and available funds."
-        : burnState.key === "critical" ? "You are spending faster than the month can comfortably absorb. Without a trim, the end-of-month result is likely to deteriorate further."
-          : burnState.key === "pressure" ? "You are spending faster than expected for this point in the month. The buffer is narrowing and needs active monitoring."
-          : burnState.key === "watch" ? "You are close to expected pace. A few heavier spending days could quickly reduce the remaining cushion."
-          : burnState.key === "stable" ? "You are broadly aligned with expected pace. Staying disciplined should keep the month manageable."
-          : "You are spending slower than expected. This gives you healthy room to absorb variability later in the month.");
+      const burnTone = monthClosed ? 'neutral' : (burnState.tone || 'good');
+      // Single shared source of the actual text — see burnCardCopy — so
+      // there is only one copy to edit, not a second one here that can
+      // silently win over engine-provided text or drift out of sync with it.
+      const defaultCopy = burnCardCopy(burnState, monthClosed, burnDisplay, monthEndOutcome);
+      const burnHint = burnCard.hint || defaultCopy.hint;
+      const burnBody = burnCard.body || defaultCopy.body;
       const paceGapLabel = burnCard.paceGapLabel || `${burnDisplay.delta > 0 ? '+' : ''}${burnDisplay.delta.toFixed(1)}%`;
       const forecastLabel = burnCard.forecastLabel || `${burnDisplay.forecastEndPct.toFixed(1)}%`;
-      const bufferLabel = burnCard.bufferLabel || (monthClosed ? 'Final review' : burnState.label);
-      const interpretation = burnCard.interpretation || (monthClosed
-        ? burnDisplay.forecastEndPct > 100
-          ? `Final burn summary: finished at ${burnDisplay.forecastEndPct.toFixed(1)}% used.${monthEndOutcome.hasRolloverImpact ? ` Pre-rollover close before ${currency(monthEndOutcome.closingBeforeRollover)} moved forward.` : ` Carry a slightly tighter setup into next month.`}`
-          : burnDisplay.forecastEndPct >= 95
-          ? `Final burn summary: finished at ${burnDisplay.forecastEndPct.toFixed(1)}% used.${monthEndOutcome.hasRolloverImpact ? ` Pre-rollover close before ${currency(monthEndOutcome.closingBeforeRollover)} moved forward.` : ` Landed close to plan with modest room left.`}`
-          : `Final burn summary: finished at ${burnDisplay.forecastEndPct.toFixed(1)}% used.${monthEndOutcome.hasRolloverImpact ? ` Pre-rollover close before ${currency(monthEndOutcome.closingBeforeRollover)} moved forward.` : ` The structure held up well and preserved buffer.`}`
-        : burnState.key === "critical" ? "Keep discretionary spending very tight for now. Every lighter day helps prevent a weaker month-end result."
-          : burnState.key === "pressure" ? "Try to hold discretionary spending below your current pace so the month does not drift further off track."
-          : burnState.key === "watch" ? "A steady pace matters here. Small trims now help preserve flexibility for the rest of the month."
-          : burnState.key === "stable" ? "Stay close to current pacing. The month looks manageable, but discipline still matters."
-          : "At this pace, you can absorb later variability more safely or preserve extra buffer into month-end.");
+      const interpretation = burnCard.interpretation || defaultCopy.interpretation;
+      const paceGapNum = Number(burnDisplay.delta || 0);
+      const gapTile = { icon: paceGapNum > 0.5 ? '▲' : paceGapNum < -0.5 ? '▼' : '✓', value: paceGapLabel, caption: 'vs plan' };
+      const monthEndTile = { icon: burnDisplay.forecastEndPct > 100 ? '▲' : '✓', value: forecastLabel, caption: 'forecast' };
+      const statusTile = { icon: burnTone === 'bad' ? '▼' : burnTone === 'warn' ? '▲' : '✓', value: burnStateLabel, caption: monthClosed ? 'final review' : 'this month' };
       return `${renderUnifiedCardHeader({ title: 'Spending Pace' })}
         <div class="insight-main ${burnDisplay.forecastEndPct > 100 ? "value-negative" : burnDisplay.delta > 0 ? "" : "income-positive"}">${burnDisplay.spentPct.toFixed(1)}% used vs ${burnDisplay.timePct.toFixed(1)}% month</div>
         <div class="burn-triangle-wrap">
@@ -9156,9 +9152,9 @@ function renderBurnContent(burnDisplay, burn, monthClosed, monthEndOutcome, burn
           </div>
         </div>
         <div class="burn-stats">
-          <div class="burn-stat"><div class="burn-stat-label">Gap</div><div class="burn-stat-value">${paceGapLabel}</div><div class="burn-stat-sub">vs plan</div></div>
-          <div class="burn-stat"><div class="burn-stat-label">Month-end</div><div class="burn-stat-value">${forecastLabel}</div><div class="burn-stat-sub">forecast</div></div>
-          <div class="burn-stat"><div class="burn-stat-label">Status</div><div class="burn-stat-value">${burnStateLabel}</div><div class="burn-stat-sub">${bufferLabel}</div></div>
+          <div class="guidance-tile ${burnTone === 'bad' ? 'bad' : burnTone === 'warn' ? 'warn' : 'good'}">${renderGuidanceTile(gapTile, 'Gap')}</div>
+          <div class="guidance-tile ${burnDisplay.forecastEndPct > 100 ? 'bad' : 'good'}">${renderGuidanceTile(monthEndTile, 'Month-end')}</div>
+          <div class="guidance-tile ${burnTone === 'bad' ? 'bad' : burnTone === 'warn' ? 'warn' : 'good'}">${renderGuidanceTile(statusTile, 'Status')}</div>
         </div>
         <div class="burn-interpretation"><div class="logic-kicker inline">${monthClosed ? 'Final read' : 'Takeaway'}</div><strong>${interpretation}</strong></div>
         `;
@@ -9305,24 +9301,19 @@ function usedVsOwnedRatio(usageItems) {
                pct: Math.round((active.length / usageItems.length) * 100) };
     }
 
-    function smartInsightsGuidanceMicroCopy(text, type) {
-      let copy = String(text || '').replace(/\s+/g, ' ').trim();
-      if (!copy) return '';
-      // Strip redundant lead-ins. The tiles have room for a complete line, so we
-      // never truncate or compress into cryptic "€X used · €Y pressure" fragments.
-      copy = copy
-        .replace(/^This matters because\s+/i, '')
-        .replace(/^Why it matters:?\s*/i, '')
-        .replace(/^Best move now:?\s*/i, '')
-        .replace(/^Live signal:?\s*/i, '');
-      if (type === 'signal') {
-        // The live-signal tile carries the spent / at-risk read plus the
-        // projection — the first two sentences of the driver — shown in full.
-        const sentences = copy.split(/(?<=[.!?])\s+/).filter(Boolean);
-        return sentences.slice(0, 2).join(' ');
-      }
-      // why / action tiles are short, self-contained directions: show complete.
-      return copy;
+    function renderGuidanceTile(tile, label) {
+      // Structured {icon, kicker, value, unit, caption} instead of a full
+      // prose sentence — one hero figure/word plus a short caption, so the
+      // tile is readable in about a second instead of requiring a read.
+      tile = tile || {};
+      return `<div class="tile-label">${label || ''}</div>`
+        + `<div class="guidance-tile-body">`
+        + `<span class="guidance-tile-icon">${tile.icon || 'ℹ'}</span>`
+        + `<div class="guidance-tile-text">`
+        + (tile.kicker ? `<div class="guidance-tile-kicker">${tile.kicker}</div>` : '')
+        + `<div class="guidance-tile-value">${tile.value || ''}${tile.unit ? `<span class="guidance-tile-unit">${tile.unit}</span>` : ''}</div>`
+        + (tile.caption ? `<div class="guidance-tile-caption">${tile.caption}</div>` : '')
+        + `</div></div>`;
     }
 
 function renderInsights(month) {
@@ -9354,54 +9345,131 @@ function renderInsights(month) {
       const forecastLockIsLegacy = forecastLocked && String((lockedForecast && lockedForecast.trustLevel) || '') === 'legacy';
       const forecastReference = forecastCard.forecastReference || (forecastLocked ? lockedForecast : forecast);
       const forecastStateMeta = forecastCard.forecastStateMeta || resolvedDashboardStateMeta(
-        forecastLocked
-          ? String((lockedForecast || {}).stateKey || 'stable')
-          : forecastStateMetaForValues(forecast.projectedAvailableEnd, burn.forecastEndPct, model.head && model.head.availableBudget),
+        forecastStateMetaForValues(forecast.projectedAvailableEnd, burn.forecastEndPct, model.head && model.head.availableBudget),
         monthClosed
       );
       const monthEndOutcome = forecastCard.monthEndOutcome || {};
       const closedForecastFinalAmount = Number(forecastCard.closedForecastFinalAmount || 0);
       const forecastUsedPctForEvaluation = Number(forecastCard.forecastUsedPctForEvaluation || burn.forecastEndPct || 0);
       const burnDisplay = forecastCard.burnDisplay || Object.assign({}, burn, { forecastEndPct: forecastUsedPctForEvaluation });
-      const forecastHeadlineAmount = Number(forecastCard.forecastHeadlineAmount != null ? forecastCard.forecastHeadlineAmount : Number((forecastReference && forecastReference.projectedAvailableEnd) || 0));
-      const primaryForecastMetrics = Array.isArray(forecastCard.primaryMetrics) ? forecastCard.primaryMetrics : [];
-      const secondaryForecastMetrics = Array.isArray(forecastCard.secondaryMetrics) ? forecastCard.secondaryMetrics : [];
+      // Headline always reflects the live projection (see the same comment
+      // in smart-insights-engine.js) — this fallback mirrors that even in
+      // the rare case forecastCard didn't already supply the computed value.
+      const forecastHeadlineAmount = Number(forecastCard.forecastHeadlineAmount != null ? forecastCard.forecastHeadlineAmount : (monthClosed ? closedForecastFinalAmount : Number(forecast.projectedAvailableEnd || 0)));
       const forecastSummaryLabel = forecastCard.summaryLabel || (monthClosed ? 'Final read' : (forecastLocked ? 'vs lock' : 'Locks'));
       const forecastSummaryCopy = forecastCard.summaryCopy || (forecastLocked ? 'Live projection is available against the locked reference.' : `Locks on ${forecastLockDateText}.`);
-      const forecastDrivers = Array.isArray(forecastCard.driverRows) ? forecastCard.driverRows : (forecastLocked ? ((lockedForecast && lockedForecast.driverRows) || []) : (model.driverRows || []));
+      // "Where funds are going": the actual committed buckets — fixed bills
+      // still unpaid, day-to-day variable spending still to come, one-off
+      // purchases, and money still to set aside for savings. All four are
+      // "what's left to happen this month" (matching the same framing
+      // projectedCashEnd itself uses below), not "what's already spent" —
+      // so, e.g., Savings here is the gap still to reach target, not the
+      // amount already transferred.
+      const forecastFixedAndSubs = Math.max(0, Number(forecast.fixedRemaining || 0));
+      const forecastVariable = Math.max(0, Number(forecast.projectedRepeatable || 0)) + Math.max(0, Number(forecast.projectedOpen || 0));
+      const forecastOneoff = Math.max(0, Number(forecast.projectedOneoff || 0));
+      const forecastSavingsReserved = Math.max(0, Number(forecast.projectedSavingsReserveRemaining || 0));
+      const forecastFlowTotal = forecastFixedAndSubs + forecastVariable + forecastOneoff + forecastSavingsReserved;
+      const forecastFlowSegments = [
+        { label: 'Fixed bills unpaid', amount: forecastFixedAndSubs, color: 'var(--sky-900)' },
+        { label: 'Variable spending left', amount: forecastVariable, color: 'var(--amber)' },
+        { label: 'One-off left', amount: forecastOneoff, color: 'var(--muted)' },
+        { label: 'Savings still to set aside', amount: forecastSavingsReserved, color: 'var(--emerald)' }
+      ].filter(function(seg) { return seg.amount > 0.005; });
 
-      const forecastTooltipHtml = '<ul class="info-tooltip-list"><li>Locks on day 5 and becomes a stable benchmark. Legacy locks are restored only when a stored forecast value exists; they are clearly marked because older versions did not save all lock metadata.</li><li> Before that it\'s a preview — use the tiles for pressure signals.</li><li>After locking, compare the live projection against the locked reference rather than reacting to day-to-day movement.</li><li>Start with the End-of-Month number, then scan the tiles for status, drift, buffer, and structural load.</li></ul>';
+      // Ring denominator: this must be the SAME base projectedCashEnd itself
+      // subtracts from — head.availableBudget, the money actually still
+      // sitting uncommitted (in practice, close to the current bank
+      // balance) — not availableFundsForEvaluation (total gross income for
+      // the month), which is a much larger number used elsewhere for a
+      // genuinely different "% of income used" metric. Using the income
+      // figure here previously made the ring claim ~€3.9k was "left over"
+      // when the real uncommitted balance was ~€845 — a completely
+      // different, much smaller number, and in this case already short of
+      // what's still committed.
+      const forecastAvailableFunds = Math.max(0, Number((model.head && model.head.availableBudget) || 0));
+      const forecastOverBudget = forecastFlowTotal > forecastAvailableFunds + 0.005;
+      const forecastRingDenominator = forecastOverBudget ? forecastFlowTotal : forecastAvailableFunds;
+      const forecastOverflowAmount = forecastOverBudget ? (forecastFlowTotal - forecastAvailableFunds) : 0;
+      const forecastRingSegments = forecastFlowSegments.map(function(seg) {
+        return { label: seg.label, amount: seg.amount, color: seg.color, fraction: forecastRingDenominator > 0 ? seg.amount / forecastRingDenominator : 0 };
+      });
+      const forecastRingColor = forecastStateMeta.tone === 'bad' ? 'var(--red-700)' : forecastStateMeta.tone === 'warn' ? 'var(--amber-warn)' : forecastStateMeta.tone === 'good' ? 'var(--green-900)' : 'var(--accent)';
+      const forecastRingSvgHtml = forecastRingDenominator > 0.005 ? forecastRingSvg(
+        forecastRingSegments,
+        forecastOverBudget && forecastFlowTotal > 0 ? forecastOverflowAmount / forecastFlowTotal : 0,
+        currency(Number(forecastHeadlineAmount || 0)),
+        monthClosed ? 'final' : 'spendable',
+        forecastRingColor
+      ) : '';
+
+      // "Why": states the outcome directly (overspend / left over) rather
+      // than naming an internal bucket key and calling it a "driver" — that
+      // reads as jargon and doesn't say whether it's actually a problem.
+      const forecastWhyTone = forecastStateMeta.tone || '';
+      const forecastTopRingSegment = forecastRingSegments.slice().sort(function(a, b) { return b.amount - a.amount; })[0] || null;
+      const forecastWhyText = (function() {
+        if (!forecastTopRingSegment) return monthClosed ? 'No spending recorded this month.' : 'No spending projected yet this month.';
+        const topLabel = forecastTopRingSegment.label.toLowerCase();
+        if (forecastOverBudget) {
+          return `Mostly ${topLabel} — you're projected to overspend by ${currency(forecastOverflowAmount)} this month.`;
+        }
+        const leftover = Math.max(0, forecastAvailableFunds - forecastFlowTotal);
+        return monthClosed
+          ? `${forecastTopRingSegment.label} was your biggest cost, with ${currency(leftover)} left over.`
+          : `${forecastTopRingSegment.label} is your biggest projected cost, with ${currency(leftover)} still expected left over.`;
+      })();
+      const forecastBufferKnown = forecastLocked || !monthClosed;
+      const forecastBufferAmount = forecastLocked ? Number(forecastCard.forecastGapVsLock || 0) : Number(model.planGap || 0);
+      // The "vs lock" summary was the one tone-relevant element on the card
+      // with no color coding, which is exactly why "below the lock" read as
+      // ambiguous rather than as the bad news it actually is (a lower
+      // locked-forecast comparison means less spendable cash than predicted,
+      // not less spending).
+      const forecastGapVsLockTone = forecastLocked ? (Number(forecastCard.forecastGapVsLock || 0) < -0.005 ? 'bad' : (Number(forecastCard.forecastGapVsLock || 0) > 0.005 ? 'good' : '')) : '';
+      // Locked-vs-live shown as two explicit figures, not just the delta —
+      // "what was expected" and "where things actually stand" side by side.
+      const forecastLockedAmountText = forecastLocked ? currency(Number(lockedForecast.projectedAvailableEnd || 0)) : '';
+
+      // Confidence: brought back as a small badge (was previously a full
+      // metric tile with a methodology sentence) — the number and level are
+      // useful at a glance; the "why" behind the score stays in the tooltip.
+      const forecastConfidencePct = Math.round(Number(model.forecastConfidencePct || 0));
+      const forecastConfidenceLevel = String(model.confidenceMeta && model.confidenceMeta.level || '').trim();
+      const forecastConfidenceTone = model.confidenceMeta && model.confidenceMeta.tone || '';
+      const forecastConfidenceDetail = model.confidenceMeta ? [model.confidenceMeta.componentSummary, model.confidenceMeta.factorSummary].filter(Boolean).join(' · ') : '';
+
+      const forecastTooltipHtml = '<ul class="info-tooltip-list"><li>Locks on day 5 and becomes a stable benchmark. Legacy locks are restored only when a stored forecast value exists; they are clearly marked because older versions did not save all lock metadata.</li><li> Before that it\'s a preview.</li><li>The headline always shows today\'s live projection; once locked, compare it against the "vs lock" line at the bottom rather than reacting to day-to-day movement.</li><li>The ring shows where this month\'s funds are committed; Why names the biggest reason.</li></ul>';
       const forecastHeaderHtml = renderUnifiedCardHeader({ title: 'Monthly Forecast', tooltipId: 'monthlyForecastTooltip', tooltipHtml: forecastTooltipHtml });
-      const renderForecastMetricTile = function(metric) {
-        metric = metric || {};
-        return `<div class="forecast-metric ${metric.theme || ''} ${metric.tone || ''}">`
-          + `<span class="forecast-metric-label">${metric.label || ''}</span>`
-          + `<strong>${metric.value || ''}${metric.driftArrow ? metric.driftArrow : ''}</strong>`
-          + `<small>${metric.support || ''}</small>`
-          + `</div>`;
-      };
 
       wrap.innerHTML = `
         <section class="insight-card ui-3d-panel ui-3d-insight forecast-card ${forecastStateMeta.tone || ''}" draggable="true" data-insight-key="forecast" data-insight-span="2">
             ${forecastHeaderHtml}
             <div class="logic-kicker">${monthClosed ? 'Retrospective result' : (forecastLocked ? 'Locked forecast' : 'Forecast preview')}</div>
             <div class="insight-main ${Number(forecastHeadlineAmount || 0) < 0 ? "value-negative" : "income-positive"}">${monthClosed ? 'Final result' : 'End-of-Month spendable'} ${currency(Number(forecastHeadlineAmount || 0))}</div>
-            <div class="forecast-risk ${forecastStateMeta.tone || ''}">${monthClosed ? '✓' : (forecastLocked ? '🔒' : '⏳')} ${monthClosed ? (forecastLocked ? (forecastLockIsLegacy ? 'Closed Month · legacy lock restored' : `Closed Month · locked on ${forecastLockDateText}`) : 'Closed Month · final result') : (forecastLocked ? `${forecastStateMeta.label || 'Locked'} · locked on ${forecastLockDateText}` : `Preview · locks on ${forecastLockDateText}`)}</div>
-            <div class="micro-bar"><div class="micro-fill ${forecastUsedPctForEvaluation > 100 ? 'bad' : forecastUsedPctForEvaluation >= 80 ? 'warn' : ''}" style="width:${Math.min(Math.max(forecastUsedPctForEvaluation,0),100)}%;"></div></div>
-            <div class="insight-detail"><span>${monthClosed ? (monthEndOutcome.hasRolloverImpact ? `Rolled ${currency(monthEndOutcome.closingBeforeRollover)} forward` : `Closed with ${currency(closedForecastFinalAmount)} remaining`) : (forecastLocked ? (forecastLockIsLegacy ? 'Legacy lock restored' : `Locked ${forecastLockDateText}`) : `Preview · locks ${forecastLockDateText}`)}${!monthClosed && Number((forecastReference && forecastReference.projectedSavingsReserveRemaining) || 0) > 0 ? ` · ${currency(Number(forecastReference.projectedSavingsReserveRemaining || 0))} reserved` : ''}</span><span>${forecastUsedPctForEvaluation.toFixed(1)}% used</span></div>
-            <div class="forecast-primary-grid">${primaryForecastMetrics.map(renderForecastMetricTile).join('')}</div>
-            <div class="forecast-driver-box">
-              <div class="logic-kicker">Why</div>
-              <div class="forecast-driver-head">${forecastLocked ? 'At lock' : 'Live drivers'}</div>
-              <div class="forecast-driver-list">${forecastDrivers.map(function(row, idx) {
-                row = row || {};
-                const badge = idx === 0 && Number(row.amount || 0) > 0 ? '<span class="forecast-driver-badge">Main</span>' : '';
-                const badgeMarkup = badge ? badge : `<span class="forecast-driver-badge is-empty">Main</span>`;
-                return `<div class="forecast-driver-row"><span class="forecast-driver-label">${row.label || ''}</span><span class="forecast-driver-value"><span class="forecast-driver-amount">${currency(row.amount || 0)}</span><span class="forecast-driver-share">${Number(row.share || 0) > 0 ? `${Number(row.share || 0).toFixed(0)}%` : ''}</span>${badgeMarkup}</span></div>`;
-              }).join('')}</div>
+            <div class="forecast-status-row">
+              <div class="forecast-risk ${forecastStateMeta.tone || ''}">${monthClosed ? '✓' : (forecastLocked ? '🔒' : '⏳')} ${monthClosed ? (forecastLocked ? (forecastLockIsLegacy ? 'Closed Month · legacy lock restored' : `Closed Month · locked on ${forecastLockDateText}`) : 'Closed Month · final result') : (forecastLocked ? `${forecastStateMeta.label || 'Locked'} · locked on ${forecastLockDateText}` : `Preview · locks on ${forecastLockDateText}`)}</div>
+              ${forecastConfidencePct > 0 ? `<span class="forecast-confidence-badge ${forecastConfidenceTone}" title="${forecastConfidenceDetail.replace(/"/g, '&quot;')}">${forecastConfidenceLevel} confidence · ${forecastConfidencePct}%</span>` : ''}
             </div>
-            <div class="forecast-secondary-grid">${secondaryForecastMetrics.map(renderForecastMetricTile).join('')}</div>
-            <div class="forecast-summary-note"><div class="logic-kicker inline">${forecastSummaryLabel}</div><strong>${forecastSummaryCopy}</strong></div>
+            <div class="micro-bar"><div class="micro-fill ${forecastUsedPctForEvaluation > 100 ? 'bad' : forecastUsedPctForEvaluation >= 80 ? 'warn' : ''}" style="width:${Math.min(Math.max(forecastUsedPctForEvaluation,0),100)}%;"></div></div>
+            <div class="insight-detail"><span>${monthClosed ? (monthEndOutcome.hasRolloverImpact ? `Rolled ${currency(monthEndOutcome.closingBeforeRollover)} forward` : `Closed with ${currency(closedForecastFinalAmount)} remaining`) : (forecastSavingsReserved > 0.005 ? `${currency(forecastSavingsReserved)} still to save` : '')}</span><span>${forecastUsedPctForEvaluation.toFixed(1)}% used</span></div>
+            <div class="forecast-ring-row">
+              <div class="forecast-ring-wrap">${forecastRingSvgHtml}</div>
+              <div class="forecast-ring-side">
+                <div class="logic-kicker">Where funds are going</div>
+                <div class="forecast-ring-legend">${forecastRingSegments.map(function(seg) { return `<span><i class="forecast-flow-dot" style="background:${seg.color}"></i>${seg.label} <strong>${currency(seg.amount)}</strong></span>`; }).join('')}${forecastOverBudget ? `<span class="is-over"><i class="forecast-flow-dot" style="background:var(--red-700)"></i>Over by <strong>${currency(forecastOverflowAmount)}</strong></span>` : ''}</div>
+              </div>
+            </div>
+            <div class="forecast-why ${forecastWhyTone}">
+              <span class="forecast-why-icon">${forecastWhyTone === 'bad' ? '▼' : forecastWhyTone === 'warn' ? '▲' : '✓'}</span>
+              <span class="forecast-why-text">${forecastWhyText}</span>
+              ${forecastBufferKnown ? `<span class="forecast-why-buffer ${forecastBufferAmount < 0 ? 'bad' : 'good'}">${forecastBufferAmount >= 0 ? '+' : ''}${currency(forecastBufferAmount)}</span>` : ''}
+            </div>
+            <div class="forecast-summary-note ${forecastLocked ? forecastGapVsLockTone : ''}">
+              <div class="logic-kicker inline">${forecastSummaryLabel}</div>
+              <strong>${forecastSummaryCopy}</strong>
+              ${forecastLocked ? `<div class="forecast-lock-compare"><span>Locked (${forecastLockDateText})</span><strong>${forecastLockedAmountText}</strong><span class="forecast-lock-arrow">→</span><span>Live now</span><strong>${currency(Number(forecastHeadlineAmount || 0))}</strong></div>` : ''}
+            </div>
           </section>
         <section class="insight-card ui-3d-panel ui-3d-insight guidance-card ${guidance.type}" draggable="true" data-insight-key="guidance" data-insight-span="2">
             ${renderUnifiedCardHeader({ title: 'Smart Budget Guidance', tooltipId: 'smartBudgetGuidanceTooltip', tooltipHtml: '<ul class="info-tooltip-list"><li>One main takeaway, three guidance tiles, and the current spending pace.</li><li>Act on what\'s visible. Open this tooltip only if you want to understand the scoring logic.</li></ul>' })}
@@ -9415,18 +9483,9 @@ function renderInsights(month) {
                   <div class="guidance-hero">${guidance.headline}</div>
                 </div>
                 <div class="guidance-tile-grid">
-                  <div class="guidance-tile ${guidance.type}">
-                    <div class="tile-label">${guidance.driverLabel}</div>
-                    <div class="tile-copy">${smartInsightsGuidanceMicroCopy(guidance.driver, "signal")}</div>
-                  </div>
-                  <div class="guidance-tile ${guidance.type === "bad" ? "warn" : guidance.type}">
-                    <div class="tile-label">${guidance.impactLabel}</div>
-                    <div class="tile-copy">${smartInsightsGuidanceMicroCopy(guidance.impact, "why")}</div>
-                  </div>
-                  <div class="guidance-tile good">
-                    <div class="tile-label">${guidance.actionLabel}</div>
-                    <div class="tile-copy">${smartInsightsGuidanceMicroCopy(guidance.action, "action")}</div>
-                  </div>
+                  <div class="guidance-tile ${guidance.type}">${renderGuidanceTile(guidance.driverTile, guidance.driverLabel)}</div>
+                  <div class="guidance-tile ${guidance.type === "bad" ? "warn" : guidance.type}">${renderGuidanceTile(guidance.impactTile, guidance.impactLabel)}</div>
+                  <div class="guidance-tile good">${renderGuidanceTile(guidance.actionTile, guidance.actionLabel)}</div>
                 </div>
                 ${renderCategoryBudgetBars(guidance && guidance.budgetBars ? guidance.budgetBars : null)}
                 <div class="guidance-urgency"><strong>${guidance.urgencyLabel}:</strong> ${guidance.urgency}</div>
@@ -9700,60 +9759,86 @@ function selectedTrendRows(rows) {
       return selected.slice(0, 3);
     }
 
-function trendInsightRowHtml(row, maxVal, monthLabels, expanded) {
+function forecastRingSvg(segments, overflowFraction, centerValue, centerLabel, centerColor) {
+      // A ring (not a flat bar) so this reads as a proper meter, matching the
+      // donut already used on Current Budget Allocation, rather than another
+      // thin progress strip. `segments` are pre-normalized fractions that sum
+      // to <=1; when they sum to exactly 1 with money still overflowing that,
+      // `overflowFraction` draws a thin arc just outside the ring's edge —
+      // visually "spilling over" — instead of a fictitious 4th ring segment.
+      const cx = 70, cy = 70, r = 58, sw = 14;
+      const circumference = 2 * Math.PI * r;
+      let offset = 0;
+      const arcs = segments.map(function(seg) {
+        const dash = Math.max(0, seg.fraction) * circumference;
+        const circle = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${seg.color}" stroke-width="${sw}" stroke-dasharray="${dash.toFixed(1)} ${(circumference - dash).toFixed(1)}" stroke-dashoffset="${(-offset).toFixed(1)}" transform="rotate(-90 ${cx} ${cy})"></circle>`;
+        offset += dash;
+        return circle;
+      }).join('');
+      const rOuter = r + 9;
+      const outerCircumference = 2 * Math.PI * rOuter;
+      const overflowArc = overflowFraction > 0.004
+        ? `<circle cx="${cx}" cy="${cy}" r="${rOuter}" fill="none" stroke="var(--red-700)" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(overflowFraction * outerCircumference).toFixed(1)} ${(outerCircumference * (1 - overflowFraction)).toFixed(1)}" transform="rotate(-90 ${cx} ${cy})"></circle>`
+        : '';
+      return `<svg width="140" height="140" viewBox="0 0 140 140" class="forecast-ring-svg" role="img" aria-label="${centerLabel}: ${centerValue}">`
+        + `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--panel-2)" stroke-width="${sw}"></circle>`
+        + arcs + overflowArc
+        + `<text x="${cx}" y="${cy - 4}" text-anchor="middle" class="forecast-ring-value" style="fill:${centerColor}">${centerValue}</text>`
+        + `<text x="${cx}" y="${cy + 15}" text-anchor="middle" class="forecast-ring-label">${centerLabel}</text>`
+        + `</svg>`;
+    }
+
+function trendSparklinePoints(values, maxVal) {
+      const denom = Math.max(1, Number(maxVal || 0));
+      const w = 56, h = 22, pad = 3;
+      return values.map(function(v, i) {
+        const x = pad + (i * (w - pad * 2)) / Math.max(1, values.length - 1);
+        const y = h - pad - (Math.max(0, Number(v || 0)) / denom) * (h - pad * 2);
+        return x.toFixed(1) + "," + y.toFixed(1);
+      }).join(" ");
+    }
+
+function trendInsightRowHtml(row, maxVal) {
+      // Both the compact card and the "View all" modal use this same row —
+      // the older version had a second, much denser "expanded" rendering
+      // (status badge, 3 stat tiles, a 3-bar chart with month labels) used
+      // only in the modal. That duplicated numbers already shown in Budget
+      // Allocation and made "View all" the most complex screen in the app
+      // for what should be a quick scan, so it's gone; both places now
+      // answer the same one question — which categories are moving, and
+      // should you care — the same way.
       const padded = [0,0,0];
       row.values.forEach(function(v, i) { padded[3 - row.values.length + i] = v; });
       const change = Number(row.pctChange || 0);
-      const changeText = row.values.length < 2 ? "—" : `${change > 0 ? "+" : ""}${change.toFixed(0)}% vs prev`;
-      const rowClass = expanded ? "trend-insight-row expanded" : "trend-insight-row";
-      const thirdLabel = row.mode === 'committed' ? 'Committed' : 'Projected';
-      const footerChangeClass = row.mode === 'committed' ? 'warn' : (change > 0 ? 'bad' : change < 0 ? 'good' : 'warn');
+      const changeClass = row.mode === 'committed' ? 'warn' : (change > 0 ? 'bad' : change < 0 ? 'good' : 'warn');
+      const changeColor = changeClass === 'bad' ? 'var(--red-700)' : changeClass === 'good' ? 'var(--green-900)' : 'var(--amber-warn)';
+      const arrow = row.values.length < 2 ? "" : (change > 0 ? "↑" : change < 0 ? "↓" : "→");
+      const compactChangeText = row.values.length < 2 ? "—" : `${arrow} ${Math.abs(change).toFixed(0)}%`;
+      // Same color the user picked (or was assigned) for this category in
+      // Expenses/Budget Allocation — a swatch here, not the sparkline color,
+      // since the sparkline/arrow already carries a different signal (is
+      // this good or bad); the swatch answers "which category is this" so
+      // the two don't compete for the same color.
+      const categoryColor = expenseCategoryPickerColor(row.key);
       return `
-        <div class="${rowClass}" data-trend-group="${row.key}">
-          <div class="trend-insight-top">
-            <div class="trend-name">${row.key}</div>
-            <span class="trend-badge ${row.status}">${row.statusLabel}</span>
-          </div>
-          <div class="trend-insight-metrics">
-            <div class="trend-metric">
-              <span class="trend-metric-label">Actual</span>
-              <strong>${currency(row.curr)}</strong>
-            </div>
-            <div class="trend-metric">
-              <span class="trend-metric-label">Target</span>
-              <strong>${currency(row.target)}</strong>
-            </div>
-            <div class="trend-metric">
-              <span class="trend-metric-label">${thirdLabel}</span>
-              <strong>${currency(row.projected)}</strong>
-            </div>
-          </div>
-          <div class="trend-chart-stack">
-            <div class="trend-bars">
-              ${padded.map(function(value, idx) {
-                const labelIndex = monthLabels.length - 3 + idx;
-                const monthLabel = monthLabels[labelIndex] || "—";
-                let tooltip = `${monthLabel}: ${currency(value)}`;
-                if (idx === 2 && row.values.length >= 2) {
-                  tooltip += ` • ${change > 0 ? '+' : ''}${change.toFixed(0)}% vs previous month • ${row.statusLabel}`;
-                } else if (idx === 1 && row.values.length >= 2) {
-                  tooltip += ` • previous reference month`;
-                }
-                return `
-                <div class="trend-bar-wrap has-tooltip" data-tooltip="${tooltip.replace(/"/g, '&quot;')}">
-                  <div class="trend-bar ${idx === 0 ? "old" : idx === 1 ? "prev" : "curr"}" style="height:${Math.max(2, (value / maxVal) * 28)}px"></div>
-                </div>`;
-              }).join("")}
-            </div>
-            <div class="trend-month-labels-inline">
-              ${[0,1,2].map(function(i) { return `<span>${monthLabels[monthLabels.length - 3 + i] || "—"}</span>`; }).join("")}
-            </div>
-          </div>
-          <div class="trend-insight-note">${row.summary} <span class="${footerChangeClass}">${changeText}</span></div>
+        <div class="trend-insight-row-compact" data-trend-group="${row.key}">
+          <div class="trend-name"><span class="trend-name-swatch" style="background:${categoryColor}"></span><span class="trend-name-text">${row.key}</span></div>
+          <svg class="trend-sparkline" width="56" height="22" viewBox="0 0 56 22" aria-hidden="true">
+            <polyline points="${trendSparklinePoints(padded, maxVal)}" fill="none" stroke="${changeColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+          </svg>
+          <div class="trend-change" style="color:${changeColor}">${compactChangeText}</div>
+          <div class="trend-insight-note-compact">${row.summary}</div>
         </div>
       `;
     }
 
+// Restored — this function looks unused from within app.js alone (nothing
+// here calls it), but js/features/smart-insights-engine.js calls it directly
+// by name. app.js's top-level functions are exposed globally rather than
+// module-scoped, so that cross-file call works silently — and silently broke
+// (via a try/catch fallback there) when this was removed as "dead code"
+// based on an app.js-only search. Lesson: verify a function's callers across
+// every loaded script, not just the file it's defined in, before deleting it.
 function orderedTrendRowsForExpenses(month, rows) {
       const order = monthExpenseGroups(month);
       const indexMap = {};
@@ -9781,7 +9866,6 @@ function openCategoryTrendsModal() {
         ? engine.cardModels.categoryTrends
         : { orderedRows: [], monthLabels: [], maxVal: 1, modalMeta: "No category trend data yet." };
       const rows = Array.isArray(trendModel.orderedRows) ? trendModel.orderedRows : [];
-      const monthLabels = Array.isArray(trendModel.monthLabels) ? trendModel.monthLabels : [];
       const maxVal = Number(trendModel.maxVal || 1);
 
       title.textContent = `All Category Trends · ${month.name}`;
@@ -9791,7 +9875,7 @@ function openCategoryTrendsModal() {
         : "No category trend data yet.");
 
       list.innerHTML = rows.length
-        ? rows.map(function(row) { return trendInsightRowHtml(row, maxVal, monthLabels, true); }).join("")
+        ? rows.map(function(row) { return trendInsightRowHtml(row, maxVal); }).join("")
         : `<div class="empty">No category trend data yet.</div>`;
 
       modal.hidden = false;
@@ -10395,7 +10479,7 @@ function renderCategoryTrends(month) {
             <div class="trends-title-block">
               <span class="trends-eyebrow">Category movement</span>
               <div class="trends-title-row"><h3>Category Trends</h3></div>
-              <p>Last 3 months per category — fixed buckets use committed-plan logic, variable buckets use pace.</p>
+              <p>Your 3 biggest movers this month.</p>
             </div>
           </div>
           <div class="empty">Add at least one previous month to see trends.</div>
@@ -10403,7 +10487,6 @@ function renderCategoryTrends(month) {
         return;
       }
 
-      const monthLabels = Array.isArray(trendModel.monthLabels) ? trendModel.monthLabels : [];
       const topRows = Array.isArray(trendModel.selectedRows) ? trendModel.selectedRows : [];
       const maxVal = Number(trendModel.maxVal || 1);
 
@@ -10414,17 +10497,14 @@ function renderCategoryTrends(month) {
             <span class="trends-eyebrow">Category movement</span>
             <div class="trends-title-row">
               <h3>Category Trends</h3>
-              <span class="inline-info-wrap">
-                <button type="button" class="inline-info-trigger" aria-label="How category trends are selected">i</button>
-                <span class="inline-info-tooltip">${trendsTooltip}</span>
-              </span>
+              ${inlineInfoTriggerHtml('categoryTrendsInfo', trendsTooltip, { label: 'How category trends are selected' })}
             </div>
-            <p>Top categories selected by target gap, recent movement, and committed impact.</p>
+            <p>Your 3 biggest movers this month.</p>
           </div>
           <button class="trends-open-btn trends-open-btn-modern" type="button" onclick="openCategoryTrendsModal()">View all</button>
         </div>
         <div class="trend-insight-list">
-          ${topRows.map(function(row) { return trendInsightRowHtml(row, maxVal, monthLabels, false); }).join("")}
+          ${topRows.map(function(row) { return trendInsightRowHtml(row, maxVal); }).join("")}
         </div>
       `;
     }
@@ -11916,9 +11996,11 @@ function renderExpenseGroupModal(group, groupRows) {
       const cadenceSelect = selectedRow ? renderExpenseCadenceSelect(selectedRow.id, EXPENSE_CADENCE_HINT_DEFAULT) : '';
       const txHtml = selectedEntryCount
         ? selectedRow.transactions.map(function(tx, idx) {
+            const cadenceChip = renderExpenseCadenceChip(tx && tx.cadenceHint);
             return `
               <div class="tx-item">
                 <div class="tx-left"><strong>${currency(transactionReportingDisplayAmount(tx))}</strong><small title="${escapeHtml((tx.note || "Manual entry") + (tx.date ? " · " + tx.date : ""))}">${escapeHtml(tx.note || "Manual entry")}${tx.date ? ` · ${escapeHtml(tx.date)}` : ``}</small></div>
+                ${cadenceChip ? `<span class="tx-item-pattern">${cadenceChip}</span>` : ``}
                 ${renderTransactionNoteEditButton(selectedRow.id, idx)}
                 <button class="chip-remove" type="button" title="Remove entry" aria-label="Remove entry" data-remove="${selectedRow.id}" data-index="${idx}">×</button>
               </div>`;
@@ -14271,9 +14353,21 @@ function renderRows(targetId, rows, kind) {
       const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark' || document.body.classList.contains('dark-mode');
       ctx.clearRect(0, 0, w, h);
 
-      const items = chartBreakdown(month);
+      let items = chartBreakdown(month);
+      // "Available Funds" is not a spend category — it's whatever's left of
+      // this month's available funds once every category above is added up.
+      // Appending it as a normal (but distinctly colored, non-drillable) item
+      // means it rides along with the exact same angle/legend/hover code path
+      // as every real category, instead of needing a parallel drawing path.
+      const spentTotal = items.reduce((sum, item) => sum + item.value, 0);
+      const remainingForChart = allocationAvailableFunds(month) - spentTotal;
+      if (remainingForChart > 0.005) {
+        items = items.concat([{ label: "Available Funds", value: remainingForChart, type: "remaining", key: "remaining" }]);
+      }
       const total = items.reduce((sum, item) => sum + item.value, 0);
       const colors = piePalette(items);
+      const remainingItemIndex = items.findIndex(function(item) { return item.type === "remaining"; });
+      if (remainingItemIndex !== -1) colors[remainingItemIndex] = isDarkTheme ? "#a78bfa" : "#5e17eb";
 
       if (!items.length || total <= 0) {
         legend.dataset.legendCount = "0";
@@ -14357,11 +14451,20 @@ function renderRows(targetId, rows, kind) {
         const angle = (item.value / total) * Math.PI * 2;
         const endAngle = startAngle + angle;
         const offset = segmentOffsetFor(startAngle, endAngle, idx);
+        // Small gap between segments reads as more deliberate/modern than a
+        // solid ring. Hit-testing and the hover offset still use the true
+        // (non-gapped) start/end so clicking near the seam still works and
+        // the pop-out direction is unaffected. Adaptive + capped so a thin
+        // sliver category never has its gap exceed its own angle.
+        const gap = Math.min(0.026, angle * 0.16);
+        let drawStart = startAngle + gap;
+        let drawEnd = endAngle - gap;
+        if (drawEnd <= drawStart) { drawStart = startAngle; drawEnd = endAngle; }
         const grad = ctx.createRadialGradient((cx + offset.x) - outerR * 0.35, (cy + offset.y) - outerR * 0.45, innerR * 0.2, cx + offset.x, cy + offset.y, outerR * 1.1);
         grad.addColorStop(0, shade(colors[idx % colors.length], 24));
         grad.addColorStop(0.65, colors[idx % colors.length]);
         grad.addColorStop(1, shade(colors[idx % colors.length], -14));
-        drawSegment(startAngle, endAngle, outerR, innerR, 0, grad, offset.x, offset.y);
+        drawSegment(drawStart, drawEnd, outerR, innerR, 0, grad, offset.x, offset.y);
         hitRegions.push({ start: startAngle, end: endAngle, item, idx, mid: offset.mid });
         startAngle = endAngle;
       });
@@ -14480,7 +14583,7 @@ function renderRows(targetId, rows, kind) {
       };
       canvas.onclick = (event) => {
         const idx = chartHitIndex(event);
-        if (idx >= 0 && items[idx]) drillToChartItem(items[idx]);
+        if (idx >= 0 && items[idx] && items[idx].type !== "remaining") drillToChartItem(items[idx]);
       };
 
       legend.dataset.legendCount = String(items.length);
@@ -14491,11 +14594,14 @@ function renderRows(targetId, rows, kind) {
       legend.innerHTML = items.map((item, idx) => {
         const pct = total > 0 ? (item.value / total) * 100 : 0;
         const activeClass = idx === spendingChartHoverIndex ? " is-active" : "";
+        const isRemaining = item.type === "remaining";
+        const barColor = colors[idx % colors.length];
         return `
-          <div class="chart-legend-item chart-clickable${activeClass}" data-chart-item="${idx}">
-            <span class="chart-swatch" style="background:${colors[idx % colors.length]}"></span>
+          <div class="chart-legend-item${isRemaining ? " chart-legend-remaining" : " chart-clickable"}${activeClass}" data-chart-item="${idx}">
+            <span class="chart-swatch" style="background:${barColor}"></span>
             <span class="chart-legend-label">${item.label}</span>
             <span class="chart-legend-value"><span class="amount">${currency(item.value)}</span><span class="percent">${pct.toFixed(1)}%</span></span>
+            <span class="chart-legend-bar-track"><span class="chart-legend-bar-fill" style="width:${Math.max(0, Math.min(100, pct))}%;background:${barColor}"></span></span>
           </div>`;
       }).join("");
 
@@ -14515,7 +14621,7 @@ function renderRows(targetId, rows, kind) {
         };
         el.onclick = () => {
           const idx = Number(el.dataset.chartItem);
-          drillToChartItem(items[idx]);
+          if (items[idx] && items[idx].type !== "remaining") drillToChartItem(items[idx]);
         };
       });
     }
@@ -18039,12 +18145,15 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
         title: 'On track',
         priority: '#1 Live issue: Daily pace',
         headline: 'Your current budget setup is still workable this month.',
-        driverLabel: 'Live signal',
+        driverLabel: 'The issue',
         driver: 'Fixed costs and savings reserves are covered within the current available budget.',
-        impactLabel: 'Why it matters',
+        driverTile: { icon: '✓', kicker: 'Budget setup', value: 'Covered', caption: 'fixed & savings within budget' },
+        impactLabel: 'The impact',
         impact: `Keep discretionary spending near the Target Daily Budget of ${currency(targetDaily)} per day to preserve your current buffer.`,
-        actionLabel: 'Best move now',
+        impactTile: { icon: '🎯', kicker: 'Stay near', value: currency(targetDaily), unit: '/day', caption: 'to preserve buffer' },
+        actionLabel: 'Your move',
         action: 'Use Target Daily Budget as your day-to-day decision limit.',
+        actionTile: { icon: '✓', kicker: 'Daily limit', value: currency(targetDaily), unit: '/day', caption: 'your decision cap' },
         urgencyLabel: 'Confidence',
         urgency: `Forecast ${model.confidenceLabel.toLowerCase()}. ${signalMeta.urgencyTail} Pace confidence is ${paceConfidence}.`,
         trackLabel: pace.trackLabel,
@@ -18077,10 +18186,17 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
         result.driver = topRisk
           ? `${topRisk.key} was the clearest issue at close, finishing ${currency(Math.max(Number(topRisk.actualOver || topRisk.actualDelta || 0), 0))} above allocation.`
           : 'No single category closed materially above allocation after final offsets.';
+        result.driverTile = topRisk
+          ? { icon: '⚠', kicker: topRisk.key, value: currency(Math.max(Number(topRisk.actualOver || topRisk.actualDelta || 0), 0)), caption: 'over allocation at close' }
+          : { icon: '✓', kicker: 'Categories', value: 'On track', caption: 'no material overage' };
         result.impact = topImprove
           ? `${topImprove.key} helped most by finishing ${currency(Math.abs(Number(topImprove.projectedDelta || 0)))} under target.`
           : 'Use this closed month as the baseline for the next month configuration.';
+        result.impactTile = topImprove
+          ? { icon: '📈', kicker: topImprove.key, value: currency(Math.abs(Number(topImprove.projectedDelta || 0))), caption: 'finished under target' }
+          : { icon: 'ℹ', kicker: 'Baseline', value: 'Set', caption: 'for next month' };
         result.action = 'Review any category that closed above target before carrying those settings into the next month.';
+        result.actionTile = { icon: '✓', kicker: 'Next step', value: 'Review', caption: 'categories over target' };
         result.urgency = signalMeta.cadenceRows > 0
           ? 'Historical comparisons will strengthen as more months are stored, and this month already benefited from explicit cadence guidance.'
           : 'Historical comparisons will strengthen as more months are stored.';
@@ -18105,8 +18221,11 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
         result.priority = '#1 Live issue: Core budget setup';
         result.headline = `Target Daily Budget is negative at ${currency(targetDaily)} per day.`;
         result.driver = `${currency(head.unpaidFixedExpenses)} of unpaid fixed costs and ${currency(head.uncommittedSavings)} still reserved for savings are larger than the safe spendable pool.`;
+        result.driverTile = { icon: '⚠', kicker: 'Committed', value: currency(Number(head.unpaidFixedExpenses || 0) + Number(head.uncommittedSavings || 0)), caption: `${currency(head.unpaidFixedExpenses)} fixed + ${currency(head.uncommittedSavings)} savings` };
         result.impact = `Free up about ${currency(recovery)} and the Target Daily Budget returns to non-negative territory.`;
+        result.impactTile = { icon: '🎯', kicker: 'Free up', value: currency(recovery), caption: 'to fix daily budget' };
         result.action = 'Pause discretionary spending first, then reduce or move the largest reserved items until the Target Daily Budget is back above zero.';
+        result.actionTile = { icon: '⏸', kicker: 'Do now', value: 'Pause spending', caption: 'trim reserved items next' };
         result.urgency = 'Already critical — the current setup is mathematically unsustainable this month.';
         return result;
       }
@@ -18120,12 +18239,21 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
         result.driver = topRisk
           ? `${topRisk.key} has used ${currency(Math.max(Number(topRisk.curr || 0), 0))} so far, with ${currency(Math.max(Number(topRisk.futureRisk || 0), 0))} more at risk if the pace holds. ${historyNarrative(month, topRisk)} ${recurrenceNarrative(topRisk.signal)}`.trim()
           : `${currency(forecast.fixedRemaining)} of fixed costs still remain, while current variable spending pace projects another ${currency(forecast.projectedVariable)} before month-end.`;
+        result.driverTile = topRisk
+          ? { icon: '⚠', kicker: topRisk.key, value: currency(Math.max(Number(topRisk.curr || 0), 0)), caption: `+${currency(Math.max(Number(topRisk.futureRisk || 0), 0))} more at risk` }
+          : { icon: 'ℹ', kicker: 'Fixed & variable', value: currency(forecast.fixedRemaining), caption: `+${currency(forecast.projectedVariable)} projected` };
         result.impact = lever && topRisk && lever.key !== topRisk.key
           ? `${topRisk.key} is the cause, but ${lever.key} is the better live adjustment lever with about ${currency(lever.capacity)} still controllable.`
           : `Reduce variable spending by about ${currency(dailyRecovery)} per remaining day to get back to breakeven.`;
+        result.impactTile = lever && topRisk && lever.key !== topRisk.key
+          ? { icon: '🔀', kicker: `Use ${lever.key}`, value: currency(lever.capacity), caption: 'still controllable' }
+          : { icon: '✂', kicker: 'Cut by', value: currency(dailyRecovery), unit: '/day', caption: 'to break even' };
         result.action = lever && topRisk && lever.key !== topRisk.key
           ? `Keep total discretionary spending near ${currency(targetDaily)} per day and trim ${lever.key} first.`
           : `Use the Target Daily Budget of ${currency(targetDaily)} per day as the hard cap until the month-end projection returns positive.`;
+        result.actionTile = lever && topRisk && lever.key !== topRisk.key
+          ? { icon: '🎯', kicker: `Trim ${lever.key} first`, value: currency(targetDaily), unit: '/day', caption: 'stay near this elsewhere' }
+          : { icon: '🎯', kicker: 'Hard cap', value: currency(targetDaily), unit: '/day', caption: 'until positive' };
         result.urgency = anomaly
           ? `${urgencyFromOverrun(topRisk ? topRisk.futureRisk : Math.abs(forecast.projectedAvailableEnd))} Separate note: ${anomaly.key} is unusual historically, but not the main current lever.`
           : urgencyFromOverrun(topRisk ? topRisk.futureRisk : Math.abs(forecast.projectedAvailableEnd));
@@ -18142,21 +18270,28 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
         result.priority = `#1 Live issue: ${topRisk.key}`;
         result.headline = `${topRisk.key} is the clearest live pressure on this month.`;
         result.driver = `${currency(Math.max(Number(topRisk.curr || 0), 0))} used so far; already ${currency(actualOver)} above target, with ${currency(futureRisk)} more at risk if the current pace holds. ${historyNarrative(month, topRisk)} ${topRisk.history.count ? `${topRisk.history.confidence} historical confidence.` : ''}`.trim();
+        result.driverTile = { icon: severe ? '⚠' : '✓', kicker: topRisk.key, value: currency(Math.max(Number(topRisk.curr || 0), 0)), caption: `${currency(actualOver)} over · ${currency(futureRisk)} at risk` };
         if (lever && lever.key !== topRisk.key) {
           result.impact = futureRisk > 0
             ? `${topRisk.key} is the cause, but ${lever.key} is the better adjustment lever because only about ${currency(futureRisk)} of the projected miss is still preventable.`
             : `${topRisk.key} is already over target, so the goal now is to stop the miss widening through the remaining flexible categories.`;
+          result.impactTile = { icon: '🔀', kicker: `Via ${lever.key}`, value: currency(futureRisk), caption: 'still preventable' };
           result.action = `Leave ${topRisk.key} labelled as the live issue and recover through ${lever.key} first while keeping discretionary spend near ${currency(targetDaily)} per day.`;
+          result.actionTile = { icon: '🎯', kicker: `Trim ${lever.key} first`, value: currency(targetDaily), unit: '/day', caption: 'discretionary cap' };
         } else if (topRisk.driverType !== 'open') {
           result.impact = futureRisk > 0
             ? `${topRisk.key} is mostly already committed or one-off. Focus on preventing about ${currency(futureRisk)} of additional damage through the remaining flexible categories.`
             : `${topRisk.key} is mostly already committed or one-off, so it should be monitored rather than treated as the main trim lever.`;
+          result.impactTile = { icon: 'ℹ', kicker: 'Already committed', value: currency(futureRisk), caption: 'limit further damage' };
           result.action = `Avoid adding further spend around ${topRisk.key} and keep the rest of the month near ${currency(targetDaily)} per day.`;
+          result.actionTile = { icon: 'ℹ', kicker: `Avoid more in ${topRisk.key}`, value: currency(targetDaily), unit: '/day', caption: 'rest of month' };
         } else {
           result.impact = futureRisk > 0
             ? `The miss has already started. The realistic recovery is to prevent roughly ${currency(realisticTrim)} more from being added this month.`
             : `${topRisk.key} is already over target, so the realistic move is to stop any further overspend from here.`;
+          result.impactTile = { icon: '✂', kicker: 'Prevent more', value: currency(realisticTrim), caption: 'realistic recovery' };
           result.action = `Use ${topRisk.key} as the first trim lever from this point forward and keep discretionary spending near ${currency(targetDaily)} per day.`;
+          result.actionTile = { icon: '🎯', kicker: `Trim ${topRisk.key}`, value: currency(targetDaily), unit: '/day', caption: 'from here on' };
         }
         result.urgency = anomaly
           ? `${urgencyFromOverrun(futureRisk)} Background anomaly: ${anomaly.key} changed sharply historically, but it is not the main live issue.`
@@ -18170,10 +18305,15 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
         result.priority = '#1 Focus: Protected commitments';
         result.headline = `Target Daily Budget is ${currency(targetDaily)} per day after reservations.`;
         result.driver = `${currency(head.unpaidFixedExpenses)} unpaid fixed and ${currency(head.uncommittedSavings)} still earmarked for savings are already protected.`;
+        result.driverTile = { icon: '🔒', kicker: 'Protected', value: currency(Number(head.unpaidFixedExpenses || 0) + Number(head.uncommittedSavings || 0)), caption: `${currency(head.unpaidFixedExpenses)} fixed + ${currency(head.uncommittedSavings)} savings` };
         result.impact = 'That reserved money should not be treated as freely spendable in day-to-day decisions.';
+        result.impactTile = { icon: 'ℹ', kicker: 'Note', value: 'Not spendable', caption: 'day-to-day' };
         result.action = topImprove
           ? `Hold discretionary spending close to ${currency(targetDaily)} per day and keep using ${topImprove.key} as the strongest under-target offset.`
           : `Hold discretionary spending close to ${currency(targetDaily)} per day while protected items remain in place.`;
+        result.actionTile = topImprove
+          ? { icon: '🎯', kicker: `Watch ${topImprove.key}`, value: currency(targetDaily), unit: '/day', caption: 'discretionary cap' }
+          : { icon: '🎯', kicker: 'Hold pace', value: currency(targetDaily), unit: '/day', caption: 'discretionary cap' };
         result.urgency = 'Healthy setup — the key is not to consume protected reserves indirectly.';
         return result;
       }
@@ -18184,8 +18324,11 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
         result.priority = `#1 Positive move: ${topImprove.key}`;
         result.headline = `${topImprove.key} is creating the most room right now.`;
         result.driver = `${currency(Math.abs(Number(topImprove.projectedDelta || 0)))} under target. ${historyNarrative(month, topImprove)}`;
+        result.driverTile = { icon: '📈', kicker: topImprove.key, value: currency(Math.abs(Number(topImprove.projectedDelta || 0))), caption: 'under target' };
         result.impact = 'Maintain the current pace and your month-end buffer should stay comfortably positive.';
+        result.impactTile = { icon: '✓', kicker: 'Keep going', value: 'Stable', caption: 'buffer stays positive' };
         result.action = `Keep spending close to the Target Daily Budget of ${currency(targetDaily)} and preserve the extra room for savings goals.`;
+        result.actionTile = { icon: '🎯', kicker: 'Target pace', value: currency(targetDaily), unit: '/day', caption: 'preserve savings room' };
         result.urgency = anomaly
           ? `Improvement is real. Background anomaly: ${anomaly.key} moved unusually, but it is not hurting the plan.`
           : 'Safe for now — preserve the current buffer.';
@@ -18262,6 +18405,40 @@ document.addEventListener("DOMContentLoaded", function(){ applyCategoryIcons(doc
       if (burn.delta > 0 || burn.forecastEndPct >= 97) return normalizedStateMeta('watch');
       if (burn.delta > -4) return normalizedStateMeta('stable');
       return normalizedStateMeta('healthy');
+    }
+
+    // Single source of truth for the Spending Pace card's hint/body/takeaway
+    // text. Both smart-insights-engine.js's getBurnCard (the normal path)
+    // and renderBurnContent's defensive fallback (only reached if getBurnCard
+    // itself throws) call this same function, so there is exactly one copy
+    // of this text to edit — the earlier bug (editing app.js's copy while
+    // the engine's separate copy kept winning) can't recur structurally.
+    function burnCardCopy(state, monthClosed, burnDisplay, monthEndOutcome) {
+      monthEndOutcome = monthEndOutcome || {};
+      const hint = monthClosed
+        ? burnDisplay.forecastEndPct > 100 ? 'Closed above ideal pace.'
+          : burnDisplay.forecastEndPct >= 95 ? 'Closed close to ideal pace.'
+          : 'Closed with pace under control.'
+        : state.key === 'critical' ? 'Pace is actively threatening the month.'
+          : state.key === 'pressure' ? 'Pace is above target and needs attention.'
+          : state.key === 'watch' ? 'Close to the edge — keep an eye on pace.'
+          : state.key === 'stable' ? 'Pace is close to plan.'
+          : 'Controlled pace, with room to spare.';
+      const body = monthClosed
+        ? "A retrospective read of pace against the month's timeline and funds."
+        : state.key === 'critical' ? 'Spending faster than the month can absorb — trim now or the result gets worse.'
+          : state.key === 'pressure' ? 'Spending faster than expected; the buffer is narrowing.'
+          : state.key === 'watch' ? 'A heavy spending day could quickly shrink your cushion.'
+          : state.key === 'stable' ? 'Broadly aligned with expected pace.'
+          : 'Spending slower than expected, with healthy room to absorb surprises.';
+      const interpretation = monthClosed
+        ? `Finished at ${Number(burnDisplay.forecastEndPct || 0).toFixed(1)}% used.${monthEndOutcome.hasRolloverImpact ? ` ${currency(monthEndOutcome.closingBeforeRollover)} rolled forward.` : (burnDisplay.forecastEndPct > 100 ? ' Carry a tighter setup into next month.' : burnDisplay.forecastEndPct >= 95 ? ' Landed close to plan.' : ' Preserved buffer well.')}`
+        : state.key === 'critical' ? 'Keep spending very tight. Every lighter day helps.'
+          : state.key === 'pressure' ? 'Hold spending below current pace to stay on track.'
+          : state.key === 'watch' ? 'Small trims now help preserve flexibility.'
+          : state.key === 'stable' ? 'Stay disciplined — the month looks manageable.'
+          : 'Absorb variability freely, or bank the extra buffer.';
+      return { hint: hint, body: body, interpretation: interpretation };
     }
 
     function flexibilityHealthState(planGap, flexScore, atRisk, flexible) {

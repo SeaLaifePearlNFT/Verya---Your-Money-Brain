@@ -35,12 +35,15 @@
       title: 'On track',
       priority: '#1 Live issue: Daily pace',
       headline: 'No urgent guidance available yet.',
-      driverLabel: 'Live signal',
+      driverLabel: 'The issue',
       driver: 'Guidance will appear once this month has enough budget data.',
-      impactLabel: 'Why it matters',
+      driverTile: { icon: 'ℹ', kicker: 'No data yet', value: 'Pending', caption: 'add spending to see guidance' },
+      impactLabel: 'The impact',
       impact: 'The insight engine is waiting for more usable inputs.',
-      actionLabel: 'Best move now',
+      impactTile: { icon: 'ℹ', kicker: 'Waiting', value: 'No data', caption: 'usable inputs needed' },
+      actionLabel: 'Your move',
       action: 'Keep logging spending and reviewing subscriptions.',
+      actionTile: { icon: '✓', kicker: 'Meanwhile', value: 'Log spending', caption: 'and review subscriptions' },
       urgencyLabel: 'Confidence',
       urgency: 'Low confidence until more data is available.',
       trackLabel: 'Spending Pace',
@@ -127,10 +130,12 @@
       var forecastLockIsLegacy = forecastLocked && String((lockedForecast && lockedForecast.trustLevel) || '') === 'legacy';
       var preLockWindow = !forecastLocked && Number(forecast.currentDay || 0) < forecastLockDay;
       var forecastReference = forecastLocked ? lockedForecast : forecast;
+      // Same fix as the headline: the status badge (Critical/On track/etc.)
+      // must match what the now-live headline is actually saying, not the
+      // day-5 lock's frozen state — otherwise a live "-€112" headline could
+      // sit next to a stale "Healthy" badge from lock day.
       var forecastStateMeta = resolvedDashboardStateMeta(
-        forecastLocked
-          ? String(lockedForecast.stateKey || 'stable')
-          : forecastStateMetaForValues(forecast.projectedAvailableEnd, burn.forecastEndPct, model.head && model.head.availableBudget),
+        forecastStateMetaForValues(forecast.projectedAvailableEnd, burn.forecastEndPct, model.head && model.head.availableBudget),
         monthClosed
       );
       var forecastContext = forecastContextLayer(month, model, Array.isArray(reallocation) ? reallocation : []);
@@ -145,12 +150,17 @@
             delta: forecastUsedPctForEvaluation - 100
           })
         : Object.assign({}, burn, { forecastEndPct: forecastUsedPctForEvaluation });
-      var forecastHeadlineAmount = monthClosed
-        ? closedForecastFinalAmount
-        : Number(forecastReference.projectedAvailableEnd || 0);
       var comparisonProjectedEnd = monthClosed
         ? closedForecastFinalAmount
         : Number(forecast.projectedAvailableEnd || 0);
+      // Headline always shows the LIVE projection, never the frozen lock
+      // snapshot. It used to switch to forecastReference (the lock) once
+      // locked, which silently froze the headline at whatever was true on
+      // lock day — so a real, current shortfall could sit behind a headline
+      // that still read a healthy day-5 number. The locked value is still
+      // shown, just as an explicit secondary comparison (forecastGapVsLock /
+      // the "vs lock" summary line), never as the number people read first.
+      var forecastHeadlineAmount = comparisonProjectedEnd;
       var forecastGapVsLock = forecastLocked
         ? comparisonProjectedEnd - Number(lockedForecast.projectedAvailableEnd || 0)
         : 0;
@@ -161,7 +171,6 @@
       var confidencePct = Number((confidenceMeta && confidenceMeta.pct) || (model && model.forecastConfidencePct) || 0);
       var confidenceLabel = (confidenceMeta && confidenceMeta.label) || (model && model.confidenceLabel) || (confidencePct >= 75 ? 'High confidence' : (confidencePct >= 50 ? 'Medium confidence' : 'Low confidence'));
       var confidenceTone = (confidenceMeta && confidenceMeta.tone) || (confidencePct >= 75 ? 'good' : (confidencePct >= 50 ? 'warn' : 'bad'));
-      var confidenceSupport = (confidenceMeta && confidenceMeta.support) || 'Based on month progress, recurring expenses, savings, and spending history.';
       var driftDir = forecastDriftDirection(month);
       var driftArrowHtml = '<span class="forecast-drift-arrow ' + (driftDir.cls || '') + '" title="' + (driftDir.title || '') + '">' + (driftDir.arrow || '') + '</span>';
       var primaryMetrics = monthClosed ? [
@@ -171,22 +180,22 @@
           label: 'Locked forecast',
           value: forecastLocked ? money(Number(lockedForecast.projectedAvailableEnd || 0)) : 'N/A',
           support: forecastLocked
-            ? (forecastLockIsLegacy ? 'Historical lock restored from legacy data' : 'Day-' + forecastLockDay + ' expectation captured for ' + (month.name || 'this month'))
-            : 'No forecast lock was captured for comparison'
+            ? (forecastLockIsLegacy ? 'Restored from legacy data' : 'Captured on day ' + forecastLockDay)
+            : 'No lock captured'
         },
         {
           theme: 'theme-live',
           tone: closedForecastFinalAmount >= 0 ? 'good' : 'bad',
           label: 'Final result',
           value: money(closedForecastFinalAmount),
-          support: monthEndOutcome.hasRolloverImpact ? 'Closing result before rollover transfer' : 'Final remaining allocation'
+          support: monthEndOutcome.hasRolloverImpact ? 'Before rollover transfer' : 'Final remaining allocation'
         },
         {
           theme: 'theme-plan',
           tone: forecastAccuracy ? forecastAccuracy.tone : '',
           label: 'Forecast accuracy',
           value: forecastAccuracy ? ((forecastAccuracy.label ? forecastAccuracy.label + ' · ' : '') + forecastAccuracy.pct + '%') : 'N/A',
-          support: forecastLocked ? ((forecastAccuracy && forecastAccuracy.support ? forecastAccuracy.support + ' · ' : '') + 'Variance ' + (forecastGapVsLock >= 0 ? '+' : '') + money(forecastGapVsLock) + (forecastLockIsLegacy ? ' vs restored legacy lock' : ' vs locked forecast')) : 'No lock available for comparison',
+          support: forecastLocked ? ((forecastGapVsLock >= 0 ? '+' : '') + money(forecastGapVsLock) + (forecastLockIsLegacy ? ' vs restored lock' : ' vs locked forecast')) : 'No lock to compare',
           driftArrow: forecastLocked ? driftArrowHtml : ''
         }
       ] : [
@@ -196,7 +205,7 @@
           label: 'Forecast status',
           value: forecastLocked ? (forecastLockIsLegacy ? 'Legacy lock' : 'Locked') : 'Open',
           support: forecastLocked
-            ? (forecastLockIsLegacy ? 'Restored historical reference for ' + (month.name || 'this month') : 'Reference forecast saved for ' + (month.name || 'this month'))
+            ? (forecastLockIsLegacy ? 'Restored for ' + (month.name || 'this month') : 'Saved for ' + (month.name || 'this month'))
             : Math.max(forecastLockDay - Number(forecast.currentDay || 0), 0) + ' day' + (Math.max(forecastLockDay - Number(forecast.currentDay || 0), 0) === 1 ? '' : 's') + ' until lock'
         },
         {
@@ -204,14 +213,17 @@
           tone: confidenceTone,
           label: 'Forecast confidence',
           value: confidencePct ? (confidenceLabel.replace(' confidence', '') + ' · ' + Math.round(confidencePct) + '%') : confidenceLabel.replace(' confidence', ''),
-          support: ((confidenceMeta && confidenceMeta.componentSummary) ? confidenceMeta.componentSummary + ' · ' : '') + confidenceSupport
+          // Short and to the point — the full methodology sentence (what
+          // month progress, recurring expenses, etc. each contributed) lives
+          // in the tooltip for anyone who wants it, not stated by default.
+          support: (confidenceMeta && confidenceMeta.componentSummary) || 'Based on month progress.'
         },
         {
           theme: 'theme-plan',
           tone: forecastLocked ? (forecastGapVsLock >= 0 ? 'good' : 'bad') : (model.planGap < 0 ? 'bad' : 'good'),
           label: forecastLocked ? (forecastLockIsLegacy ? 'Vs legacy lock' : 'Vs locked forecast') : 'Buffer vs plan',
           value: forecastLocked ? (forecastGapVsLock >= 0 ? '+' : '') + money(forecastGapVsLock) : ((model.planGap >= 0 ? '+' : '') + money(model.planGap)),
-          support: forecastLocked ? (forecastLockIsLegacy ? 'Current end projection vs restored historical reference' : 'Current end projection vs locked reference') : (forecast.remainingDays > 0 ? forecast.remainingDays + ' day' + (forecast.remainingDays === 1 ? '' : 's') + ' left' : 'Month closed'),
+          support: forecastLocked ? (forecastLockIsLegacy ? 'vs restored reference' : 'vs locked reference') : (forecast.remainingDays > 0 ? forecast.remainingDays + ' day' + (forecast.remainingDays === 1 ? '' : 's') + ' left' : 'Month closed'),
           driftArrow: driftArrowHtml
         }
       ];
@@ -221,14 +233,14 @@
           tone: '',
           label: 'Repeatable / open',
           value: money(Number((forecastLocked ? lockedForecast.projectedRepeatable : forecast.projectedRepeatable) || 0) + Number((forecastLocked ? lockedForecast.projectedOpen : forecast.projectedOpen) || 0)),
-          support: forecastLocked ? 'Captured at lock as the base recurring load' : 'Projected from pace and confirmed note patterns'
+          support: forecastLocked ? 'Base recurring load at lock' : 'Projected from pace'
         },
         {
           theme: 'theme-structure',
           tone: Number(forecastLocked ? lockedForecast.projectedOneoff : forecast.projectedOneoff) > 0 ? 'bad' : 'good',
           label: 'One-off left',
           value: money(Number(forecastLocked ? lockedForecast.projectedOneoff : forecast.projectedOneoff) || 0),
-          support: forecastLocked ? 'Remaining one-off allowance at lock' : 'Not extrapolated from past one-off spend'
+          support: forecastLocked ? 'Allowance at lock' : 'Not projected from past spend'
         },
         {
           theme: 'theme-structure',
@@ -247,11 +259,11 @@
           support: Math.round((specialFunding.ratio || 0) * 100) + '% of ' + specialFunding.targetLabel + ' covered'
         });
       }
-      var summaryLabel = monthClosed ? 'Final read' : (forecastLocked ? 'vs lock' : 'Locks');
+      var summaryLabel = monthClosed ? 'Final read' : (forecastLocked ? (forecastGapVsLock >= 0 ? 'Better than expected' : 'Worse than expected') : 'Locks');
       var summaryCopy = monthClosed
-        ? (forecastLocked ? ((forecastGapVsLock >= 0 ? 'Above' : 'Below') + (forecastLockIsLegacy ? ' legacy forecast by ' : ' locked forecast by ') + money(Math.abs(forecastGapVsLock)) + '.') : 'Closed with final result ' + money(closedForecastFinalAmount) + '.') + (monthEndOutcome.hasRolloverImpact ? ' ' + money(monthEndOutcome.closingBeforeRollover) + ' rolled forward.' : '')
+        ? (forecastLocked ? ('You ended with ' + money(Math.abs(forecastGapVsLock)) + (forecastGapVsLock >= 0 ? ' more' : ' less') + ' than the ' + (forecastLockIsLegacy ? 'restored' : 'locked') + ' forecast predicted.') : 'Closed with final result ' + money(closedForecastFinalAmount) + '.') + (monthEndOutcome.hasRolloverImpact ? ' ' + money(monthEndOutcome.closingBeforeRollover) + ' rolled forward.' : '')
         : (forecastLocked
-          ? 'Live projection is ' + (forecastGapVsLock >= 0 ? 'above' : 'below') + ' the lock by ' + money(Math.abs(forecastGapVsLock)) + '.'
+          ? "You're projected to end with " + money(Math.abs(forecastGapVsLock)) + (forecastGapVsLock >= 0 ? ' more' : ' less') + ' than the ' + forecastLockDateText + ' lock predicted.'
           : 'Locks on ' + forecastLockDateText + '.');
       return {
         monthClosed: monthClosed,
@@ -293,32 +305,18 @@
       var closedMeta = normalizedStateMeta('closed');
       var stateLabel = monthClosed ? 'Closed Month' : state.label;
       var stateClass = monthClosed ? closedMeta.className : state.className;
-      var hint = monthClosed
-        ? burnDisplay.forecastEndPct > 100 ? 'The month closed above its ideal available-funds pace.'
-          : burnDisplay.forecastEndPct >= 95 ? 'The month closed close to its ideal available-funds pace.'
-          : 'The month closed with pace under control.'
-        : state.key === 'critical' ? 'Pace is now actively threatening the month.'
-          : state.key === 'pressure' ? 'Pace is above target and needs attention.'
-          : state.key === 'watch' ? 'Close to the edge — keep an eye on pace.'
-          : state.key === 'stable' ? 'Pace is close to plan with limited drift.'
-          : 'Controlled pace with room to spare.';
-      var body = monthClosed
-        ? 'This is now a retrospective read. The pace signal is no longer live, but it still shows how spending tracked against the month timeline and available funds.'
-        : state.key === 'critical' ? 'You are spending faster than the month can comfortably absorb. Without a trim, the end-of-month result is likely to deteriorate further.'
-          : state.key === 'pressure' ? 'You are spending faster than expected for this point in the month. The buffer is narrowing and needs active monitoring.'
-          : state.key === 'watch' ? 'You are close to expected pace. A few heavier spending days could quickly reduce the remaining cushion.'
-          : state.key === 'stable' ? 'You are broadly aligned with expected pace. Staying disciplined should keep the month manageable.'
-          : 'You are spending slower than expected. This gives you healthy room to absorb variability later in the month.';
+      // hint/body/interpretation text lives in one place only — app.js's
+      // burnCardCopy — called from here for the normal path and from
+      // renderBurnContent itself as its defensive fallback if this whole
+      // function throws. Previously each kept its own full copy of this
+      // text, which silently drifted out of sync when only one was edited.
+      var copy = (typeof burnCardCopy === 'function' ? burnCardCopy(state, monthClosed, burnDisplay, monthEndOutcome) : {});
+      var hint = copy.hint;
+      var body = copy.body;
       var paceGapLabel = (burnDisplay.delta > 0 ? '+' : '') + Number(burnDisplay.delta || 0).toFixed(1) + '%';
       var forecastLabel = Number(burnDisplay.forecastEndPct || 0).toFixed(1) + '%';
       var bufferLabel = monthClosed ? 'Final review' : state.label;
-      var interpretation = monthClosed
-        ? 'Final burn summary: finished at ' + Number(burnDisplay.forecastEndPct || 0).toFixed(1) + '% used.' + (monthEndOutcome.hasRolloverImpact ? ' Pre-rollover close before ' + money(monthEndOutcome.closingBeforeRollover) + ' moved forward.' : (burnDisplay.forecastEndPct > 100 ? ' Carry a slightly tighter setup into next month.' : burnDisplay.forecastEndPct >= 95 ? ' Landed close to plan with modest room left.' : ' The structure held up well and preserved buffer.'))
-        : state.key === 'critical' ? 'Keep discretionary spending very tight for now. Every lighter day helps prevent a weaker month-end result.'
-          : state.key === 'pressure' ? 'Try to hold discretionary spending below your current pace so the month does not drift further off track.'
-          : state.key === 'watch' ? 'A steady pace matters here. Small trims now help preserve flexibility for the rest of the month.'
-          : state.key === 'stable' ? 'Stay close to current pacing. The month looks manageable, but discipline still matters.'
-          : 'At this pace, you can absorb later variability more safely or preserve extra buffer into month-end.';
+      var interpretation = copy.interpretation;
       return { visualState: visualState, state: state, stateLabel: stateLabel, stateClass: stateClass, hint: hint, body: body, paceGapLabel: paceGapLabel, forecastLabel: forecastLabel, bufferLabel: bufferLabel, interpretation: interpretation };
     }, {});
   }

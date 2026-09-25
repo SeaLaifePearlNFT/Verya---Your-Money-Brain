@@ -137,11 +137,8 @@ html[data-theme="dark"] [data-view="smart-insights"] .si-signal-value,
 html[data-theme="dark"] [data-view="smart-insights"] .smart-insights-section-head h3,
 html[data-theme="dark"] [data-view="smart-insights"] .insight-main,
 html[data-theme="dark"] [data-view="smart-insights"] .guidance-hero,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-metric strong,
 html[data-theme="dark"] [data-view="smart-insights"] .advisor-item-main,
-html[data-theme="dark"] [data-view="smart-insights"] .burn-stat-value,
 html[data-theme="dark"] [data-view="smart-insights"] .subscription-burden-main,
-html[data-theme="dark"] [data-view="smart-insights"] .subscription-burden-metric strong,
 html[data-theme="dark"] [data-view="smart-insights"] .behavior-hero-main,
 html[data-theme="dark"] [data-view="smart-insights"] .tile-copy,
 html[data-theme="dark"] [data-view="smart-insights"] .mix-label,
@@ -155,34 +152,23 @@ html[data-theme="dark"] [data-view="smart-insights"] .smart-insights-kicker,
 html[data-theme="dark"] [data-view="smart-insights"] .si-briefing-card span,
 html[data-theme="dark"] [data-view="smart-insights"] .si-briefing-card small,
 html[data-theme="dark"] [data-view="smart-insights"] .logic-kicker,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-metric-label,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-metric small,
 html[data-theme="dark"] [data-view="smart-insights"] .tile-label,
 html[data-theme="dark"] [data-view="smart-insights"] .advisor-category,
 html[data-theme="dark"] [data-view="smart-insights"] .advisor-eur,
 html[data-theme="dark"] [data-view="smart-insights"] .advisor-confidence,
-html[data-theme="dark"] [data-view="smart-insights"] .burn-stat-label,
-html[data-theme="dark"] [data-view="smart-insights"] .burn-stat-sub,
 html[data-theme="dark"] [data-view="smart-insights"] .subscription-burden-sub,
-html[data-theme="dark"] [data-view="smart-insights"] .subscription-burden-metric span,
-html[data-theme="dark"] [data-view="smart-insights"] .subscription-burden-metric small,
-html[data-theme="dark"] [data-view="smart-insights"] .behavior-hero-sub,
-html[data-theme="dark"] [data-view="smart-insights"] .intel-behavior-kicker,
 html[data-theme="dark"] [data-view="smart-insights"] .evolution-chart-title,
 html[data-theme="dark"] [data-view="smart-insights"] .evolution-legend-item {
   color: var(--si-muted) !important;
 }
 
 /* Internal tiles/cards that were still light */
-html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .forecast-metric,
+html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .forecast-why,
 html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .forecast-summary-note,
-html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .forecast-driver-row,
 html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .guidance-tile,
-html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .behavior-guidance-tile,
+html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .behavior-row,
 html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .advisor-item,
 html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .burn-state-row,
-html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .burn-stat,
-html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .subscription-burden-metric,
 html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .reallocation-hero,
 html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .guidance-track-card,
 html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .behavior-hero,
@@ -194,19 +180,19 @@ html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .burn-interpre
 }
 
 html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .guidance-tile.good,
-html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .behavior-guidance-tile.good {
+html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .behavior-row.good {
   background: rgba(20, 83, 45, 0.20) !important;
   border-color: rgba(134, 239, 172, 0.35) !important;
 }
 
 html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .guidance-tile.warn,
-html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .behavior-guidance-tile.warn {
+html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .behavior-row.warn {
   background: rgba(146, 64, 14, 0.22) !important;
   border-color: rgba(252, 211, 77, 0.34) !important;
 }
 
 html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .guidance-tile.bad,
-html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .behavior-guidance-tile.bad {
+html[data-theme="dark"] [data-view="smart-insights"] #insightGrid .behavior-row.bad {
   background: rgba(127, 29, 29, 0.24) !important;
   border-color: rgba(252, 165, 165, 0.35) !important;
 }
@@ -273,9 +259,7 @@ html[data-theme="dark"] [data-view="smart-insights"] .behavior-state-badge,
 html[data-theme="dark"] [data-view="smart-insights"] .burn-state-badge,
 html[data-theme="dark"] [data-view="smart-insights"] .subscription-burden-badge,
 html[data-theme="dark"] [data-view="smart-insights"] .reallocation-badge,
-html[data-theme="dark"] [data-view="smart-insights"] .note-ac-chip-tab,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-driver-badge,
-html[data-theme="dark"] [data-view="smart-insights"] .behavior-signal-chip {
+html[data-theme="dark"] [data-view="smart-insights"] .note-ac-chip-tab {
   background: rgba(15, 23, 42, 0.92) !important;
   border-color: var(--si-border) !important;
   color: var(--si-text) !important;
@@ -283,20 +267,17 @@ html[data-theme="dark"] [data-view="smart-insights"] .behavior-signal-chip {
 
 html[data-theme="dark"] [data-view="smart-insights"] .income-positive,
 html[data-theme="dark"] [data-view="smart-insights"] .value-positive,
-html[data-theme="dark"] [data-view="smart-insights"] .good,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-metric.good strong {
+html[data-theme="dark"] [data-view="smart-insights"] .good {
   color: var(--si-green) !important;
 }
 
 html[data-theme="dark"] [data-view="smart-insights"] .value-negative,
 html[data-theme="dark"] [data-view="smart-insights"] .bad,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-metric.bad strong,
 html[data-theme="dark"] [data-view="smart-insights"] .advisor-item.trim .advisor-percent {
   color: var(--si-red) !important;
 }
 
-html[data-theme="dark"] [data-view="smart-insights"] .warn,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-metric.warn strong {
+html[data-theme="dark"] [data-view="smart-insights"] .warn {
   color: var(--si-amber) !important;
 }
 
@@ -347,80 +328,13 @@ html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="loc
   color: #f8fafc !important;
 }
 
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .logic-kicker,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .tile-label,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] small,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .logic-kicker,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .tile-label,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] small {
-  color: #a8b6ca !important;
-}
-
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .forecast-driver-row,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .forecast-breakdown-row,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .lock-row,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .forecast-driver-row,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .forecast-breakdown-row,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .lock-row {
-  background: rgba(30, 41, 59, 0.82) !important;
-  border: 1px solid rgba(148, 163, 184, 0.18) !important;
-  color: #eaf1fb !important;
-}
-
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .forecast-driver-row:hover,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .forecast-breakdown-row:hover,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .lock-row:hover,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .forecast-driver-row:hover,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .forecast-breakdown-row:hover,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .lock-row:hover {
-  background: rgba(38, 52, 75, 0.92) !important;
-}
-
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .forecast-driver-label,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .forecast-breakdown-label,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .lock-row-label,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .forecast-driver-label,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .forecast-breakdown-label,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .lock-row-label {
-  color: #f1f5f9 !important;
-}
-
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .forecast-driver-value,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .forecast-breakdown-value,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .lock-row-value,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .forecast-driver-value,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .forecast-breakdown-value,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .lock-row-value {
-  color: #eaf1fb !important;
-}
-
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .forecast-driver-percent,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .forecast-breakdown-percent,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .lock-row-percent,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .forecast-driver-percent,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .forecast-breakdown-percent,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .lock-row-percent {
-  color: #a8b6ca !important;
-}
-
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .forecast-driver-badge,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="why"] .lock-row-badge,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .forecast-driver-badge,
-html[data-theme="dark"] [data-view="smart-insights"] .forecast-card [class*="lock-breakdown"] .lock-row-badge {
-  background: rgba(16, 185, 129, 0.10) !important;
-  border-color: rgba(134, 239, 172, 0.34) !important;
-  color: #86efac !important;
-}
-
-
-/* === v1335 exact fix: Smart Insights Monthly Forecast WHY / AT LOCK block ===
-   The actual element is .forecast-driver-box, not a "*why*" class. */
-body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-box,
-body.dark-mode #insightGrid .forecast-card .forecast-driver-box,
-html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-box,
-html[data-theme="dark"] #insightGrid .forecast-card .forecast-driver-box,
-.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-box,
-.dark-mode #insightGrid .forecast-card .forecast-driver-box {
+/* === v1335 exact fix: Smart Insights Monthly Forecast WHY / flow block === */
+body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-why,
+body.dark-mode #insightGrid .forecast-card .forecast-why,
+html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-why,
+html[data-theme="dark"] #insightGrid .forecast-card .forecast-why,
+.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-why,
+.dark-mode #insightGrid .forecast-card .forecast-why {
   margin-top: 10px !important;
   padding: 14px 16px !important;
   border-radius: 16px !important;
@@ -434,66 +348,22 @@ html[data-theme="dark"] #insightGrid .forecast-card .forecast-driver-box,
     0 10px 24px rgba(0,0,0,0.22) !important;
 }
 
-body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-box .logic-kicker,
-body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-head,
-html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-box .logic-kicker,
-html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-head,
-.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-box .logic-kicker,
-.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-head {
-  color: #8fa3bc !important;
-  opacity: 1 !important;
-}
-
-body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-list,
-html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-list,
-.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-list {
-  display: grid !important;
-  gap: 8px !important;
-}
-
-body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-row,
-body.dark-mode #insightGrid .forecast-card .forecast-driver-row,
-html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-row,
-html[data-theme="dark"] #insightGrid .forecast-card .forecast-driver-row,
-.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-row,
-.dark-mode #insightGrid .forecast-card .forecast-driver-row {
-  min-height: 38px !important;
-  padding: 8px 12px !important;
-  border-radius: 12px !important;
-  background: rgba(30,41,59,0.88) !important;
-  border: 1px solid rgba(148,163,184,0.20) !important;
+body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-why-text,
+html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-why-text,
+.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-why-text {
   color: #f1f5f9 !important;
 }
 
-body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-label,
-html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-label,
-.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-label {
-  color: #f8fafc !important;
-  font-weight: 700 !important;
-}
-
-body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-amount,
-body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-share,
-html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-amount,
-html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-share,
-.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-amount,
-.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-share {
-  color: #eaf1fb !important;
-}
-
-body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-share,
-html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-share,
-.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-share {
+body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-ring-legend,
+html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-ring-legend,
+.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-ring-legend {
   color: #a8b6ca !important;
 }
 
-body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-badge,
-html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-badge,
-.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-driver-badge {
-  background: rgba(16,185,129,0.12) !important;
-  border: 1px solid rgba(134,239,172,0.38) !important;
-  color: #86efac !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05) !important;
+body.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-ring-legend strong,
+html[data-theme="dark"] .smart-insights-card-body #insightGrid .forecast-card .forecast-ring-legend strong,
+.dark-mode .smart-insights-card-body #insightGrid .forecast-card .forecast-ring-legend strong {
+  color: #eaf1fb !important;
 }
 
 

@@ -695,22 +695,31 @@
   color: #fcd34d !important;
 }
 
-/* Buttons inside detail popup */
-#debtDetailOverlay button,
-#debtDetailOverlay .feature-action-btn,
-#debtDetailOverlay .cbm-btn-ghost,
-#debtDetailOverlay .cbm-btn-primary {
+/* Buttons inside detail popup — dark-mode only. This block was missing its
+   theme guard, so `color: #f8fafc` (near-white) was forced onto every
+   <button> in this modal in ALL themes. The other buttons (.cbm-btn-ghost /
+   .cbm-btn-primary) have a light-mode counter-override further down that
+   masked the bug for them, but the header's close button (.cbm-close-btn) —
+   matched only via the bare `button` selector here — has no such
+   counter-override, so in light mode its "×" was rendering near-white
+   against the header's white background: invisible. Dark mode already has
+   its own correctly-scoped, more specific rule for .cbm-close-btn further
+   below, so scoping this block changes nothing there. */
+html[data-theme="dark"] #debtDetailOverlay button,
+html[data-theme="dark"] #debtDetailOverlay .feature-action-btn,
+html[data-theme="dark"] #debtDetailOverlay .cbm-btn-ghost,
+html[data-theme="dark"] #debtDetailOverlay .cbm-btn-primary {
   border-color: rgba(148,163,184,0.34) !important;
   color: #f8fafc !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 14px rgba(0,0,0,0.24) !important;
 }
 
-#debtDetailOverlay .feature-action-btn,
-#debtDetailOverlay .cbm-btn-ghost {
+html[data-theme="dark"] #debtDetailOverlay .feature-action-btn,
+html[data-theme="dark"] #debtDetailOverlay .cbm-btn-ghost {
   background: linear-gradient(145deg, rgba(30,41,59,0.96), rgba(15,23,42,0.98)) !important;
 }
 
-#debtDetailOverlay .cbm-btn-primary {
+html[data-theme="dark"] #debtDetailOverlay .cbm-btn-primary {
   background: linear-gradient(145deg, rgba(59,130,246,0.96), rgba(37,99,235,0.98)) !important;
   border-color: rgba(147,197,253,0.55) !important;
 }
