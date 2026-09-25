@@ -17366,6 +17366,8 @@ body.tools-drawer-open .tools-drawer{transform:translateX(0);opacity:1;pointer-e
 .tools-drawer-body.side-actions button{width:100%;display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:9px;border:1px solid var(--line);background:var(--panel-2);color:var(--accent);font:inherit;font-size:.74rem;font-weight:700;cursor:pointer;white-space:nowrap;}
 .tools-drawer-body.side-actions button:hover{background:#fff;border-color:rgba(99,102,241,.25);color:var(--accent);}
 .tools-drawer-body.side-actions button.danger,.tools-drawer-body.side-actions .danger{border-color:var(--red-border);background:var(--red-bg);color:var(--red-text);}
+html[data-theme="dark"] .tools-drawer-body.side-actions button:not(.danger):is(:hover,:focus-visible),
+html[data-theme="dark"] .tools-drawer-close:is(:hover,:focus-visible){background:var(--accent-surface-hover);border-color:var(--card-border-hover);color:var(--accent);}
 .tools-drawer-body .side-divider{height:1px;background:var(--line);margin:6px 0;}
 .tools-drawer-body .customize-cards-anchor{position:relative;}
 .tools-drawer-body .card-visibility-popover{left:0;right:auto;top:calc(100% + 6px);z-index:80;}
